@@ -4,7 +4,7 @@ This file covers working on Congress Tracker once your laptop is set up. If you 
 
 ## Branches
 
-The repo has three kinds of branch. `main` holds the version that is ready to demo, and it only changes when `develop` is merged into it before a presentation. `develop` is where everyone's finished work comes together, and it is the default branch, so new pull requests target it automatically. Each teammate also has a personal branch (`dev/adam`, `dev/akbar` or `dev/abdrahman`) that lasts the whole project and holds their work in progress.
+The repo has three kinds of branch. `main` holds the version that is ready to demo, and it only changes when `develop` is merged into it before a milestone. `develop` is where everyone's finished work comes together, and it is the default branch, so new pull requests target it automatically. Each teammate also has a personal branch (`dev/adam`, `dev/akbar` or `dev/abdrahman`) that lasts the whole project and holds their work in progress.
 
 A git hook installed by `npm run setup` refuses any push straight to `main` or `develop`, because the repo is private on a free plan and GitHub cannot enforce that rule itself. Do not bypass it with `--no-verify`. If a push fails with "Direct pushes to main are blocked" or the same message for develop, you committed on a shared branch. Carry those commits to your own branch with `git switch dev/your-name` followed by `git merge develop` (or `git merge main`), then push and open a pull request.
 
@@ -88,10 +88,10 @@ If a conflict is confusing, run `git merge --abort` to return to where you were 
 
 ## Releases
 
-Before each presentation, one person opens a pull request from `develop` into `main` and merges it once CI passes.
+Before each milestone, one person opens a pull request from `develop` into `main` and merges it once CI passes, so `main` always holds the demo version.
 
 ```bash
-gh pr create --base main --head develop --title "Release for final demo"
+gh pr create --base main --head develop --title "Release for milestone name"
 ```
 
 ## Database migrations
