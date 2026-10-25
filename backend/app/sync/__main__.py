@@ -5,7 +5,7 @@ from app.sync.client import CongressClient
 
 
 def main() -> int:
-    """Confirm the API key works and report how much data Congress.gov has available."""
+    """Check the API key against Congress.gov, report the data available and return an exit code."""
     if not settings.congress_api_key:
         print("CONGRESS_API_KEY is not set. Add it to the .env file at the repo root.")
         return 1

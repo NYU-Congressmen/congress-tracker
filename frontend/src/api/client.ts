@@ -1,4 +1,4 @@
-// Mirrors the Health model in backend/app/routes/health.py
+// Keep this type in step with the Health model in backend/app/routes/health.py, which defines the response
 export type Health = {
   status: string
   database_configured: boolean
