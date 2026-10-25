@@ -47,9 +47,31 @@ Each teammate keeps their own `.env` at the repo root, and `.env.example` is the
 | Variable | Needed | Purpose |
 |---|---|---|
 | `CONGRESS_API_KEY` | Now | Authenticates requests to Congress.gov |
-| `DATABASE_URL` | Once the database exists | Postgres connection string from Supabase |
+| `DATABASE_URL` | To see real data | Connection string for the team's Supabase database. Ask the teammate who manages it to send it privately, and never paste it into the repo or a group chat |
 | `FIREBASE_PROJECT_ID` | Once login is added | Lets the API verify Firebase login tokens |
 | `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID` | Once login is added | Firebase web configuration for the React app, which identifies the project and is not secret |
+
+## Database tests
+
+The database tests check the migrations, the cache and the search queries against a real PostgreSQL, and they skip themselves when none is available, so `npm test` passes without one. CI always runs them against its own PostgreSQL, so installing it locally is optional and only needed to run those tests before pushing. The tests empty their database every run, so they only use a database whose name contains "test" and refuse anything else.
+
+On Linux, install PostgreSQL, give your user permission to create databases, and create the test database:
+
+```bash
+sudo apt install postgresql
+sudo -u postgres createuser --createdb "$USER"
+createdb congress_test
+```
+
+On macOS with Homebrew:
+
+```bash
+brew install postgresql@17
+brew services start postgresql@17
+createdb congress_test
+```
+
+On Windows, install PostgreSQL from <https://www.postgresql.org/download/windows/>, create a database named `congress_test` in pgAdmin, and set `TEST_DATABASE_URL` to `postgresql://postgres:your-password@localhost:5432/congress_test` before running the tests. Linux and macOS need no variable, because the tests connect to `congress_test` through the local socket by default.
 
 ## Troubleshooting
 

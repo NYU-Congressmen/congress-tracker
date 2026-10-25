@@ -29,6 +29,7 @@ def test_clean_house_member():
         "chamber": "House",
         "district": 14,
         "image_url": "https://example.test/w.jpg",
+        "is_current": True,
     }
 
 

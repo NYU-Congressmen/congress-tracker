@@ -1,6 +1,6 @@
 import pytest
 
-from app.sync.status import status_from_action
+from app.sync.status import furthest_status, status_from_action
 
 
 @pytest.mark.parametrize(
@@ -28,3 +28,31 @@ from app.sync.status import status_from_action
 )
 def test_status_from_action(action_type, text, expected):
     assert status_from_action(action_type, text) == expected
+
+
+@pytest.mark.parametrize(
+    ("text", "bill_type", "expected"),
+    [
+        # A bill held at the desk or on the Senate calendar has passed the other chamber
+        ("Held at the desk.", "hr", "passed_house"),
+        ("Held at the desk.", "s", "passed_senate"),
+        ("Placed on Senate Legislative Calendar under General Orders.", "hr", "passed_house"),
+        # A Senate bill on the Senate calendar has only been reported by committee
+        ("Placed on Senate Legislative Calendar under General Orders.", "s", "committee"),
+        ("Reported by the Committee on Ways and Means.", "hr", "committee"),
+        ("Placed on the Union Calendar, Calendar No. 12.", "hr", "committee"),
+        ("Signed by President.", "hr", "to_president"),
+    ],
+)
+def test_status_from_action_with_bill_type(text, bill_type, expected):
+    assert status_from_action(None, text, bill_type) == expected
+
+
+def test_furthest_status_takes_the_latest_stage_reached():
+    actions = [
+        {"type": "IntroReferral", "text": "Referred to the Committee on Finance."},
+        {"type": "Floor", "text": "Passed/agreed to in House: On passage."},
+        {"type": "Floor", "text": "Motion to reconsider laid on the table."},
+    ]
+    assert furthest_status(actions, "hr") == "passed_house"
+    assert furthest_status([], "hr") == "introduced"
