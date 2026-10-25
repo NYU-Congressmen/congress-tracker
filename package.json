@@ -1,0 +1,29 @@
+{
+  "name": "congress-tracker",
+  "private": true,
+  "workspaces": [
+    "frontend"
+  ],
+  "scripts": {
+    "prepare": "node scripts/install-hooks.mjs",
+    "setup": "npm install && uv sync --directory backend",
+    "predev": "npm run db:migrate",
+    "dev": "concurrently -n api,web -c blue,magenta \"npm:dev:be\" \"npm:dev:fe\"",
+    "dev:be": "uv run --directory backend uvicorn app.main:app --reload --host 127.0.0.1 --port 8000",
+    "dev:fe": "npm run dev -w frontend",
+    "db:migrate": "uv run --directory backend python -m app.migrate",
+    "db:revision": "uv run --directory backend alembic revision -m",
+    "sync": "uv run --directory backend python -m app.sync",
+    "lint": "npm run lint:be && npm run lint:fe",
+    "lint:be": "uv run --directory backend ruff check . && uv run --directory backend ruff format --check .",
+    "lint:fe": "npm run lint -w frontend",
+    "format": "uv run --directory backend ruff format .",
+    "test": "npm run test:be && npm run test:fe",
+    "test:be": "uv run --directory backend pytest",
+    "test:fe": "npm run test -w frontend",
+    "build": "npm run build -w frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.6"
+  }
+}

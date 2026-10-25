@@ -1,0 +1,12 @@
+#!/bin/sh
+# Changes reach main and develop only through pull requests, so refuse direct pushes to them
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$remote_ref" in
+    refs/heads/main | refs/heads/develop)
+      echo "Direct pushes to ${remote_ref#refs/heads/} are blocked." >&2
+      echo "Push your dev branch and open a pull request instead (see CONTRIBUTING.md)." >&2
+      exit 1
+      ;;
+  esac
+done
+exit 0

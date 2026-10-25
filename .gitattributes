@@ -1,0 +1,2 @@
+# Keep LF line endings on every OS, because the git hooks are shell scripts that break with CRLF
+* text=auto eol=lf

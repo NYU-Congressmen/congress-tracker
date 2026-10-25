@@ -1,0 +1,14 @@
+#!/bin/sh
+# Setting core.hooksPath for this repo hides any global hooks folder, so run a global
+# commit-msg hook from here when one exists
+global=$(git config --global core.hooksPath)
+case "$global" in
+  "~/"*) global="$HOME/${global#\~/}" ;;
+esac
+if [ -n "$global" ] && [ -x "$global/commit-msg" ]; then
+  here=$(cd "$(dirname "$0")" && pwd)
+  if [ "$(cd "$global" && pwd)" != "$here" ]; then
+    exec "$global/commit-msg" "$@"
+  fi
+fi
+exit 0
