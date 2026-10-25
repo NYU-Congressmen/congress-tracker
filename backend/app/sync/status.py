@@ -1,12 +1,19 @@
 from collections.abc import Iterable
-from typing import Any
+from typing import Any, get_args
 
-# Stages in the order a bill moves through them, so a later stage always ranks higher
-STAGES = ("introduced", "committee", "passed_house", "passed_senate", "to_president", "became_law")
+from app.models import Status
+
+# Chamber passage is recorded separately because either chamber can act first.
+STAGES = get_args(Status)
 
 # SQL that keeps a bill's stored status unless the incoming one ranks higher
 NEVER_DOWNGRADE_SQL = f"""
-    CASE WHEN array_position(ARRAY{list(STAGES)}::text[], EXCLUDED.status)
+    CASE WHEN (bills.passed_house OR EXCLUDED.passed_house)
+              AND (bills.passed_senate OR EXCLUDED.passed_senate)
+              AND bills.status NOT IN ('to_president', 'became_law')
+              AND EXCLUDED.status NOT IN ('to_president', 'became_law')
+         THEN 'passed_both_chambers'
+         WHEN array_position(ARRAY{list(STAGES)}::text[], EXCLUDED.status)
               > array_position(ARRAY{list(STAGES)}::text[], bills.status)
          THEN EXCLUDED.status ELSE bills.status END
 """
@@ -49,6 +56,23 @@ def status_from_action(
 
 
 def furthest_status(actions: Iterable[dict[str, Any]], bill_type: str | None = None) -> str:
-    """Return the furthest status any of a bill's actions reaches."""
-    statuses = [status_from_action(a.get("type"), a.get("text"), bill_type) for a in actions]
-    return max(statuses, key=STAGES.index, default="introduced")
+    """Return the simplified stage reached by the observed actions in either chamber order."""
+    return summarize_actions(actions, bill_type)["status"]
+
+
+def summarize_actions(
+    actions: Iterable[dict[str, Any]], bill_type: str | None = None
+) -> dict[str, Any]:
+    """Return a simplified stage and independent chamber-passage flags for observed actions."""
+    observed = {status_from_action(a.get("type"), a.get("text"), bill_type) for a in actions}
+    enacted = bool(observed & {"to_president", "became_law"})
+    house = enacted or "passed_house" in observed
+    senate = enacted or "passed_senate" in observed
+    stages = observed - {"passed_house", "passed_senate"}
+    if house or senate:
+        stages.add("passed_both_chambers" if house and senate else "passed_one_chamber")
+    return {
+        "status": max(stages, key=STAGES.index, default="introduced"),
+        "passed_house": house,
+        "passed_senate": senate,
+    }

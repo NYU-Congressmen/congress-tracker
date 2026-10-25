@@ -1,6 +1,6 @@
 import pytest
 
-from app.sync.status import furthest_status, status_from_action
+from app.sync.status import furthest_status, status_from_action, summarize_actions
 
 
 @pytest.mark.parametrize(
@@ -54,5 +54,15 @@ def test_furthest_status_takes_the_latest_stage_reached():
         {"type": "Floor", "text": "Passed/agreed to in House: On passage."},
         {"type": "Floor", "text": "Motion to reconsider laid on the table."},
     ]
-    assert furthest_status(actions, "hr") == "passed_house"
+    assert furthest_status(actions, "hr") == "passed_one_chamber"
     assert furthest_status([], "hr") == "introduced"
+
+
+@pytest.mark.parametrize("chambers", [("House", "Senate"), ("Senate", "House")])
+def test_passage_is_independent_of_chamber_order(chambers):
+    actions = [{"text": f"Passed/agreed to in {chamber}: On passage."} for chamber in chambers]
+    assert summarize_actions(actions) == {
+        "status": "passed_both_chambers",
+        "passed_house": True,
+        "passed_senate": True,
+    }

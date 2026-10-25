@@ -1,4 +1,5 @@
 from collections.abc import Iterator
+from time import monotonic
 from typing import Any
 
 import httpx
@@ -7,20 +8,28 @@ BASE_URL = "https://api.congress.gov/v3"
 
 # The API returns 20 results per page by default and allows at most 250
 PAGE_SIZE = 250
+TIMEOUT = 30.0
 
 
 class CongressClient:
     """Wrap the Congress.gov v3 API with authentication, JSON output and paging handled."""
 
-    def __init__(self, api_key: str, transport: httpx.BaseTransport | None = None):
+    def __init__(
+        self,
+        api_key: str,
+        transport: httpx.BaseTransport | None = None,
+        budget: float | None = None,
+    ):
         # The key goes in a header so it never appears in URLs, logs or error messages
         self._http = httpx.Client(
             base_url=BASE_URL,
             headers={"X-Api-Key": api_key},
             params={"format": "json"},
-            timeout=30.0,
+            timeout=TIMEOUT,
             transport=transport,
         )
+        # Every request in one refresh shares a single deadline
+        self._deadline = None if budget is None else monotonic() + budget
 
     def __enter__(self) -> "CongressClient":
         return self
@@ -29,8 +38,19 @@ class CongressClient:
         self._http.close()
 
     def get(self, path: str, **params: Any) -> dict[str, Any]:
-        """Fetch one response from the API and return its decoded JSON body."""
-        response = self._http.get(path, params=params)
+        """Fetch one response from the API and return its decoded JSON body.
+
+        With a budget, each request may wait only for the time the refresh has left, so a
+        stalled connection ends at the deadline, although a server that keeps trickling
+        bytes can still run past it.
+        """
+        timeout = TIMEOUT
+        if self._deadline is not None:
+            remaining = self._deadline - monotonic()
+            if remaining <= 0:
+                raise httpx.TimeoutException("Congress.gov refresh deadline expired")
+            timeout = min(TIMEOUT, remaining)
+        response = self._http.get(path, params=params, timeout=timeout)
         response.raise_for_status()
         return response.json()
 

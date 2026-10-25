@@ -53,7 +53,7 @@ Each teammate keeps their own `.env` at the repo root, and `.env.example` is the
 
 ## Database tests
 
-The database tests check the migrations, the cache and the search queries against a real PostgreSQL, and they skip themselves when none is available, so `npm test` passes without one. CI always runs them against its own PostgreSQL, so installing it locally is optional and only needed to run those tests before pushing. The tests empty their database every run, so they only use a database whose name contains "test" and refuse anything else.
+The database tests check migration upgrades and downgrades, cache versions, retry cooldowns, atomic writes, chamber-passage milestones and search pagination against a real PostgreSQL. They skip themselves when none is available, so `npm test` passes without one. CI always runs them against its own PostgreSQL, so installing it locally is optional and only needed to run those tests before pushing. The tests empty their database every run, so they only use a database whose name contains "test" and refuse anything else. Set `REQUIRE_TEST_DATABASE=1` to make an unavailable test database fail locally as it does in CI.
 
 On Linux, install PostgreSQL, give your user permission to create databases, and create the test database:
 
@@ -80,3 +80,5 @@ If a command reports that `uv` is not found right after the setup script install
 If the setup script never asks for your API key on Windows, Git Bash is not presenting itself to Node as an interactive terminal. The script prints instructions instead, so paste the key into `.env` by hand and run `npm run sync` to check it.
 
 If `npm run dev` stops because port 5173 or 8000 is already in use, an earlier dev server is probably still running. Stop it with Ctrl+C in its terminal, or close that terminal, and start again.
+
+If a database-backed endpoint reports a missing cache or passage column after pulling changes, ask the migration's author to check that the merged migrations were applied. Do not run an unmerged migration against the shared database. The cache fields shown in `/docs` explain whether a detail response is complete, stale or waiting to retry after an upstream failure.
