@@ -20,11 +20,11 @@ npm run setup
 
 Without an SSH key on GitHub, clone with `git clone https://github.com/NYU-Congressmen/congress-tracker.git` or `gh repo clone NYU-Congressmen/congress-tracker` instead.
 
-The script asks its questions first and then installs everything without further input. It checks the Node version, offers to install uv, creates `.env` from `.env.example`, asks for a Congress.gov API key and asks which teammate is running it so it can switch to that person's dev branch. It then installs the frontend packages into `node_modules` and the backend packages into `backend/.venv`, a virtual environment that belongs to this project alone, and turns on the repo's git hooks. The script is safe to run again at any time and never overwrites an existing `.env`.
+The script asks its questions first and then installs everything without further input. It checks the Node version, offers to install uv, creates `.env` from `.env.example`, asks for a Congress.gov API key and asks which teammate is running it so it can switch to that person's dev branch. It then installs the frontend packages into `node_modules` and the backend packages into `backend/.venv`, a virtual environment that belongs to this project alone, and turns on the repo's git hooks. Rerunning it preserves existing settings and offers to add a key when one is missing. Outside Windows, it restricts `.env` permissions to its owner before prompting for a key.
 
 ## API key
 
-Each teammate needs their own free key from <https://api.congress.gov/sign-up/>. What you paste at the script's prompt stays hidden, the script checks the key with Congress.gov before saving it, and the key is written only to `.env`, which git ignores. If you skipped the prompt, paste the key after `CONGRESS_API_KEY=` in `.env` and confirm it works:
+Each teammate needs their own free key from <https://api.congress.gov/sign-up/>. What you paste at the script's prompt stays hidden, the script checks the key with Congress.gov before saving it, and the key is written only to `.env`, which git ignores. Validation waits up to ten seconds. If Congress.gov cannot be reached, setup reports that the key was saved unchecked. If you skipped the prompt, paste the key after `CONGRESS_API_KEY=` in `.env` and confirm it works:
 
 ```bash
 npm run sync
@@ -38,7 +38,7 @@ Start the API and the frontend together:
 npm run dev
 ```
 
-The app runs at <http://localhost:5173> and the API at <http://localhost:8000>, with interactive API documentation at <http://localhost:8000/docs>. Before starting, `npm run dev` applies any pending database migrations, and it skips that step with a message while `DATABASE_URL` is blank.
+The app runs at <http://localhost:5173> and the API at <http://localhost:8000>, with interactive API documentation at <http://localhost:8000/docs>. Both servers stop when either exits. Database migrations run separately through the workflow in [CONTRIBUTING.md](CONTRIBUTING.md#database-migrations).
 
 ## Environment variables
 
