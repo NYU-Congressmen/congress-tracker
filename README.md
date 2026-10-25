@@ -1,6 +1,6 @@
 # Congress Tracker
 
-Congress Tracker is a web app for following U.S. legislation, being built so people can search bills, follow members of Congress and get alerts when something changes. A scheduled sync job will copy bills, members and votes from the [Congress.gov API](https://github.com/LibraryOfCongress/api.congress.gov) into Postgres, a FastAPI backend will serve that data, and a React frontend will display it. Every page reads from the project's own database rather than calling Congress.gov directly, so the app never depends on Congress.gov being fast or on staying within its rate limit.
+Congress Tracker is a web app for following U.S. legislation, being built so people can search bills, follow members of Congress and get alerts when something changes. A scheduled sync job will copy bills, members and votes from the [Congress.gov API](https://github.com/LibraryOfCongress/api.congress.gov) into Postgres, a FastAPI backend will serve that data, and a React frontend will display it. Every page will read from the project's own database rather than calling Congress.gov directly, so the app will never depend on Congress.gov being fast or on staying within its rate limit.
 
 ## Status
 
@@ -27,13 +27,15 @@ The features follow the initial roadmap below, and this section is updated as ea
 
 ## Stack
 
-| Part | Technology |
-|---|---|
-| Frontend | React 19, TypeScript, Vite |
-| Backend API | FastAPI on Python 3.13 |
-| Sync job | Python, sharing code with the API |
-| Database | PostgreSQL on Supabase, with migrations managed by Alembic |
-| Login | Firebase Auth, with tokens verified by the API |
+The table shows the planned stack and how much of each part exists today.
+
+| Part | Technology | State |
+|---|---|---|
+| Frontend | React 19, TypeScript, Vite | One page that reports the API's health |
+| Backend API | FastAPI on Python 3.13 | One health endpoint |
+| Sync job | Python, sharing code with the API | Connection check only |
+| Database | PostgreSQL on Supabase, with migrations managed by Alembic | Planned, with Alembic installed and no migrations yet |
+| Login | Firebase Auth, with tokens verified by the API | Planned |
 
 ## Setup
 
@@ -104,9 +106,9 @@ congress-tracker/
 │   │   ├── main.py          FastAPI app, where routers are registered
 │   │   ├── config.py        Settings read from .env
 │   │   ├── migrate.py       Runs Alembic, or skips without a database
-│   │   ├── routes/          One module per group of endpoints
-│   │   └── sync/            Congress.gov client and the sync job
-│   ├── alembic/versions/    Database migrations, written as SQL
+│   │   ├── routes/          Endpoint modules, currently only health
+│   │   └── sync/            Congress.gov client and connection check
+│   ├── alembic/versions/    Database migrations, empty until the schema
 │   └── tests/
 ├── frontend/
 │   └── src/
