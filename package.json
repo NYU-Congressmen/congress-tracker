@@ -6,7 +6,7 @@
   ],
   "scripts": {
     "prepare": "node scripts/install-hooks.mjs",
-    "setup": "npm install && uv sync --directory backend",
+    "setup": "node scripts/setup.mjs",
     "predev": "npm run db:migrate",
     "dev": "concurrently -n api,web -c blue,magenta \"npm:dev:be\" \"npm:dev:fe\"",
     "dev:be": "uv run --directory backend uvicorn app.main:app --reload --host 127.0.0.1 --port 8000",

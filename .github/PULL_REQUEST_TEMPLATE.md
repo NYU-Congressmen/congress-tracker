@@ -1,8 +1,8 @@
-## What this changes
+## Summary
 
-## Which feature or slide it belongs to
+## Roadmap item
 
-## How I tested it
+## Testing
 
 - [ ] npm run lint passes
 - [ ] npm test passes

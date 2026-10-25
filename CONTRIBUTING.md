@@ -1,6 +1,6 @@
 # Contributing
 
-## How the branches fit together
+## Branches
 
 The repo has three kinds of branch. `main` holds the version that is ready to demo, and it only changes when `develop` is merged into it before a presentation. `develop` is where everyone's finished work comes together, and it is the default branch, so new pull requests target it automatically. Each teammate also has a personal branch (`dev/adam`, `dev/akbar` or `dev/abdrahman`) that lasts the whole project and holds their work in progress.
 
@@ -44,24 +44,24 @@ A git hook installed by `npm run setup` refuses any push straight to `main` or `
 
 5. Merge the pull request on GitHub with the "Create a merge commit" button, which is the only merge option the repo allows. After merging, keep working on the same branch and continue from step 1.
 
-## Why merge commits only
+## Merge strategy
 
 Squash merging turns a pull request into one new commit on `develop`, which leaves your dev branch holding the original commits that `develop` does not recognise. Because the dev branches last the whole project, the next merge of `develop` into your branch would conflict with your own earlier work. A merge commit keeps the shared history, so `git merge origin/develop` stays clean.
 
-## Resolving a merge conflict
+## Merge conflicts
 
-When `git merge origin/develop` reports a conflict, git marks the conflicting sections in each affected file between `<<<<<<<` and `>>>>>>>` lines. Edit each file to keep the correct code and delete the markers, then finish the merge and push.
+When `git merge origin/develop` reports a conflict, git marks the conflicting sections in each affected file between `<<<<<<<` and `>>>>>>>` lines. Run `git status` to see which files have conflicts. Edit each one to keep the correct code and delete the markers, then stage it with `git add`. Once every file is staged, `git commit` completes the merge and `git push` sends it.
 
 ```bash
-git status            # lists the files with conflicts
-git add path/to/file  # after fixing each one
-git commit            # completes the merge
+git status
+git add path/to/file
+git commit
 git push
 ```
 
 If a conflict is confusing, run `git merge --abort` to return to where you were and ask the teammate whose code it touches.
 
-## Releasing to main
+## Releases
 
 Before each presentation, one person opens a pull request from `develop` into `main` and merges it once CI passes.
 
@@ -73,6 +73,6 @@ gh pr create --base main --head develop --title "Release for final demo"
 
 Create a migration with `npm run db:revision -- "describe the change"` and write the SQL in its `upgrade()` function using `op.execute`. While everyone shares one Supabase database, only the author runs `npm run db:migrate`, and only after the pull request is merged, so two people never change the shared schema at the same time.
 
-## When the repo goes public
+## Branch protection
 
 Making the repo public unlocks GitHub's own branch protection. An admin can then open Settings, then Branches, and add a rule for `main` and `develop` that requires a pull request and passing CI checks. The local hook can stay as an early warning.
