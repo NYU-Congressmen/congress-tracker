@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from app.routes import health, members
+from app.routes import bills, health, members
 
 app = FastAPI(title="Congress Tracker API", version="0.1.0")
 
@@ -8,3 +8,5 @@ app = FastAPI(title="Congress Tracker API", version="0.1.0")
 app.include_router(health.router, prefix="/api")
 
 app.include_router(members.router, prefix="/api")
+
+app.include_router(bills.router, prefix="/api")
