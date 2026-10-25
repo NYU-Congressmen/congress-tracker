@@ -53,10 +53,10 @@ All commands run from the repo root.
 | Command | What it does |
 |---|---|
 | `npm run setup` | Installs uv if needed and every dependency, turns on the git hooks, creates `.env`, saves your API key and switches to your branch |
-| `npm run dev` | Runs migrations, then the API and frontend together |
+| `npm run dev` | Runs the API and frontend together and stops both when either exits |
 | `npm run dev:be` / `npm run dev:fe` | Runs only the API or only the frontend |
 | `npm run sync` | Checks the Congress.gov key and connection |
-| `npm test` | Runs the backend (pytest) and frontend (Vitest) tests |
+| `npm test` | Runs the setup scripts, backend (pytest) and frontend (Vitest) tests |
 | `npm run lint` | Checks Python with ruff and TypeScript with oxlint |
 | `npm run format` | Reformats the Python code with ruff |
 | `npm run db:migrate` | Applies pending database migrations |
@@ -96,7 +96,7 @@ gh pr create --base main --head develop --title "Release for milestone name"
 
 ## Database migrations
 
-Create a migration with `npm run db:revision -- "describe the change"` and write the SQL in its `upgrade()` function using `op.execute`. While everyone shares one Supabase database, only the author runs `npm run db:migrate`, and only after the pull request is merged, so two people never change the shared schema at the same time.
+Create a migration with `npm run db:revision -- "describe the change"` and write the SQL in its `upgrade()` function using `op.execute`. The generated file is formatted automatically with Ruff. While everyone shares one Supabase database, only the author runs `npm run db:migrate`, and only after the pull request is merged, so two people never change the shared schema at the same time. Starting the development servers never applies migrations.
 
 ## Branch protection
 

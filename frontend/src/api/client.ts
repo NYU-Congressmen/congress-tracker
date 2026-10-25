@@ -5,7 +5,7 @@ export type Health = {
   congress_api_configured: boolean
 }
 
-// Fetch the API's health report through the Vite proxy
+// Fetch the API's health report through the Vite proxy and return it.
 export async function getHealth(): Promise<Health> {
   const response = await fetch('/api/health')
   if (!response.ok) {

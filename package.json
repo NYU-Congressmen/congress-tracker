@@ -7,8 +7,7 @@
   "scripts": {
     "prepare": "node scripts/install-hooks.mjs",
     "setup": "node scripts/setup.mjs",
-    "predev": "npm run db:migrate",
-    "dev": "concurrently -n api,web -c blue,magenta \"npm:dev:be\" \"npm:dev:fe\"",
+    "dev": "concurrently --kill-others -n api,web -c blue,magenta \"npm:dev:be\" \"npm:dev:fe\"",
     "dev:be": "uv run --directory backend uvicorn app.main:app --reload --host 127.0.0.1 --port 8000",
     "dev:fe": "npm run dev -w frontend",
     "db:migrate": "uv run --directory backend python -m app.migrate",
@@ -18,7 +17,8 @@
     "lint:be": "uv run --directory backend ruff check . && uv run --directory backend ruff format --check .",
     "lint:fe": "npm run lint -w frontend",
     "format": "uv run --directory backend ruff format .",
-    "test": "npm run test:be && npm run test:fe",
+    "test": "npm run test:scripts && npm run test:be && npm run test:fe",
+    "test:scripts": "node --test scripts/*.test.mjs",
     "test:be": "uv run --directory backend pytest",
     "test:fe": "npm run test -w frontend",
     "build": "npm run build -w frontend"

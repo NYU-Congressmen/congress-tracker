@@ -31,6 +31,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - run: npm run test:scripts
       - run: npm run lint:fe
       - run: npm run test:fe
       - run: npm run build
