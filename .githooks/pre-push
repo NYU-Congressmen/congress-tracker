@@ -4,7 +4,8 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   case "$remote_ref" in
     refs/heads/main | refs/heads/develop)
       echo "Direct pushes to ${remote_ref#refs/heads/} are blocked." >&2
-      echo "Run npm run get-latest to move your commits to your dev branch and push them," >&2
+      echo "Run git get-latest (or npm run get-latest) to move your commits to your dev branch" >&2
+      echo "and push them," >&2
       echo "then open a pull request (see CONTRIBUTING.md)." >&2
       exit 1
       ;;

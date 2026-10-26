@@ -1,7 +1,7 @@
 // Bring the team's latest code from develop into your dev branch. Run it with
-// `npm run get-latest` at the start of every session. It saves any uncommitted work as a
+// `git get-latest`, or `npm run get-latest`, at the start of every session. It saves any uncommitted work as a
 // commit on your branch, merges develop, updates dependencies and pushes your branch.
-// After resolving a conflict, run it again to finish, or add -- --abort to cancel the merge.
+// After resolving a conflict, run it again to finish, or add --abort to cancel the merge.
 // Only Node's built-in modules are used, so it works even when node_modules is out of date.
 import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, statSync } from 'node:fs'
@@ -12,7 +12,8 @@ import { createInterface } from 'node:readline/promises'
 const isWindows = platform() === 'win32'
 const teammates = ['adam', 'akbar', 'abdrahman']
 const sharedBranches = ['main', 'develop']
-const command = 'npm run get-latest'
+const command = 'git get-latest'
+const alias = '!npm run --silent get-latest --'
 const saveMessage = 'Save work in progress before getting the latest code'
 const interactive = process.stdin.isTTY && !process.env.CI
 const lockFiles = ['package-lock.json', 'backend/uv.lock']
@@ -43,6 +44,15 @@ function succeeds(...args) {
 // Return whether a branch or other ref exists.
 function refExists(ref) {
   return succeeds('rev-parse', '--quiet', '--verify', ref)
+}
+
+// Make git get-latest run this command in this checkout, for clones made before it existed.
+function installAlias() {
+  const current = spawnSync('git', ['config', 'alias.get-latest'], { encoding: 'utf8' }).stdout.trim()
+  if (current !== alias) {
+    git('config', 'alias.get-latest', alias)
+    console.log('You can now run this command as git get-latest.')
+  }
 }
 
 // Return whether an unfinished merge is waiting in this checkout.
@@ -111,7 +121,7 @@ function conflictHelp(paths) {
     'block into the code that should stay, delete the marker lines and save. Then run',
     `  ${command}`,
     'again to finish. To cancel the merge instead, run',
-    `  ${command} -- --abort`,
+    `  ${command} --abort`,
     'Your own work is saved on your branch either way.',
   ].join('\n')
 }
@@ -263,6 +273,7 @@ function abort() {
 // Update the current dev branch with develop and push it.
 async function getLatest(args) {
   process.chdir(git('rev-parse', '--show-toplevel'))
+  installAlias()
   if (args.includes('--abort')) {
     abort()
     return

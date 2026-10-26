@@ -6,17 +6,17 @@ This file covers working on Congress Tracker once your laptop is set up. If you 
 
 The repo has three kinds of branch. `main` holds the version that is ready to demo, and it only changes when `develop` is merged into it before a milestone. `develop` is where everyone's finished work comes together, and it is the default branch, so new pull requests target it automatically. Each teammate also has a personal branch (`dev/adam`, `dev/akbar` or `dev/abdrahman`) that lasts the whole project and holds their work in progress.
 
-A git hook installed by `npm run setup` refuses any push straight to `main` or `develop`, because the repo is private on a free plan and GitHub cannot enforce that rule itself. Do not bypass it with `--no-verify`. If a push fails with "Direct pushes to main are blocked" or the same message for develop, you committed on a shared branch. Run `npm run get-latest`, which moves those commits to your own branch and resets the shared one to GitHub's copy, then open a pull request.
+A git hook installed by `npm run setup` refuses any push straight to `main` or `develop`, because the repo is private on a free plan and GitHub cannot enforce that rule itself. Do not bypass it with `--no-verify`. If a push fails with "Direct pushes to main are blocked" or the same message for develop, you committed on a shared branch. Run `git get-latest`, which moves those commits to your own branch and resets the shared one to GitHub's copy, then open a pull request.
 
 ## Daily workflow
 
 1. Start every session by bringing your branch up to date.
 
    ```bash
-   npm run get-latest
+   git get-latest
    ```
 
-   If you are on `main` or `develop`, the command first switches you to your branch and carries over any commits made there. It then saves your uncommitted work as a commit on your branch, merges anything you pushed from another computer and everything your teammates have merged into `develop`, updates the frontend and backend packages and pushes your branch to GitHub. Run it again before opening a pull request, because small, frequent merges produce fewer conflicts than one large merge at the end.
+   If you are on `main` or `develop`, the command first switches you to your branch and carries over any commits made there. It then saves your uncommitted work as a commit on your branch, merges anything you pushed from another computer and everything your teammates have merged into `develop`, updates the frontend and backend packages and pushes your branch to GitHub. Run it again before opening a pull request, because small, frequent merges produce fewer conflicts than one large merge at the end. `npm run get-latest` does exactly the same, and running it or `npm install` once adds `git get-latest` to a clone that does not have it yet.
 
 2. Make your changes and check them before committing.
 
@@ -46,8 +46,8 @@ All commands run from the repo root.
 
 | Command | What it does |
 |---|---|
-| `npm run setup` | Installs uv if needed and every dependency, turns on the git hooks, creates `.env`, saves your API key and switches to your branch |
-| `npm run get-latest` | Brings your branch up to date with `develop` and pushes it, as described in the daily workflow |
+| `npm run setup` | Installs uv if needed and every dependency, turns on the git hooks, adds `git get-latest`, creates `.env`, saves your API key and switches to your branch |
+| `git get-latest` or `npm run get-latest` | Brings your branch up to date with `develop` and pushes it, as described in the daily workflow |
 | `npm run dev` | Runs the API and frontend together and stops both when either exits |
 | `npm run dev:be` / `npm run dev:fe` | Runs only the API or only the frontend |
 | `npm run sync` | Checks the Congress.gov key and copies current members and 119th-Congress bill summaries when a database is configured |
@@ -82,13 +82,13 @@ Bill stages are `introduced`, `committee`, `passed_one_chamber`, `passed_both_ch
 
 ## Merge strategy
 
-Squash merging turns a pull request into one new commit on `develop`, which leaves your dev branch holding the original commits that `develop` does not recognise. Because the dev branches last the whole project, the next merge of `develop` into your branch would conflict with your own earlier work. A merge commit keeps the shared history, so the merge from `develop` that `npm run get-latest` makes stays clean.
+Squash merging turns a pull request into one new commit on `develop`, which leaves your dev branch holding the original commits that `develop` does not recognise. Because the dev branches last the whole project, the next merge of `develop` into your branch would conflict with your own earlier work. A merge commit keeps the shared history, so the merge from `develop` that `git get-latest` makes stays clean.
 
 ## Merge conflicts
 
-When the incoming code changes the same lines as your branch, `npm run get-latest` stops and lists the files in conflict. Git marks each conflicting section between `<<<<<<<` and `>>>>>>>` lines, with your branch's version above `=======` and the incoming version below. Edit each section into the code that should stay, delete the marker lines and save, then run the command again. It refuses to continue while any marker remains, and otherwise completes the merge and carries on with the update and push. A conflict in `package-lock.json` or `backend/uv.lock` needs no editing, because the command regenerates the lock file from the merged `package.json` or `backend/pyproject.toml`.
+When the incoming code changes the same lines as your branch, `git get-latest` stops and lists the files in conflict. Git marks each conflicting section between `<<<<<<<` and `>>>>>>>` lines, with your branch's version above `=======` and the incoming version below. Edit each section into the code that should stay, delete the marker lines and save, then run the command again. It refuses to continue while any marker remains, and otherwise completes the merge and carries on with the update and push. A conflict in `package-lock.json` or `backend/uv.lock` needs no editing, because the command regenerates the lock file from the merged `package.json` or `backend/pyproject.toml`.
 
-If a conflict is confusing, cancel the merge with `npm run get-latest -- --abort` and ask the teammate whose code it touches. Your work stays saved on your branch.
+If a conflict is confusing, cancel the merge with `git get-latest --abort` and ask the teammate whose code it touches. Your work stays saved on your branch.
 
 ## Releases
 
