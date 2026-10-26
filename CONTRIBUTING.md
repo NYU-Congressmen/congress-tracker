@@ -6,25 +6,19 @@ This file covers working on Congress Tracker once your laptop is set up. If you 
 
 The repo has three kinds of branch. `main` holds the version that is ready to demo, and it only changes when `develop` is merged into it before a milestone. `develop` is where everyone's finished work comes together, and it is the default branch, so new pull requests target it automatically. Each teammate also has a personal branch (`dev/adam`, `dev/akbar` or `dev/abdrahman`) that lasts the whole project and holds their work in progress.
 
-A git hook installed by `npm run setup` refuses any push straight to `main` or `develop`, because the repo is private on a free plan and GitHub cannot enforce that rule itself. Do not bypass it with `--no-verify`. If a push fails with "Direct pushes to main are blocked" or the same message for develop, you committed on a shared branch. Carry those commits to your own branch with `git switch dev/your-name` followed by `git merge develop` (or `git merge main`), then push and open a pull request.
+A git hook installed by `npm run setup` refuses any push straight to `main` or `develop`, because the repo is private on a free plan and GitHub cannot enforce that rule itself. Do not bypass it with `--no-verify`. If a push fails with "Direct pushes to main are blocked" or the same message for develop, you committed on a shared branch. Run `npm run get-latest`, which moves those commits to your own branch and resets the shared one to GitHub's copy, then open a pull request.
 
 ## Daily workflow
 
-1. Start on your branch and pick up anything you pushed from another computer.
+1. Start every session by bringing your branch up to date.
 
    ```bash
-   git switch dev/your-name
-   git pull
+   npm run get-latest
    ```
 
-2. Bring in the work your teammates have merged into `develop`. Do this at the start of each session and again before opening a pull request, because small, frequent merges produce fewer conflicts than one large merge at the end.
+   If you are on `main` or `develop`, the command first switches you to your branch and carries over any commits made there. It then saves your uncommitted work as a commit on your branch, merges anything you pushed from another computer and everything your teammates have merged into `develop`, updates the frontend and backend packages and pushes your branch to GitHub. Run it again before opening a pull request, because small, frequent merges produce fewer conflicts than one large merge at the end.
 
-   ```bash
-   git fetch origin
-   git merge origin/develop
-   ```
-
-3. Make your changes and check them before committing.
+2. Make your changes and check them before committing.
 
    ```bash
    npm run lint
@@ -36,7 +30,7 @@ A git hook installed by `npm run setup` refuses any push straight to `main` or `
 
    The first push from a new clone may ask you to set the upstream branch, which `git push -u origin dev/your-name` does once.
 
-4. Open a pull request from your branch into `develop`, either on GitHub or from the terminal with the GitHub CLI.
+3. Open a pull request from your branch into `develop`, either on GitHub or from the terminal with the GitHub CLI.
 
    ```bash
    gh pr create --base develop --fill
@@ -44,7 +38,7 @@ A git hook installed by `npm run setup` refuses any push straight to `main` or `
 
    Fill in the template's Summary, Roadmap item and Testing sections, then wait for the CI checks to pass and for a teammate to review the change.
 
-5. Merge the pull request on GitHub with the "Create a merge commit" button, which is the only merge option the repo allows. After merging, keep working on the same branch and continue from step 1.
+4. Merge the pull request on GitHub with the "Create a merge commit" button, which is the only merge option the repo allows. After merging, keep working on the same branch and continue from step 1.
 
 ## Commands
 
@@ -53,6 +47,7 @@ All commands run from the repo root.
 | Command | What it does |
 |---|---|
 | `npm run setup` | Installs uv if needed and every dependency, turns on the git hooks, creates `.env`, saves your API key and switches to your branch |
+| `npm run get-latest` | Brings your branch up to date with `develop` and pushes it, as described in the daily workflow |
 | `npm run dev` | Runs the API and frontend together and stops both when either exits |
 | `npm run dev:be` / `npm run dev:fe` | Runs only the API or only the frontend |
 | `npm run sync` | Checks the Congress.gov key and copies current members and 119th-Congress bill summaries when a database is configured |
@@ -91,16 +86,9 @@ Squash merging turns a pull request into one new commit on `develop`, which leav
 
 ## Merge conflicts
 
-When `git merge origin/develop` reports a conflict, git marks the conflicting sections in each affected file between `<<<<<<<` and `>>>>>>>` lines. Run `git status` to see which files have conflicts. Edit each one to keep the correct code and delete the markers, then stage it with `git add`. Once every file is staged, `git commit` completes the merge and `git push` sends it.
+When the incoming code changes the same lines as your branch, `npm run get-latest` stops and lists the files in conflict. Git marks each conflicting section between `<<<<<<<` and `>>>>>>>` lines, with your branch's version above `=======` and the incoming version below. Edit each section into the code that should stay, delete the marker lines and save, then run the command again. It refuses to continue while any marker remains, and otherwise completes the merge and carries on with the update and push. A conflict in `package-lock.json` or `backend/uv.lock` needs no editing, because the command regenerates the lock file from the merged `package.json` or `backend/pyproject.toml`.
 
-```bash
-git status
-git add path/to/file
-git commit
-git push
-```
-
-If a conflict is confusing, run `git merge --abort` to return to where you were and ask the teammate whose code it touches.
+If a conflict is confusing, cancel the merge with `npm run get-latest -- --abort` and ask the teammate whose code it touches. Your work stays saved on your branch.
 
 ## Releases
 
