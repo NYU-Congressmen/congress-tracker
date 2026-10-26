@@ -20,7 +20,7 @@ npm run setup
 
 Without an SSH key on GitHub, clone with `git clone https://github.com/NYU-Congressmen/congress-tracker.git` or `gh repo clone NYU-Congressmen/congress-tracker` instead.
 
-The script asks its questions first and then installs everything without further input. It checks the Node version, offers to install uv, creates `.env` from `.env.example`, asks for a Congress.gov API key and asks which teammate is running it so it can switch to that person's dev branch. It then installs the frontend packages into `node_modules` and the backend packages into `backend/.venv`, a virtual environment that belongs to this project alone, and turns on the repo's git hooks. Rerunning it preserves existing settings and offers to add a key when one is missing. Outside Windows, it restricts `.env` permissions to its owner before prompting for a key.
+The script asks its questions first and then installs everything without further input. It checks the Node version, offers to install uv, creates `.env` from `.env.example`, asks for a Congress.gov API key and asks which teammate is running it so it can switch to that person's dev branch. It then installs the frontend packages into `node_modules` and the backend packages into `backend/.venv`, a virtual environment that belongs to this project alone, and turns on the repo's git hooks along with the `git get-latest` command described in [CONTRIBUTING.md](CONTRIBUTING.md#daily-workflow). Rerunning it preserves existing settings and offers to add a key when one is missing. Outside Windows, it restricts `.env` permissions to its owner before prompting for a key.
 
 ## API key
 

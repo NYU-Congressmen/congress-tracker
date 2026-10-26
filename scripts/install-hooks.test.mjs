@@ -14,6 +14,7 @@ test('installs hooks in a checkout and fails when its configuration cannot be wr
   assert.equal(spawnSync('git', ['init', '--quiet'], options).status, 0)
   assert.equal(spawnSync(process.execPath, [installer], options).status, 0)
   assert.equal(spawnSync('git', ['config', '--local', 'core.hooksPath'], options).stdout.trim(), '.githooks')
+  assert.equal(spawnSync('git', ['config', '--local', 'alias.get-latest'], options).stdout.trim(), '!npm run --silent get-latest --')
 
   writeFileSync(join(directory, '.git', 'config.lock'), '')
   const result = spawnSync(process.execPath, [installer], options)

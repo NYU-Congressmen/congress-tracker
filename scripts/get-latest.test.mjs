@@ -69,6 +69,7 @@ test('saves uncommitted work, merges develop and pushes the branch', (t) => {
   assert.equal(git(adam, 'status', '--porcelain'), '')
   assert.match(git(adam, 'log', '--format=%s'), new RegExp(saveMessage))
   assert.equal(git(adam, 'rev-parse', 'HEAD'), git(adam, 'rev-parse', 'origin/dev/adam'))
+  assert.equal(git(adam, 'config', 'alias.get-latest'), '!npm run --silent get-latest --')
 })
 
 test('stops on a conflict until it is resolved and then finishes', (t) => {
