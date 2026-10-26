@@ -68,7 +68,7 @@ congress-tracker/
 │   └── src/
 │       ├── api/             Functions that call the backend
 │       └── App.tsx
-├── scripts/                 The setup script and the git hook installer
+├── scripts/                 The setup, get-latest and git hook installer scripts
 ├── .githooks/               Blocks direct pushes to main and develop
 ├── .github/workflows/ci.yml Lint, tests and build on every pull request
 ├── .env.example             Template for your local .env

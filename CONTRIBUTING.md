@@ -82,7 +82,7 @@ Bill stages are `introduced`, `committee`, `passed_one_chamber`, `passed_both_ch
 
 ## Merge strategy
 
-Squash merging turns a pull request into one new commit on `develop`, which leaves your dev branch holding the original commits that `develop` does not recognise. Because the dev branches last the whole project, the next merge of `develop` into your branch would conflict with your own earlier work. A merge commit keeps the shared history, so `git merge origin/develop` stays clean.
+Squash merging turns a pull request into one new commit on `develop`, which leaves your dev branch holding the original commits that `develop` does not recognise. Because the dev branches last the whole project, the next merge of `develop` into your branch would conflict with your own earlier work. A merge commit keeps the shared history, so the merge from `develop` that `npm run get-latest` makes stays clean.
 
 ## Merge conflicts
 
