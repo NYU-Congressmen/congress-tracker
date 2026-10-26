@@ -47,9 +47,31 @@ Each teammate keeps their own `.env` at the repo root, and `.env.example` is the
 | Variable | Needed | Purpose |
 |---|---|---|
 | `CONGRESS_API_KEY` | Now | Authenticates requests to Congress.gov |
-| `DATABASE_URL` | Once the database exists | Postgres connection string from Supabase |
+| `DATABASE_URL` | To see real data | Connection string for the team's Supabase database. Ask the teammate who manages it to send it privately, and never paste it into the repo or a group chat |
 | `FIREBASE_PROJECT_ID` | Once login is added | Lets the API verify Firebase login tokens |
 | `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID` | Once login is added | Firebase web configuration for the React app, which identifies the project and is not secret |
+
+## Database tests
+
+The database tests check migration upgrades and downgrades, cache versions, retry cooldowns, atomic writes, chamber-passage milestones and search pagination against a real PostgreSQL. They skip themselves when none is available, so `npm test` passes without one. CI always runs them against its own PostgreSQL, so installing it locally is optional and only needed to run those tests before pushing. The tests empty their database every run, so they only use a database whose name contains "test" and refuse anything else. Set `REQUIRE_TEST_DATABASE=1` to make an unavailable test database fail locally as it does in CI.
+
+On Linux, install PostgreSQL, give your user permission to create databases, and create the test database:
+
+```bash
+sudo apt install postgresql
+sudo -u postgres createuser --createdb "$USER"
+createdb congress_test
+```
+
+On macOS with Homebrew:
+
+```bash
+brew install postgresql@17
+brew services start postgresql@17
+createdb congress_test
+```
+
+On Windows, install PostgreSQL from <https://www.postgresql.org/download/windows/>, create a database named `congress_test` in pgAdmin, and set `TEST_DATABASE_URL` to `postgresql://postgres:your-password@localhost:5432/congress_test` before running the tests. Linux and macOS need no variable, because the tests connect to `congress_test` through the local socket by default.
 
 ## Troubleshooting
 
@@ -58,3 +80,5 @@ If a command reports that `uv` is not found right after the setup script install
 If the setup script never asks for your API key on Windows, Git Bash is not presenting itself to Node as an interactive terminal. The script prints instructions instead, so paste the key into `.env` by hand and run `npm run sync` to check it.
 
 If `npm run dev` stops because port 5173 or 8000 is already in use, an earlier dev server is probably still running. Stop it with Ctrl+C in its terminal, or close that terminal, and start again.
+
+If a database-backed endpoint reports a missing cache or passage column after pulling changes, ask the migration's author to check that the merged migrations were applied. Do not run an unmerged migration against the shared database. The cache fields shown in `/docs` explain whether a detail response is complete, stale or waiting to retry after an upstream failure.
