@@ -10,7 +10,7 @@ import { join } from 'node:path'
 import { createInterface } from 'node:readline/promises'
 
 const isWindows = platform() === 'win32'
-const teammates = ['adam', 'akbar', 'abdrahman']
+const teammates = ['adam', 'akbar', 'abdrahman', 'manah']
 const sharedBranches = ['main', 'develop']
 const command = 'git get-latest'
 const alias = '!npm run --silent get-latest --'
