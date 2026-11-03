@@ -48,6 +48,7 @@ Each teammate keeps their own `.env` at the repo root, and `.env.example` is the
 |---|---|---|
 | `CONGRESS_API_KEY` | Now | Authenticates requests to Congress.gov |
 | `DATABASE_URL` | To see real data | Connection string for the team's Supabase database. Ask the teammate who manages it to send it privately, and never paste it into the repo or a group chat |
+| `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL` | Once the AI service is added | Your own free Gemini key from <https://aistudio.google.com/apikey>, with the endpoint and model from `.env.example`. The AI service calls the model through OpenAI's SDK, so another provider needs only different values here |
 | `FIREBASE_PROJECT_ID` | Once login is added | Lets the API verify Firebase login tokens |
 | `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID` | Once login is added | Firebase web configuration for the React app, which identifies the project and is not secret |
 

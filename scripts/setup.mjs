@@ -9,7 +9,7 @@ import { checkKey, ensureEnvFile, hasApiKey } from './setup-config.mjs'
 
 const root = join(import.meta.dirname, '..')
 const isWindows = platform() === 'win32'
-const teammates = ['adam', 'akbar', 'abdrahman']
+const teammates = ['adam', 'akbar', 'abdrahman', 'manah']
 const interactive = process.stdin.isTTY && !process.env.CI
 
 // Print the next setup step.
