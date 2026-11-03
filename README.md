@@ -28,6 +28,7 @@ The initial roadmap follows the bootcamp's weekly structure. Two additions bring
 | Adam | adamwwardak | dev/adam |
 | Akbar | ekberby | dev/akbar |
 | Abdrahman | aidahmed | dev/abdrahman |
+| Manah | manah4 | dev/manah |
 
 ## Data flow
 
