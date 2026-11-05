@@ -83,4 +83,7 @@ class CongressClient:
                 items[ident(item)] = item
             if len(items) >= expected:
                 break
+        # A partial list would otherwise look like a finished sync, which is how bills went missing
+        if len(items) < expected:
+            print(f"{path}: read {len(items)} of {expected} items after {MAX_PASSES} passes.")
         return list(items.values())

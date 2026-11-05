@@ -1,4 +1,4 @@
-"""create bill summaries
+"""Create the table for CRS bill summaries.
 
 Revision ID: 69e9a6ddebfb
 Revises: cfca1ae1cd5b
@@ -24,11 +24,16 @@ def upgrade() -> None:
         """
         CREATE TABLE bill_summaries (
             bill_id       TEXT NOT NULL REFERENCES bills (bill_id) ON DELETE CASCADE,
-            version_code  TEXT NOT NULL,          -- e.g. 00 Introduced, 49 Public Law
-            action_date   DATE,                   -- the stage the summary describes
-            action_desc   TEXT,                   -- e.g. Introduced in Senate
-            text          TEXT NOT NULL,          -- HTML written by CRS
-            update_date   TIMESTAMPTZ,            -- when Congress.gov last changed it
+            -- The summary's stage as a code, such as 00 for Introduced or 49 for Public Law
+            version_code  TEXT NOT NULL,
+            -- The date of the stage the summary describes
+            action_date   DATE,
+            -- The stage in words, such as Introduced in Senate
+            action_desc   TEXT,
+            -- HTML written by CRS
+            text          TEXT NOT NULL,
+            -- When Congress.gov last changed the summary
+            update_date   TIMESTAMPTZ,
             PRIMARY KEY (bill_id, version_code)
         )
         """

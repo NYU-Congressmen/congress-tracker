@@ -23,7 +23,7 @@ def test_clean_bill():
     assert row["latest_action_date"] == "2025-07-04"
 
 
-def test_full_sync_reads_oldest_first_and_saves_each_bill_once(monkeypatch):
+def test_full_sync_uses_the_default_order_and_saves_each_bill_once(monkeypatch):
     sorts, saved = [], []
 
     def fake_api(request: httpx.Request) -> httpx.Response:

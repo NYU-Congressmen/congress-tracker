@@ -50,7 +50,7 @@ All commands run from the repo root.
 | `git get-latest` or `npm run get-latest` | Brings your branch up to date with `develop` and pushes it, as described in the daily workflow |
 | `npm run dev` | Runs the API and frontend together and stops both when either exits |
 | `npm run dev:be` / `npm run dev:fe` | Runs only the API or only the frontend |
-| `npm run sync` | Checks the Congress.gov key and copies current members and 119th-Congress bill summaries when a database is configured |
+| `npm run sync` | Checks the Congress.gov key and copies current members, 119th-Congress bills and their CRS summaries when a database is configured |
 | `npm test` | Runs the setup scripts, backend (pytest) and frontend (Vitest) tests |
 | `npm run lint` | Checks Python with ruff and TypeScript with oxlint |
 | `npm run format` | Reformats the Python code with ruff |
@@ -62,7 +62,7 @@ All commands run from the repo root.
 
 New endpoints go in a module under `backend/app/routes/` and are registered in `backend/app/main.py` under the `/api` prefix, which the Vite dev server forwards to the backend. Frontend functions that call the backend belong in `frontend/src/api/`. Each change should come with tests next to the existing ones in `backend/tests/` or beside the component in `frontend/src/`.
 
-Code that talks to Congress.gov lives in `backend/app/sync/`. The list sync in `bills.py` and `members.py` fills the tables cheaply, and `cache.py` fetches a single bill's or member's details when an endpoint needs them, so new endpoints should read from the database and call the cache rather than Congress.gov directly. Tests that need a database use the `db` fixture in `backend/tests/conftest.py`, and [SETUP.md](SETUP.md#database-tests) explains how to run them locally.
+Code that talks to Congress.gov lives in `backend/app/sync/`. The list sync in `bills.py`, `members.py` and `summaries.py` fills the tables cheaply, and `cache.py` fetches a single bill's or member's details when an endpoint needs them, so new endpoints should read from the database and call the cache rather than Congress.gov directly. Tests that need a database use the `db` fixture in `backend/tests/conftest.py`, and [SETUP.md](SETUP.md#database-tests) explains how to run them locally.
 
 Public response models live in `backend/app/models.py` and appear in FastAPI's `/docs` and `/openapi.json`. Update them alongside endpoint changes so frontend code depends on a documented response rather than every column in a database row. The Congress.gov client has a synchronous interface and owns an event loop for cancellable HTTP requests, so use it from synchronous routes and jobs.
 
