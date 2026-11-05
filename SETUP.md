@@ -60,6 +60,7 @@ On Linux, install PostgreSQL, give your user permission to create databases, and
 
 ```bash
 sudo apt install postgresql
+sudo apt install postgresql-17-pgvector
 sudo -u postgres createuser --createdb "$USER"
 createdb congress_test
 ```
@@ -68,11 +69,14 @@ On macOS with Homebrew:
 
 ```bash
 brew install postgresql@17
+brew install pgvector
 brew services start postgresql@17
 createdb congress_test
 ```
 
 On Windows, install PostgreSQL from <https://www.postgresql.org/download/windows/>, create a database named `congress_test` in pgAdmin, and set `TEST_DATABASE_URL` to `postgresql://postgres:your-password@localhost:5432/congress_test` before running the tests. Linux and macOS need no variable, because the tests connect to `congress_test` through the local socket by default.
+
+The migrations enable the pgvector extension, so the test database needs pgvector installed as well. The commands above include it on Linux and macOS. On Windows, follow the installation steps at <https://github.com/pgvector/pgvector#windows>. CI uses the `pgvector/pgvector:pg17` image, which has it built in.
 
 ## Troubleshooting
 
