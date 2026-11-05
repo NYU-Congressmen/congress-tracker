@@ -56,12 +56,11 @@ Each teammate keeps their own `.env` at the repo root, and `.env.example` is the
 
 The database tests check migration upgrades and downgrades, cache versions, retry cooldowns, atomic writes, chamber-passage milestones and search pagination against a real PostgreSQL. They skip themselves when none is available, so `npm test` passes without one. CI always runs them against its own PostgreSQL, so installing it locally is optional and only needed to run those tests before pushing. The tests empty their database every run, so they only use a database whose name contains "test" and refuse anything else. Set `REQUIRE_TEST_DATABASE=1` to make an unavailable test database fail locally as it does in CI.
 
-On Linux, install PostgreSQL, give your user permission to create databases, and create the test database:
+On Linux, install PostgreSQL and pgvector, make your user a superuser of the local PostgreSQL, because enabling pgvector requires one, and create the test database. The pgvector package must match your PostgreSQL version, which is 18 on current Ubuntu:
 
 ```bash
-sudo apt install postgresql
-sudo apt install postgresql-17-pgvector
-sudo -u postgres createuser --createdb "$USER"
+sudo apt install postgresql postgresql-18-pgvector
+sudo -u postgres createuser --superuser "$USER"
 createdb congress_test
 ```
 

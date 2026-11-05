@@ -1,4 +1,4 @@
-"""create pull tables
+"""Create the tables for Pull's users, reviews, follow-through and weekly briefs.
 
 Revision ID: cfca1ae1cd5b
 Revises: b71e8a40d192
@@ -34,16 +34,20 @@ PULL_TABLES = (
 
 def upgrade() -> None:
     """Create the tables for Pull's users, reviews, follow-through and weekly briefs."""
-    # Only the extension for now; the embedding columns come with the embedding model (A8)
+    # The embedding columns come later, once the embedding model is chosen
     op.execute("CREATE EXTENSION IF NOT EXISTS vector")
 
     op.execute(
         """
         CREATE TABLE users (
-            uid         TEXT PRIMARY KEY,         -- Firebase Auth UID
-            phone       TEXT NOT NULL UNIQUE,     -- one account per phone number
-            state       TEXT,                     -- two-letter code, from the address
-            district    INTEGER,                  -- 0 for at-large, 98 for DC and territories
+            -- The Firebase Auth UID
+            uid         TEXT PRIMARY KEY,
+            -- One account per phone number
+            phone       TEXT NOT NULL UNIQUE,
+            -- A two-letter code taken from the address
+            state       TEXT,
+            -- Empty for at-large seats and delegates, to match members.district
+            district    INTEGER,
             created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
         )
         """
@@ -52,7 +56,8 @@ def upgrade() -> None:
         """
         CREATE TABLE issues (
             issue_id  SERIAL PRIMARY KEY,
-            name      TEXT NOT NULL UNIQUE      -- e.g. Health, Housing
+            -- An issue a user can follow, such as Health or Housing
+            name      TEXT NOT NULL UNIQUE
         )
         """
     )
@@ -72,10 +77,13 @@ def upgrade() -> None:
             uid               TEXT NOT NULL REFERENCES users (uid) ON DELETE CASCADE,
             bill_id           TEXT NOT NULL REFERENCES bills (bill_id) ON DELETE CASCADE,
             stance            TEXT NOT NULL CHECK (stance IN ('support', 'oppose', 'unsure')),
-            story             TEXT,                 -- no length cap, it is what people share
-            action_taken      TEXT,                 -- what the user did about it, in their words
+            -- No length cap, because this is what people share
+            story             TEXT,
+            -- What the user did about the bill, in their own words
+            action_taken      TEXT,
             consent_to_share  BOOLEAN NOT NULL DEFAULT false,
-            hidden_at         TIMESTAMPTZ,          -- set when hidden, empty while visible
+            -- Empty while the review is visible
+            hidden_at         TIMESTAMPTZ,
             created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
             updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
             UNIQUE (uid, bill_id)
@@ -89,7 +97,8 @@ def upgrade() -> None:
             uid          TEXT NOT NULL REFERENCES users (uid) ON DELETE CASCADE,
             bill_id      TEXT NOT NULL REFERENCES bills (bill_id) ON DELETE CASCADE,
             bioguide_id  TEXT NOT NULL REFERENCES members (bioguide_id),
-            action_type  TEXT NOT NULL,          -- e.g. call
+            -- The kind of action, such as call
+            action_type  TEXT NOT NULL,
             created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
         )
         """
@@ -100,7 +109,8 @@ def upgrade() -> None:
             uid           TEXT NOT NULL REFERENCES users (uid) ON DELETE CASCADE,
             bill_id       TEXT NOT NULL REFERENCES bills (bill_id) ON DELETE CASCADE,
             followed_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-            last_seen_at  TIMESTAMPTZ,              -- last time the user opened the bill
+            -- The last time the user opened the bill
+            last_seen_at  TIMESTAMPTZ,
             PRIMARY KEY (uid, bill_id)
         )
         """
@@ -111,7 +121,8 @@ def upgrade() -> None:
             notification_id  SERIAL PRIMARY KEY,
             uid              TEXT NOT NULL REFERENCES users (uid) ON DELETE CASCADE,
             bill_id          TEXT REFERENCES bills (bill_id) ON DELETE CASCADE,
-            type             TEXT NOT NULL,         -- e.g. status_change, vote_scheduled
+            -- The kind of update, such as status_change or vote_scheduled
+            type             TEXT NOT NULL,
             message          TEXT NOT NULL,
             is_read          BOOLEAN NOT NULL DEFAULT false,
             created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -122,11 +133,13 @@ def upgrade() -> None:
         """
         CREATE TABLE text_versions (
             bill_id       TEXT NOT NULL REFERENCES bills (bill_id) ON DELETE CASCADE,
-            version_type  TEXT NOT NULL,            -- e.g. Introduced in House
+            -- The version's name, such as Introduced in House
+            version_type  TEXT NOT NULL,
             version_date  TIMESTAMPTZ,
             pdf_url       TEXT,
             xml_url       TEXT,
-            text          TEXT,                     -- filled once downloaded, empty until then
+            -- Empty until the text is downloaded
+            text          TEXT,
             PRIMARY KEY (bill_id, version_type)
         )
         """
@@ -135,15 +148,19 @@ def upgrade() -> None:
         """
         CREATE TABLE briefs (
             brief_id       SERIAL PRIMARY KEY,
-            bioguide_id    TEXT NOT NULL REFERENCES members (bioguide_id),  -- the office
+            -- The office that receives the brief
+            bioguide_id    TEXT NOT NULL REFERENCES members (bioguide_id),
             bill_id        TEXT NOT NULL REFERENCES bills (bill_id) ON DELETE CASCADE,
-            week_start     DATE NOT NULL,           -- the Monday of the week covered
+            -- The Monday of the week covered
+            week_start     DATE NOT NULL,
             support_count  INTEGER NOT NULL DEFAULT 0,
             oppose_count   INTEGER NOT NULL DEFAULT 0,
             unsure_count   INTEGER NOT NULL DEFAULT 0,
             action_count   INTEGER NOT NULL DEFAULT 0,
-            content        TEXT,                    -- the written Constituent Signal brief
-            sent_at        TIMESTAMPTZ,             -- empty until it is sent to the office
+            -- The written Constituent Signal brief
+            content        TEXT,
+            -- Empty until the brief is sent to the office
+            sent_at        TIMESTAMPTZ,
             created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
             UNIQUE (bioguide_id, bill_id, week_start)
         )
@@ -154,7 +171,8 @@ def upgrade() -> None:
         CREATE TABLE post_cards (
             post_card_id    SERIAL PRIMARY KEY,
             review_id       INTEGER NOT NULL REFERENCES reviews (review_id) ON DELETE CASCADE,
-            platform        TEXT NOT NULL,          -- e.g. bluesky
+            -- The platform, such as bluesky
+            platform        TEXT NOT NULL,
             post_url        TEXT,
             hidden_on_pull  BOOLEAN NOT NULL DEFAULT false,
             created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
