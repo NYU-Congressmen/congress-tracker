@@ -14,7 +14,7 @@ jobs:
     # The database tests run against this throwaway PostgreSQL and fail rather than skip
     services:
       postgres:
-        image: postgres:17
+        image: pgvector/pgvector:pg17
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
