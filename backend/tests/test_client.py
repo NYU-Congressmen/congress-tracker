@@ -59,3 +59,30 @@ def test_refresh_budget_is_shared_across_pages():
         with pytest.raises(httpx.TimeoutException):
             list(client.paginate("/bill", "bills"))
     assert calls == ["0", "1"]
+
+
+def test_collect_reads_again_until_nothing_is_missing():
+    passes = []
+
+    def flaky_api(request: httpx.Request) -> httpx.Response:
+        if request.url.params["limit"] == "1":
+            return httpx.Response(200, json={"bills": [], "pagination": {"count": 3}})
+        passes.append(1)
+        # The first pass skips bill 3, as a reshuffled page boundary would
+        bills = [{"n": 1}, {"n": 2}] if len(passes) == 1 else [{"n": 1}, {"n": 2}, {"n": 3}]
+        return httpx.Response(200, json={"bills": bills, "pagination": {}})
+
+    with CongressClient("test-key", transport=httpx.MockTransport(flaky_api)) as client:
+        items = client.collect("/bill", "bills", lambda b: b["n"])
+    assert sorted(b["n"] for b in items) == [1, 2, 3]
+    assert len(passes) == 2
+
+
+def test_collect_reports_items_still_missing_after_every_pass(capsys):
+    def short_api(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"bills": [{"n": 1}], "pagination": {"count": 2}})
+
+    with CongressClient("test-key", transport=httpx.MockTransport(short_api)) as client:
+        items = client.collect("/bill", "bills", lambda b: b["n"])
+    assert len(items) == 1
+    assert "read 1 of 2 items" in capsys.readouterr().out
