@@ -1,6 +1,6 @@
-# Congress Tracker
+# Pull
 
-Congress Tracker is a web app for following U.S. legislation, being built so people can search bills, follow members of Congress and get alerts when something changes. A Python sync job copies member and bill summaries from the [Congress.gov API](https://github.com/LibraryOfCongress/api.congress.gov) into Postgres, and a FastAPI backend serves stored data and fills detail caches on demand. A React frontend will display that data, with user accounts, tracking, notifications and voting records planned for later milestones.
+Pull is a web app for following U.S. legislation, being built so people can search bills, follow members of Congress and get alerts when something changes. A Python sync job copies member and bill summaries from the [Congress.gov API](https://github.com/LibraryOfCongress/api.congress.gov) into Postgres, and a FastAPI backend serves stored data and fills detail caches on demand. A React frontend will display that data, with user accounts, tracking, notifications and voting records planned for later milestones.
 
 ## Development
 
