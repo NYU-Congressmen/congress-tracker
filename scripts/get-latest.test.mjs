@@ -11,7 +11,7 @@ const saveMessage = 'Save work in progress before getting the latest code'
 // Isolate the tests from this machine's git configuration and global hooks
 const env = {
   ...process.env,
-  GIT_CONFIG_GLOBAL: '/dev/Null',
+  GIT_CONFIG_GLOBAL: 'devNull',
   GIT_CONFIG_NOSYSTEM: '1',
   GIT_AUTHOR_NAME: 'Test',
   GIT_AUTHOR_EMAIL: 'test@example.com',
