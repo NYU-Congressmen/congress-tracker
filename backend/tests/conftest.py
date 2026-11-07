@@ -42,5 +42,5 @@ def db(migrated_database, monkeypatch):
     """Empty every table before a test and return the Alembic config for the test database."""
     monkeypatch.setattr(settings, "database_url", TEST_DATABASE_URL)
     with psycopg.connect(TEST_DATABASE_URL) as conn:
-        conn.execute("TRUNCATE bill_actions, bills, members RESTART IDENTITY CASCADE")
+        conn.execute("TRUNCATE bill_actions, bills, members, users RESTART IDENTITY CASCADE")
     return migrated_database
