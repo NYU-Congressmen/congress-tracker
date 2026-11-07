@@ -55,7 +55,7 @@ export default function AboutPage() {
   return (
     <div className="container page about">
       <header className="page__header">
-        <h1>About Congress Tracker</h1>
+        <h1>About Pull</h1>
         <p className="page__lede">
           A web app for following U.S. legislation: search bills, follow members of Congress, and see how
           legislation moves through the {CONGRESS_NUMBER}th Congress.

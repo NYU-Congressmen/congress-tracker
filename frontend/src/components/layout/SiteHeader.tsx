@@ -9,7 +9,7 @@ export function SiteHeader() {
     <header className="site-header">
       <div className="site-header__main">
         <div className="container site-header__row">
-          <Link to="/" className="brand" aria-label="Congress Tracker, home">
+          <Link to="/" className="brand" aria-label="Pull, home">
             <span className="brand__mark">
               <CapitolIcon />
             </span>

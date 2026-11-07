@@ -8,7 +8,7 @@ export function SiteFooter() {
       <div className="container site-footer__grid">
         <div className="site-footer__about">
           <p className="site-footer__brand">
-            <CapitolIcon size={22} /> Congress Tracker
+            <CapitolIcon size={22} /> Pull
           </p>
           <p>
             Follow the {CONGRESS_NUMBER}th Congress: search bills, browse members, and watch legislation move from
@@ -55,7 +55,7 @@ export function SiteFooter() {
       <div className="site-footer__bottom">
         <div className="container">
           <p>
-            Congress Tracker is an educational project and is not an official U.S. Government site. Its status
+            Pull is an educational project and is not an official U.S. Government site. Its status
             summaries are simplified interpretations of congressional action.
           </p>
           <p>Legislative data courtesy of the U.S. Congress via congress.gov.</p>

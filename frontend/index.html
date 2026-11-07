@@ -10,14 +10,14 @@
     />
     <meta name="theme-color" content="#162e51" />
     <meta name="color-scheme" content="light dark" />
-    <title>Congress Tracker — Follow the 119th Congress</title>
+    <title>Pull: Follow the 119th Congress</title>
     <script>
       // Apply the stored theme choice before first paint so a forced
       // light/dark mode never flashes the other palette. 'auto' (or no
       // choice) leaves the attribute off and follows the OS setting.
       ;(function () {
         try {
-          var stored = localStorage.getItem('congress-tracker-theme')
+          var stored = localStorage.getItem('pull-theme')
           if (stored === 'light' || stored === 'dark') {
             document.documentElement.dataset.theme = stored
           }

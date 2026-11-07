@@ -5,7 +5,7 @@
 
 export type ThemeMode = 'auto' | 'light' | 'dark'
 
-export const THEME_STORAGE_KEY = 'congress-tracker-theme'
+export const THEME_STORAGE_KEY = 'pull-theme'
 
 const NEXT_MODE: Record<ThemeMode, ThemeMode> = { auto: 'light', light: 'dark', dark: 'auto' }
 
