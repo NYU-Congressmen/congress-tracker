@@ -6,10 +6,10 @@ from app.ai.explainer import (
     BillContext,
     Explanation,
     explain,
-    plain_text,
     related_line,
     user_message,
 )
+from app.sync.texts import plain_text
 
 BILL = BillContext(
     label="S 3108",

@@ -99,3 +99,21 @@ class MemberDetail(Member):
 
     sponsored_bills: list[BillSummary]
     cache: CacheInfo
+
+
+class TextVersion(BaseModel):
+    """Describe one published version of a bill's text and where to read it."""
+
+    version_type: str
+    version_date: datetime | None
+    text_url: str | None
+    pdf_url: str | None
+    downloaded: bool
+
+
+class BillDiff(BaseModel):
+    """Describe the line-by-line changes between two versions of a bill's text."""
+
+    from_version: str
+    to_version: str
+    changes: list[str]

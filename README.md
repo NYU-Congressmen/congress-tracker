@@ -32,7 +32,7 @@ The initial roadmap follows the bootcamp's weekly structure. Two additions bring
 
 ## Data flow
 
-Congress.gov allows [5,000 requests an hour per key](https://github.com/LibraryOfCongress/api.congress.gov#rate-limit), so search reads stored summaries. A full list sync takes roughly 115 requests at the current dataset size. A bill's sponsor and full action history are fetched on its first view and refreshed when the list sync records an upstream version newer than the cached detail version. A member's current-Congress sponsored bills are fetched on profile view and kept for a day.
+Congress.gov allows [5,000 requests an hour per key](https://github.com/LibraryOfCongress/api.congress.gov#rate-limit), so search reads stored summaries. A full list sync takes roughly 115 requests at the current dataset size. A bill's sponsor, full action history and list of text versions are fetched on its first view and refreshed when the list sync records an upstream version newer than the cached detail version. A member's current-Congress sponsored bills are fetched on profile view and kept for a day.
 
 Cold and stale detail requests can call Congress.gov. Their upstream work shares a five-second budget across all pages and any missing-sponsor request. A failed refresh leaves cached data intact and postpones retries for that cached resource for one minute, and a bill Congress.gov reports as missing is remembered for ten minutes so repeated requests for it spend no quota. Responses distinguish missing details from complete cached results and report staleness, the last fetch time and a failed refresh. Pagination and missing sponsors mean a new bill view can need more than two upstream requests, so caching reduces quota pressure without eliminating it.
 
