@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     congress_api_key: str | None = None
     database_url: str | None = None
     firebase_project_id: str | None = None
+    llm_api_key: str | None = None
+    llm_base_url: str | None = None
+    llm_model: str | None = None
 
 
 settings = Settings()

@@ -4,6 +4,7 @@ from app.config import settings
 from app.sync.bills import sync_bills
 from app.sync.client import CongressClient
 from app.sync.members import sync_members
+from app.sync.summaries import sync_summaries
 
 
 def main() -> int:
@@ -24,6 +25,8 @@ def main() -> int:
         print(f"Saved {saved} members.")
         saved = sync_bills(client)
         print(f"Saved {saved} bills.")
+        saved = sync_summaries(client)
+        print(f"Saved {saved} summaries.")
     return 0
 
 

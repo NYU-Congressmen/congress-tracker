@@ -31,6 +31,19 @@ BILL_ACTIONS = [
     {"actionDate": "2025-01-03", "type": "IntroReferral", "text": "Introduced in House"},
 ]
 
+TEXT_VERSIONS = [
+    {
+        "type": "Introduced in House",
+        "date": "2025-01-03T05:00:00Z",
+        "formats": [
+            {
+                "type": "Formatted Text",
+                "url": "https://www.congress.gov/119/bills/hr1/BILLS-119hr1ih.htm",
+            }
+        ],
+    }
+]
+
 # A sponsor who has left Congress, so the current-member sync never stored them
 FORMER_MEMBER = {
     "bioguideId": "F000001",
@@ -79,6 +92,7 @@ class FakeCongress:
         responses = {
             "/bill/119/hr/1": {"bill": BILL_DETAIL},
             "/bill/119/hr/1/actions": {"actions": BILL_ACTIONS, "pagination": {}},
+            "/bill/119/hr/1/text": {"textVersions": TEXT_VERSIONS, "pagination": {}},
             "/member/F000001": {"member": FORMER_MEMBER},
             "/member/A000001/sponsored-legislation": {
                 "sponsoredLegislation": SPONSORED,
@@ -411,3 +425,14 @@ def test_failed_action_write_rolls_back_bill_and_new_sponsor(api, monkeypatch):
     with psycopg.connect(TEST_DATABASE_URL) as conn:
         for table in ("members", "bills", "bill_actions"):
             assert conn.execute(f"SELECT count(*) FROM {table}").fetchone()[0] == 0
+
+
+def test_opening_a_bill_stores_its_text_versions_without_their_text(api):
+    client, _ = api
+    client.get("/api/bills/119/hr/1")
+    with psycopg.connect(TEST_DATABASE_URL) as conn:
+        rows = conn.execute("SELECT version_type, text_url, text FROM text_versions").fetchall()
+    # Only the list is stored on opening; the text itself is downloaded when it is needed
+    assert rows == [
+        ("Introduced in House", "https://www.congress.gov/119/bills/hr1/BILLS-119hr1ih.htm", None)
+    ]

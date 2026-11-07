@@ -1,4 +1,4 @@
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from time import monotonic
 from typing import Any
 
@@ -9,6 +9,9 @@ BASE_URL = "https://api.congress.gov/v3"
 # The API returns 20 results per page by default and allows at most 250
 PAGE_SIZE = 250
 TIMEOUT = 30.0
+
+# Each extra pass costs as many requests as the first, so stop after a few
+MAX_PASSES = 3
 
 
 class CongressClient:
@@ -64,3 +67,23 @@ class CongressClient:
             if not items or not page.get("pagination", {}).get("next"):
                 return
             offset += len(items)
+
+    def collect(
+        self, path: str, key: str, ident: Callable[[dict[str, Any]], Any], **params: Any
+    ) -> list[dict[str, Any]]:
+        """Return every distinct item of a list endpoint, reading it again if a pass missed some.
+
+        Offset paging is not stable here: thousands of items share one updateDate, and an item
+        updated mid-read moves, so a single pass can skip a few. Later passes fill the gaps.
+        """
+        expected = self.get(path, limit=1, **params)["pagination"]["count"]
+        items: dict[Any, dict[str, Any]] = {}
+        for _ in range(MAX_PASSES):
+            for item in self.paginate(path, key, **params):
+                items[ident(item)] = item
+            if len(items) >= expected:
+                break
+        # A partial list would otherwise look like a finished sync, which is how bills went missing
+        if len(items) < expected:
+            print(f"{path}: read {len(items)} of {expected} items after {MAX_PASSES} passes.")
+        return list(items.values())

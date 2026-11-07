@@ -6,6 +6,7 @@ from app.sync.bills import CONGRESS, clean_bill
 from app.sync.client import CongressClient
 from app.sync.members import SAVE_MEMBER_SQL, clean_member_detail
 from app.sync.status import NEVER_DOWNGRADE_SQL, summarize_actions
+from app.sync.texts import SAVE_VERSION_SQL, clean_version
 
 # Sponsorship has no update date to compare against, so it is refreshed on a schedule
 SPONSORED_MAX_AGE = timedelta(days=1)
@@ -114,6 +115,7 @@ def refresh_bill(client: CongressClient, congress: int, bill_type: str, number: 
     path = f"/bill/{congress}/{bill_type}/{number}"
     detail = client.get(path)["bill"]
     actions = list(client.paginate(f"{path}/actions", "actions"))
+    versions = client.get(f"{path}/text").get("textVersions", [])
 
     row = clean_bill(detail)
     row["policy_area"] = (detail.get("policyArea") or {}).get("name")
@@ -148,6 +150,9 @@ def refresh_bill(client: CongressClient, congress: int, bill_type: str, number: 
                 }
                 for a in actions
             ],
+        )
+        conn.cursor().executemany(
+            SAVE_VERSION_SQL, [clean_version(row["bill_id"], v) for v in versions]
         )
     return row["bill_id"]
 

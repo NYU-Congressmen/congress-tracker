@@ -48,6 +48,7 @@ Each teammate keeps their own `.env` at the repo root, and `.env.example` is the
 |---|---|---|
 | `CONGRESS_API_KEY` | Now | Authenticates requests to Congress.gov |
 | `DATABASE_URL` | To see real data | Connection string for the team's Supabase database. Ask the teammate who manages it to send it privately, and never paste it into the repo or a group chat |
+| `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL` | Once the AI service is added | Your own free Gemini key from <https://aistudio.google.com/apikey>, with the endpoint and model from `.env.example`. The AI service calls the model through OpenAI's SDK, so another provider needs only different values here |
 | `FIREBASE_PROJECT_ID` | Once login is added | Lets the API verify Firebase login tokens |
 | `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID` | Once login is added | Firebase web configuration for the React app, which identifies the project and is not secret |
 
@@ -55,11 +56,11 @@ Each teammate keeps their own `.env` at the repo root, and `.env.example` is the
 
 The database tests check migration upgrades and downgrades, cache versions, retry cooldowns, atomic writes, chamber-passage milestones and search pagination against a real PostgreSQL. They skip themselves when none is available, so `npm test` passes without one. CI always runs them against its own PostgreSQL, so installing it locally is optional and only needed to run those tests before pushing. The tests empty their database every run, so they only use a database whose name contains "test" and refuse anything else. Set `REQUIRE_TEST_DATABASE=1` to make an unavailable test database fail locally as it does in CI.
 
-On Linux, install PostgreSQL, give your user permission to create databases, and create the test database:
+On Linux, install PostgreSQL and pgvector, make your user a superuser of the local PostgreSQL, because enabling pgvector requires one, and create the test database. The pgvector package must match your PostgreSQL version, which is 18 on current Ubuntu:
 
 ```bash
-sudo apt install postgresql
-sudo -u postgres createuser --createdb "$USER"
+sudo apt install postgresql postgresql-18-pgvector
+sudo -u postgres createuser --superuser "$USER"
 createdb congress_test
 ```
 
@@ -67,11 +68,14 @@ On macOS with Homebrew:
 
 ```bash
 brew install postgresql@17
+brew install pgvector
 brew services start postgresql@17
 createdb congress_test
 ```
 
 On Windows, install PostgreSQL from <https://www.postgresql.org/download/windows/>, create a database named `congress_test` in pgAdmin, and set `TEST_DATABASE_URL` to `postgresql://postgres:your-password@localhost:5432/congress_test` before running the tests. Linux and macOS need no variable, because the tests connect to `congress_test` through the local socket by default.
+
+The migrations enable the pgvector extension, so the test database needs pgvector installed as well. The commands above include it on Linux and macOS. On Windows, follow the installation steps at <https://github.com/pgvector/pgvector#windows>. CI uses the `pgvector/pgvector:pg17` image, which has it built in.
 
 ## Troubleshooting
 

@@ -50,8 +50,19 @@ def clean_bill(b: dict[str, Any]) -> dict[str, Any]:
 
 
 def sync_bills(client: CongressClient, max_items: int | None = None) -> int:
-    """Download bills of the current Congress, newest changes first, and return how many."""
-    bills = client.paginate(f"/bill/{CONGRESS}", "bills", sort="updateDate desc")
-    rows = [clean_bill(b) for b in islice(bills, max_items)]
-    execute_many(SAVE_BILL_SQL, rows)
+    """Download bills of the current Congress and return how many distinct bills were saved.
+
+    A full sync uses the API's default order, because sorting by updateDate pages unreliably:
+    thousands of bills share one date, and page boundaries cut those ties differently, so a
+    sorted read skips some bills. A partial sync sorts newest first, since the newest changes
+    are the point of a quick run.
+    """
+    path = f"/bill/{CONGRESS}"
+    if max_items:
+        bills = islice(client.paginate(path, "bills", sort="updateDate desc"), max_items)
+    else:
+        bills = client.collect(path, "bills", lambda b: (b["type"], b["number"]))
+    # A bill read twice keeps its later, newer copy, so each one is saved once
+    rows = {row["bill_id"]: row for row in map(clean_bill, bills)}
+    execute_many(SAVE_BILL_SQL, list(rows.values()))
     return len(rows)
