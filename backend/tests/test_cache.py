@@ -436,3 +436,85 @@ def test_opening_a_bill_stores_its_text_versions_without_their_text(api):
     assert rows == [
         ("Introduced in House", "https://www.congress.gov/119/bills/hr1/BILLS-119hr1ih.htm", None)
     ]
+
+
+def add_listed_bill() -> None:
+    """Insert a bill the list sync saved, which has no text versions yet."""
+    with psycopg.connect(TEST_DATABASE_URL) as conn:
+        conn.execute(
+            "INSERT INTO bills (bill_id, congress, type, number, title) "
+            "VALUES ('119-hr-1', 119, 'hr', 1, 'Example Act')"
+        )
+
+
+def test_texts_fetches_the_list_for_a_bill_nobody_opened(api):
+    client, fake = api
+    add_listed_bill()
+
+    versions = client.get("/api/bills/119/hr/1/texts").json()
+    again = client.get("/api/bills/119/hr/1/texts").json()
+
+    assert [version["version_type"] for version in versions] == ["Introduced in House"]
+    assert again == versions
+    # The second read came from the database
+    assert fake.paths == ["/bill/119/hr/1/text"]
+
+
+def test_texts_fetches_the_list_for_a_bill_cached_before_versions_were_stored(api):
+    client, fake = api
+    client.get("/api/bills/119/hr/1")
+    with psycopg.connect(TEST_DATABASE_URL) as conn:
+        conn.execute("DELETE FROM text_versions")
+    fake.paths.clear()
+
+    versions = client.get("/api/bills/119/hr/1/texts").json()
+
+    assert len(versions) == 1
+    assert fake.paths == ["/bill/119/hr/1/text"]
+
+
+def test_diff_fetches_the_list_for_a_bill_nobody_opened(api, monkeypatch):
+    client, fake = api
+    add_listed_bill()
+
+    def fake_get(url, **kwargs):
+        return httpx.Response(200, text="<pre>SEC. 1.</pre>", request=httpx.Request("GET", url))
+
+    monkeypatch.setattr("app.sync.texts.httpx.get", fake_get)
+    params = {"from": "Introduced in House", "to": "Introduced in House"}
+
+    response = client.get("/api/bills/119/hr/1/diff", params=params)
+
+    assert response.status_code == 200
+    assert response.json()["changes"] == []
+
+
+def test_failed_fetch_leaves_the_list_empty_and_starts_the_cooldown(api):
+    client, fake = api
+    add_listed_bill()
+    fake.down = True
+
+    first = client.get("/api/bills/119/hr/1/texts")
+    calls = len(fake.paths)
+    second = client.get("/api/bills/119/hr/1/texts")
+
+    assert (first.status_code, first.json()) == (200, [])
+    assert second.json() == []
+    # The cooldown stops the second request from reaching Congress.gov
+    assert len(fake.paths) == calls
+
+
+def test_texts_rejects_a_bill_that_is_not_stored(api):
+    client, fake = api
+
+    assert client.get("/api/bills/119/hr/1/texts").status_code == 404
+    assert fake.paths == []
+
+
+def test_texts_skips_the_fetch_without_an_api_key(api, monkeypatch):
+    client, fake = api
+    add_listed_bill()
+    monkeypatch.setattr(settings, "congress_api_key", None)
+
+    assert client.get("/api/bills/119/hr/1/texts").json() == []
+    assert fake.paths == []
