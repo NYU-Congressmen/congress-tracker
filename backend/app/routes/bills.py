@@ -1,3 +1,4 @@
+import difflib
 from datetime import date
 from typing import Annotated, Any
 
@@ -6,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app.config import settings
 from app.db import fetch_all, fetch_one
-from app.models import BillDetail, BillPage, BillType, Status
+from app.models import BillDetail, BillDiff, BillPage, BillType, Status, TextVersion
 from app.sync.bills import make_bill_id
 from app.sync.cache import (
     REFRESH_BUDGET,
@@ -18,6 +19,7 @@ from app.sync.cache import (
     retry_allowed,
 )
 from app.sync.client import CongressClient
+from app.sync.texts import load_text
 
 router = APIRouter(tags=["bills"])
 
@@ -110,3 +112,40 @@ def get_bill(congress: int, bill_type: BillType, number: int) -> dict[str, Any]:
         "retry_after": row["details_retry_after"],
     }
     return {**row, "sponsor": sponsor, "actions": actions, "cache": cache}
+
+
+@router.get("/bills/{congress}/{bill_type}/{number}/texts", response_model=list[TextVersion])
+def list_text_versions(congress: int, bill_type: BillType, number: int) -> list[dict[str, Any]]:
+    """Return a bill's stored text versions, oldest first. Opening the bill stores them."""
+    return fetch_all(
+        """
+        SELECT version_type, version_date, text_url, pdf_url, text IS NOT NULL AS downloaded
+        FROM text_versions WHERE bill_id = %s
+        ORDER BY version_date ASC NULLS LAST, version_type
+        """,
+        (make_bill_id(congress, bill_type, number),),
+    )
+
+
+@router.get("/bills/{congress}/{bill_type}/{number}/diff", response_model=BillDiff)
+def diff_text_versions(
+    congress: int,
+    bill_type: BillType,
+    number: int,
+    from_: Annotated[str, Query(alias="from")],
+    to: str,
+) -> dict[str, Any]:
+    """Return the changes between two text versions, downloading either text not yet stored."""
+    bill_id = make_bill_id(congress, bill_type, number)
+    try:
+        old, new = load_text(bill_id, from_), load_text(bill_id, to)
+    except LookupError as error:
+        raise HTTPException(404, str(error)) from error
+    except httpx.HTTPError as error:
+        raise HTTPException(502, "The bill text could not be downloaded") from error
+    if old is None or new is None:
+        raise HTTPException(404, "One of these versions has no formatted text to compare")
+    changes = difflib.unified_diff(
+        old.splitlines(), new.splitlines(), fromfile=from_, tofile=to, lineterm=""
+    )
+    return {"from_version": from_, "to_version": to, "changes": list(changes)}
