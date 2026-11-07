@@ -2,9 +2,30 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/svg+xml" href="/capitol.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Congress Tracker</title>
+    <meta
+      name="description"
+      content="Follow the 119th Congress: search bills, browse members of Congress, and track legislation from introduction to law."
+    />
+    <meta name="theme-color" content="#162e51" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Congress Tracker — Follow the 119th Congress</title>
+    <script>
+      // Apply the stored theme choice before first paint so a forced
+      // light/dark mode never flashes the other palette. 'auto' (or no
+      // choice) leaves the attribute off and follows the OS setting.
+      ;(function () {
+        try {
+          var stored = localStorage.getItem('congress-tracker-theme')
+          if (stored === 'light' || stored === 'dark') {
+            document.documentElement.dataset.theme = stored
+          }
+        } catch (error) {
+          /* storage unavailable: default to the system setting */
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

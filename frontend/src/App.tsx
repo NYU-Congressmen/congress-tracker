@@ -1,29 +1,30 @@
-import { useEffect, useState } from 'react'
-import { getHealth, type Health } from './api/client'
+import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { Layout } from './components/layout/Layout'
+import AboutPage from './pages/AboutPage'
+import BillDetailPage from './pages/BillDetailPage'
+import BillsPage from './pages/BillsPage'
+import DashboardPage from './pages/DashboardPage'
+import MemberDetailPage from './pages/MemberDetailPage'
+import MembersPage from './pages/MembersPage'
+import NotFoundPage from './pages/NotFoundPage'
 
-// Render the API's health report or the connection error.
-function App() {
-  const [health, setHealth] = useState<Health | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    getHealth().then(setHealth, (e: Error) => setError(e.message))
-  }, [])
-
+// Every route renders through the shared Layout, so the header, footer and
+// banner stay consistent. Add a new tracking category by registering a page
+// here and an entry in NAV_ITEMS.
+export default function App() {
   return (
-    <main>
-      <h1>Congress Tracker</h1>
-      {error && <p>API unreachable: {error}</p>}
-      {!error && !health && <p>Checking the API…</p>}
-      {health && (
-        <ul>
-          <li>API status: {health.status}</li>
-          <li>Database configured: {health.database_configured ? 'yes' : 'no'}</li>
-          <li>Congress.gov key configured: {health.congress_api_configured ? 'yes' : 'no'}</li>
-        </ul>
-      )}
-    </main>
+    <BrowserRouter>
+      <Routes>
+        <Route element={<Layout />}>
+          <Route index element={<DashboardPage />} />
+          <Route path="bills" element={<BillsPage />} />
+          <Route path="bills/:congress/:type/:number" element={<BillDetailPage />} />
+          <Route path="members" element={<MembersPage />} />
+          <Route path="members/:bioguideId" element={<MemberDetailPage />} />
+          <Route path="about" element={<AboutPage />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
   )
 }
-
-export default App
