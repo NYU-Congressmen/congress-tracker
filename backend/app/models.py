@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 BillType = Literal["hr", "s", "hjres", "sjres", "hconres", "sconres", "hres", "sres"]
 Status = Literal[
@@ -13,6 +13,9 @@ Status = Literal[
     "became_law",
 ]
 Stance = Literal["support", "oppose", "unsure"]
+
+# Far beyond any real post, while keeping huge pastes out of the database and the AI brief
+MAX_REVIEW_TEXT = 20_000
 
 
 class CacheInfo(BaseModel):
@@ -124,9 +127,18 @@ class ReviewIn(BaseModel):
     """Describe what a user writes when reviewing a bill."""
 
     stance: Stance
-    story: str | None = None
-    action_taken: str | None = None
+    story: str | None = Field(default=None, max_length=MAX_REVIEW_TEXT)
+    action_taken: str | None = Field(default=None, max_length=MAX_REVIEW_TEXT)
     consent_to_share: bool = False
+
+    @field_validator("story", "action_taken")
+    @classmethod
+    def clean_text(cls, value: str | None) -> str | None:
+        """Return the text as written, or None when it is blank, and refuse a null character."""
+        # PostgreSQL text cannot hold a null character, so it would otherwise fail on saving
+        if value is not None and "\x00" in value:
+            raise ValueError("Text cannot contain a null character")
+        return value if value and value.strip() else None
 
 
 class Review(ReviewIn):

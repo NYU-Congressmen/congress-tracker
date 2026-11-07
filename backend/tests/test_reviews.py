@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from app.auth import current_uid
 from app.main import app
+from app.models import MAX_REVIEW_TEXT
 from tests.conftest import TEST_DATABASE_URL
 
 URL = "/api/bills/119/hr/1/review"
@@ -20,7 +21,7 @@ def signed_in(db):
             "VALUES ('119-hr-1', 119, 'hr', 1, 'Example Act')"
         )
         conn.execute("INSERT INTO users (uid, phone) VALUES ('user-1', '+15550000001')")
-    # The stubbed sign-in: every request in the test is made as user-1
+    # Every request in the test is made as user-1
     app.dependency_overrides[current_uid] = lambda: "user-1"
     yield TestClient(app)
     app.dependency_overrides.clear()
@@ -65,3 +66,30 @@ def test_reviews_need_sign_in(db):
     client = TestClient(app)
     assert client.put(URL, json={"stance": "support"}).status_code == 401
     assert client.get(URL).status_code == 401
+
+
+def test_blank_text_is_stored_as_no_text(signed_in):
+    body = signed_in.put(URL, json={"stance": "unsure", "story": "   ", "action_taken": ""}).json()
+
+    assert body["story"] is None
+    assert body["action_taken"] is None
+
+
+def test_story_is_kept_exactly_as_written(signed_in):
+    story = "  My clinic closed.\n\nWe drive two hours now.  "
+
+    assert signed_in.put(URL, json={"stance": "oppose", "story": story}).json()["story"] == story
+
+
+def test_null_character_is_rejected(signed_in):
+    response = signed_in.put(URL, json={"stance": "oppose", "story": "a\x00b"})
+
+    assert response.status_code == 422
+
+
+def test_text_length_limit(signed_in):
+    longest = "x" * MAX_REVIEW_TEXT
+
+    assert signed_in.put(URL, json={"stance": "oppose", "story": longest}).status_code == 200
+    response = signed_in.put(URL, json={"stance": "oppose", "story": longest + "x"})
+    assert response.status_code == 422
