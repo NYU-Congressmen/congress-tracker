@@ -1,7 +1,5 @@
 """Explain a bill in plain language from its text, status and committees."""
 
-import html
-import re
 from dataclasses import dataclass
 
 import httpx
@@ -10,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from app.config import settings
 from app.sync.client import CongressClient
+from app.sync.texts import plain_text
 
 TEXT_TIMEOUT = 30.0
 LLM_TIMEOUT = 60.0
@@ -69,12 +68,6 @@ class ExplainResult:
     model: str
     input_tokens: int
     output_tokens: int
-
-
-def plain_text(page: str) -> str:
-    """Return the readable text of a Congress.gov formatted-text page."""
-    text = re.sub(r"<[^>]+>", "", page)
-    return html.unescape(text).strip()
 
 
 def related_line(related: dict) -> str:

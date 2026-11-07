@@ -1,8 +1,9 @@
+import html
+import re
 from typing import Any
 
 import httpx
 
-from app.ai.explainer import plain_text
 from app.db import connect, fetch_one
 
 # Some bills run to hundreds of pages, so the download gets the same patience as the explainer
@@ -11,7 +12,7 @@ TEXT_TIMEOUT = 30.0
 # Each Congress.gov format name and the column its link is stored in
 FORMAT_COLUMNS = {"Formatted Text": "text_url", "PDF": "pdf_url", "Formatted XML": "xml_url"}
 
-# The cached text stays only while its link is the same; a new link means the old text is stale
+# The cached text stays only while its link is the same, because a new link means stale text
 SAVE_VERSION_SQL = """
     INSERT INTO text_versions (bill_id, version_type, version_date, text_url, pdf_url, xml_url)
     VALUES (%(bill_id)s, %(version_type)s, %(version_date)s, %(text_url)s, %(pdf_url)s,
@@ -24,6 +25,12 @@ SAVE_VERSION_SQL = """
         text = CASE WHEN text_versions.text_url IS DISTINCT FROM EXCLUDED.text_url
                     THEN NULL ELSE text_versions.text END
 """
+
+
+def plain_text(page: str) -> str:
+    """Return the readable text of a Congress.gov formatted-text page."""
+    text = re.sub(r"<[^>]+>", "", page)
+    return html.unescape(text).strip()
 
 
 def clean_version(bill_id: str, version: dict[str, Any]) -> dict[str, Any]:

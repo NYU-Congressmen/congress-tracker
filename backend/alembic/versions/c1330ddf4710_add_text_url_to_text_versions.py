@@ -1,4 +1,4 @@
-"""add text url to text versions
+"""Add the formatted-text link to text versions.
 
 Revision ID: c1330ddf4710
 Revises: 69e9a6ddebfb

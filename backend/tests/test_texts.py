@@ -27,7 +27,8 @@ def test_clean_version_keeps_each_link_and_tolerates_missing_ones():
     assert row["version_type"] == "Public Law"
     assert row["text_url"].endswith(".htm")
     assert row["pdf_url"].endswith(".pdf")
-    assert row["xml_url"] is None  # this version has no Formatted XML
+    # This version has no Formatted XML
+    assert row["xml_url"] is None
 
 
 def test_clean_version_without_a_date():
@@ -56,7 +57,8 @@ def test_load_text_downloads_once_then_reads_the_cache(db, monkeypatch):
     monkeypatch.setattr("app.sync.texts.httpx.get", fake_get)
     assert load_text("119-hr-1", "Introduced in House") == "SEC. 1. Short title."
     assert load_text("119-hr-1", "Introduced in House") == "SEC. 1. Short title."
-    assert downloads == ["https://example.test/ih.htm"]  # the second call came from Postgres
+    # The second call came from Postgres
+    assert downloads == ["https://example.test/ih.htm"]
 
     with pytest.raises(LookupError):
         load_text("119-hr-1", "Enrolled Bill")
@@ -95,7 +97,8 @@ def test_diff_downloads_only_the_missing_version_and_shows_the_changes(db, monke
     body = client.get("/api/bills/119/hr/1/diff", params=params).json()
     assert "-SEC. 1. Tax rate is 20%." in body["changes"]
     assert "+SEC. 1. Tax rate is 25%." in body["changes"]
-    assert downloads == ["https://example.test/eh.htm"]  # only the version not yet stored
+    # Only the version not yet stored was downloaded
+    assert downloads == ["https://example.test/eh.htm"]
 
     params["to"] = "Enrolled Bill"
     assert client.get("/api/bills/119/hr/1/diff", params=params).status_code == 404
@@ -117,4 +120,5 @@ def test_a_new_link_clears_the_cached_text(db):
         }
         conn.execute(SAVE_VERSION_SQL, clean_version("119-hr-1", version))
         text = conn.execute("SELECT text FROM text_versions").fetchone()[0]
-    assert text is None  # downloaded again from the new link the next time it is needed
+    # The text is downloaded again from the new link the next time it is needed
+    assert text is None
