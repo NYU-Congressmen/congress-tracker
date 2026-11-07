@@ -1,6 +1,6 @@
 import sys
 
-from app.ai.explainer import explain, fetch_bill, llm_client
+from app.ai.explainer import explain, fetch_bill
 from app.config import settings
 from app.sync.client import CongressClient
 
@@ -18,7 +18,7 @@ def main(argv: list[str]) -> int:
     congress, bill_type, number = int(argv[0]), argv[1].lower(), int(argv[2])
     with CongressClient(settings.congress_api_key) as congress_client:
         bill = fetch_bill(congress_client, congress, bill_type, number)
-    result = explain(bill, llm_client(), settings.llm_model)
+    result = explain(bill)
     parts = result.explanation
     print(f"{bill.label}: {bill.title}\n{result.source}\n")
     for heading, body in (
@@ -28,7 +28,14 @@ def main(argv: list[str]) -> int:
         ("Who decides", parts.decides),
     ):
         print(f"{heading}\n{body}\n")
-    print(f"{result.model}: {result.input_tokens} input and {result.output_tokens} output tokens")
+    if result.cached:
+        print(f"{result.model}: from the cache, with no model call")
+    else:
+        cost = "unknown cost" if result.cost_usd is None else f"${result.cost_usd:.6f}"
+        print(
+            f"{result.model}: {result.input_tokens} input and {result.output_tokens} output "
+            f"tokens, {cost}"
+        )
     return 0
 
 
