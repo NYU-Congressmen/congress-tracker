@@ -12,6 +12,7 @@ Status = Literal[
     "to_president",
     "became_law",
 ]
+Stance = Literal["support", "oppose", "unsure"]
 
 
 class CacheInfo(BaseModel):
@@ -110,3 +111,20 @@ class BillDiff(BaseModel):
     from_version: str
     to_version: str
     changes: list[str]
+
+
+class ReviewIn(BaseModel):
+    """Describe what a user writes when reviewing a bill."""
+
+    stance: Stance
+    story: str | None = None
+    action_taken: str | None = None
+    consent_to_share: bool = False
+
+
+class Review(ReviewIn):
+    """Describe a saved review of one bill by the signed-in user."""
+
+    bill_id: str
+    created_at: datetime
+    updated_at: datetime
