@@ -14,7 +14,7 @@ function ScrollToTop() {
   return null
 }
 
-// Shared page shell: banner, header, main content area and footer.
+// Shared page shell: header, main content area and footer.
 // New routes render through the <Outlet /> below, so the chrome never changes.
 export function Layout() {
   return (

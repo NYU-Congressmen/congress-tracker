@@ -1,9 +1,9 @@
 import { Link, NavLink } from 'react-router-dom'
-import { CONGRESS_NUMBER, NAV_ITEMS } from '../../lib/constants'
-import { CapitolIcon, FlagIcon } from '../icons'
+import { NAV_ITEMS } from '../../lib/constants'
+import { CapitolIcon } from '../icons'
 import { ThemeToggle } from '../ui/ThemeToggle'
 
-// Official-style banner plus the wordmark and primary navigation.
+// Show the wordmark and primary navigation.
 export function SiteHeader() {
   return (
     <header className="site-header">

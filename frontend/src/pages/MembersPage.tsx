@@ -22,7 +22,7 @@ interface MembersFiltersFormProps {
   onApply: (values: FilterValues) => void
 }
 
-// Draft state is seeded from the URL; the page remounts the form with a key
+// Draft state is seeded from the URL, and the page remounts the form with a key
 // whenever the URL changes, so the fields always match the live filters.
 function MembersFiltersForm({ initial, hasFilters, onApply }: MembersFiltersFormProps) {
   const [formState, setFormState] = useState(initial.state)

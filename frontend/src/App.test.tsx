@@ -41,7 +41,6 @@ test('renders the dashboard with the live bills and members', async () => {
   render(<App />)
 
   // Chrome
-  expect(screen.getByText('An official website of Congress Tracker')).toBeTruthy()
   expect(screen.getByRole('link', { name: 'Bills' })).toBeTruthy()
   expect(screen.getByRole('link', { name: 'Members' })).toBeTruthy()
 

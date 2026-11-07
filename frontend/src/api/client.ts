@@ -11,7 +11,7 @@ export class ApiError extends Error {
   }
 }
 
-// FastAPI error bodies carry a `detail` field; surface it when it is a string.
+// FastAPI error bodies carry a `detail` field, so surface it when it is a string.
 function detailFrom(body: unknown): string | null {
   if (body !== null && typeof body === 'object' && 'detail' in body) {
     const detail = (body as { detail: unknown }).detail

@@ -5,18 +5,18 @@ export interface IconProps {
   size?: number
   className?: string
 }
-//Capitol icon from svgrepo.com, licensed to the Public Domain
+// Capitol icon from svgrepo.com, licensed to the Public Domain
 export function CapitolIcon({ size = 28, className }: IconProps) {
   return (
     <svg viewBox="0 0 512 512" width={size} height={size} className={className} aria-hidden="true" fill="currentColor">
-      <rect x="193.939" y="385.88" class="st0" width="22.939" height="40.14"/>
-      <rect x="215.787" y="312.176" class="st0" width="26.301" height="36.572"/>
-      <rect x="143.347" y="385.88" class="st0" width="22.939" height="40.14"/>
-      <rect x="269.919" y="312.176" class="st0" width="26.294" height="36.572"/>
-      <rect x="161.667" y="312.176" class="st0" width="26.294" height="36.572"/>
-      <rect x="244.531" y="385.88" class="st0" width="22.939" height="40.14"/>
-      <rect x="295.122" y="385.88" class="st0" width="22.94" height="40.14"/>
-      <path class="st0" d="M423.571,402.456v-9.599c5.026-7.469,7.822-16.342,7.822-25.536c0-16.881-9.174-31.659-22.793-39.614
+      <rect x="193.939" y="385.88" className="st0" width="22.939" height="40.14"/>
+      <rect x="215.787" y="312.176" className="st0" width="26.301" height="36.572"/>
+      <rect x="143.347" y="385.88" className="st0" width="22.939" height="40.14"/>
+      <rect x="269.919" y="312.176" className="st0" width="26.294" height="36.572"/>
+      <rect x="161.667" y="312.176" className="st0" width="26.294" height="36.572"/>
+      <rect x="244.531" y="385.88" className="st0" width="22.939" height="40.14"/>
+      <rect x="295.122" y="385.88" className="st0" width="22.94" height="40.14"/>
+      <path className="st0" d="M423.571,402.456v-9.599c5.026-7.469,7.822-16.342,7.822-25.536c0-16.881-9.174-31.659-22.793-39.614
       c9.792-8.614,16.003-21.208,16.003-35.101c0-13.713-6.178-26.341-16.083-35.034c0.34-2.524,0.453-5.086,0.066-7.656
       c-8.447-55.977-47.336-102.687-99.485-121.866c0-0.007,0-0.007,0-0.014c2.21-4.553,3.448-9.652,3.448-15.044
       c0-9.606-3.954-18.293-10.304-24.564c0.658-2.782,1.038-5.671,1.038-8.647V60.47c0-4.979-0.965-9.845-2.909-14.565l-9.439-22.64
@@ -36,8 +36,8 @@ export function CapitolIcon({ size = 28, className }: IconProps) {
       c-10.624-0.213-19.178-8.854-19.178-19.524c0-8.96,6.058-16.429,14.273-18.752h254.129c8.214,2.324,14.272,9.793,14.272,18.752
       c0,10.67-8.554,19.311-19.172,19.524v36.618h7.395c10.252,0,18.566,8.315,18.566,18.572c0,6.238-3.102,11.723-7.822,15.091v43.609
       h8.66c11.782,0,21.342,9.559,21.342,21.348V484.734z"/>
-      <rect x="345.713" y="385.88" class="st0" width="22.933" height="40.14"/>
-      <rect x="324.039" y="312.176" class="st0" width="26.294" height="36.572"/>
+      <rect x="345.713" y="385.88" className="st0" width="22.933" height="40.14"/>
+      <rect x="324.039" y="312.176" className="st0" width="26.294" height="36.572"/>
     </svg>
   )
 }
@@ -134,7 +134,7 @@ export function CalendarIcon({ size = 18, className }: IconProps) {
     </svg>
   )
 }
-//SunIcon from svgrepo.com, made by wishforge-games
+// SunIcon from svgrepo.com, made by wishforge-games
 export function SunIcon({ size = 18, className }: IconProps) {
   return (
     <svg viewBox="0 0 32 32" width={size} height={size} className={className} aria-hidden="true" fill="currentColor">
@@ -154,7 +154,7 @@ export function SunIcon({ size = 18, className }: IconProps) {
     </svg>
   )
 }
-//MoonIcon based on icon from svgrepo.com, made by wishforge-games
+// MoonIcon based on icon from svgrepo.com, made by wishforge-games
 export function MoonIcon({ size = 18, className }: IconProps) {
   return (
     <svg viewBox="0 0 32 32" width={size} height={size} className={className} aria-hidden="true" fill="currentColor">
@@ -170,7 +170,7 @@ export function MoonIcon({ size = 18, className }: IconProps) {
   )
 }
 
-//AutoIcon from svgrepo.com, made by wishforge-games
+// AutoIcon from svgrepo.com, made by wishforge-games
 export function AutoIcon({ size = 18, className }: IconProps) {
   return (
     <svg viewBox="0 0 32 32" width={size} height={size} className={className} aria-hidden="true" fill="currentColor">

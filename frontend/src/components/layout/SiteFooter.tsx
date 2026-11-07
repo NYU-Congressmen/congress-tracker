@@ -32,11 +32,13 @@ export function SiteFooter() {
         <nav className="site-footer__col" aria-label="Data and API">
           <h3>Data &amp; API</h3>
           <ul>
-            <li>
-              <a href="http://localhost:8000/docs" target="_blank" rel="noreferrer">
-                API documentation
-              </a>
-            </li>
+            {import.meta.env.DEV && (
+              <li>
+                <a href="http://localhost:8000/docs" target="_blank" rel="noreferrer">
+                  API documentation
+                </a>
+              </li>
+            )}
             <li>
               <a href="https://www.congress.gov" target="_blank" rel="noreferrer">
                 congress.gov

@@ -4,13 +4,13 @@ import { InfoIcon } from '../icons'
 
 interface CacheNoticeProps {
   cache: CacheInfo
-  // What the cache covers, e.g. "This bill's full record" or
+  // What the cache covers, such as "This bill's full record" or
   // "This member's sponsored bills".
   what: string
 }
 
 // The API's `cache` object distinguishes a complete fresh result from a
-// stored-but-incomplete or stale one; surface that honestly to the reader.
+// stored-but-incomplete or stale one, so surface that honestly to the reader.
 export function CacheNotice({ cache, what }: CacheNoticeProps) {
   if (cache.complete && !cache.stale && !cache.refresh_failed) return null
 

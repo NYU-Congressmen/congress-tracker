@@ -30,7 +30,7 @@ export default function DashboardPage() {
   )
 
   // One aggregate request per stage plus the membership gives the dashboard
-  // its tallies; each call returns just a total, so they stay cheap.
+  // its tallies, and each call returns just a total, so they stay cheap.
   const { data: overview, loading: overviewLoading } = useApi(async () => {
     const [total, ...byStatus] = await Promise.all([
       searchBills({ limit: 1 }),

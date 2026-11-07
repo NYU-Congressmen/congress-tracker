@@ -117,11 +117,13 @@ export default function AboutPage() {
           <section className="panel" aria-label="Links">
             <h2>Links</h2>
             <ul className="link-list">
-              <li>
-                <a href="http://localhost:8000/docs" target="_blank" rel="noreferrer">
-                  Interactive API documentation
-                </a>
-              </li>
+              {import.meta.env.DEV && (
+                <li>
+                  <a href="http://localhost:8000/docs" target="_blank" rel="noreferrer">
+                    Interactive API documentation
+                  </a>
+                </li>
+              )}
               <li>
                 <a href="https://www.congress.gov" target="_blank" rel="noreferrer">
                   congress.gov

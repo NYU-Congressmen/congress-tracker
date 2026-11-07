@@ -1,6 +1,6 @@
 import type { BillStatus } from '../api/bills'
 
-// The sync job stores the 119th Congress; new Congresses can be added here
+// The sync job stores the 119th Congress, and new Congresses can be added here
 // without touching the pages that display them.
 export const CONGRESS_NUMBER = 119
 

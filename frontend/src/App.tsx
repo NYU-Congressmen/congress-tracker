@@ -8,8 +8,8 @@ import MemberDetailPage from './pages/MemberDetailPage'
 import MembersPage from './pages/MembersPage'
 import NotFoundPage from './pages/NotFoundPage'
 
-// Every route renders through the shared Layout, so the header, footer and
-// banner stay consistent. Add a new tracking category by registering a page
+// Every route renders through the shared Layout, so the header and footer
+// stay consistent. Add a new tracking category by registering a page
 // here and an entry in NAV_ITEMS.
 export default function App() {
   return (
