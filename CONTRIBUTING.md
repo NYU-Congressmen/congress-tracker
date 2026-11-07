@@ -1,6 +1,6 @@
 # Contributing
 
-This file covers working on Congress Tracker once your laptop is set up. If you have not set it up yet, follow [SETUP.md](SETUP.md) first, and see the [README](README.md) for what the project is and where it stands.
+This file covers working on Pull once your laptop is set up. If you have not set it up yet, follow [SETUP.md](SETUP.md) first, and see the [README](README.md) for what the project is and where it stands.
 
 ## Branches
 
