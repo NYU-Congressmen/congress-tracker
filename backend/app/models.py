@@ -50,6 +50,13 @@ class BillPage(BaseModel):
     data: list[BillSummary]
 
 
+class Issue(BaseModel):
+    """Describe an issue a person can choose for their feed."""
+
+    issue_id: int
+    name: str
+
+
 class Member(BaseModel):
     """Describe a current or former member of Congress."""
 

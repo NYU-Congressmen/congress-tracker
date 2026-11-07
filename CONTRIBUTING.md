@@ -72,9 +72,9 @@ To add a package, run `uv add --directory backend package-name` for Python or `n
 
 ## API responses
 
-Bill lists return `total`, `page`, `limit` and `data`, ordered by latest action date descending and then bill ID ascending. The secondary order resolves date ties, although a sync that changes records between requests can still move records between pages. Member profiles include sponsored bills from the configured current Congress only. Bill detail actions retain Congress.gov's supplied sequence, including actions sharing a date.
+Bill lists return `total`, `page`, `limit` and `data`, ordered by latest action date descending and then bill ID ascending. The secondary order resolves date ties, although a sync that changes records between requests can still move records between pages. Member profiles include sponsored bills from the configured current Congress only. Bill detail actions retain Congress.gov's supplied sequence, including actions sharing a date. `GET /api/feed` returns the same shape for the bills matching one or more `issue_id` values from `GET /api/issues`, by keyword over titles and CRS summaries.
 
-Opening a bill stores its list of text versions. `GET /api/bills/{congress}/{type}/{number}/texts` lists them, oldest first, and `.../diff?from=&to=` compares two by version name, downloading and caching each text the first time it is needed.
+Opening a bill stores its list of text versions, and the texts and diff endpoints fetch that list themselves when none is stored yet. `GET /api/bills/{congress}/{type}/{number}/texts` lists them, oldest first, and `.../diff?from=&to=` compares two by version name, downloading and caching each text the first time it is needed.
 
 Both detail endpoints include a `cache` object. `complete` means the bill's details and actions, or the member's entire sponsored-bill list, were fetched successfully. It does not guarantee that the upstream source itself is complete. `stale` means that the detail version is behind the latest recorded bill version or that sponsored bills are older than a day, and is also true for a missing cache. `refreshed_at` is the last successful local fetch time. `refresh_failed` records an unsuccessful refresh, and `retry_after` gives the earliest retry time. Successful refreshes clear the failure state.
 
