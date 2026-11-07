@@ -19,7 +19,7 @@ from app.sync.cache import (
     retry_allowed,
 )
 from app.sync.client import CongressClient
-from app.sync.texts import load_text
+from app.sync.texts import load_text, refresh_text_versions
 
 router = APIRouter(tags=["bills"])
 
@@ -114,9 +114,38 @@ def get_bill(congress: int, bill_type: BillType, number: int) -> dict[str, Any]:
     return {**row, "sponsor": sponsor, "actions": actions, "cache": cache}
 
 
+def ensure_text_versions(congress: int, bill_type: BillType, number: int) -> None:
+    """Fetch a stored bill's text versions when none are saved yet.
+
+    Bills that were never opened, or were cached before versions were stored, have none. A failed
+    fetch leaves the list empty and starts the bill's retry cooldown.
+    """
+    bill_id = make_bill_id(congress, bill_type, number)
+    row = fetch_one(
+        """
+        SELECT details_retry_after,
+               EXISTS (SELECT 1 FROM text_versions t WHERE t.bill_id = bills.bill_id) AS stored
+        FROM bills WHERE bill_id = %s
+        """,
+        (bill_id,),
+    )
+    if row is None:
+        raise HTTPException(404, "Bill not found")
+    if row["stored"] or not settings.congress_api_key:
+        return
+    if not retry_allowed(row["details_retry_after"]):
+        return
+    try:
+        with CongressClient(settings.congress_api_key, budget=REFRESH_BUDGET) as client:
+            refresh_text_versions(client, bill_id, congress, bill_type, number)
+    except httpx.HTTPError:
+        record_failure("bill", bill_id)
+
+
 @router.get("/bills/{congress}/{bill_type}/{number}/texts", response_model=list[TextVersion])
 def list_text_versions(congress: int, bill_type: BillType, number: int) -> list[dict[str, Any]]:
-    """Return a bill's stored text versions, oldest first. Opening the bill stores them."""
+    """Return a bill's text versions, oldest first, fetching the list if none is stored yet."""
+    ensure_text_versions(congress, bill_type, number)
     return fetch_all(
         """
         SELECT version_type, version_date, text_url, pdf_url, text IS NOT NULL AS downloaded
@@ -137,6 +166,7 @@ def diff_text_versions(
 ) -> dict[str, Any]:
     """Return the changes between two text versions, downloading either text not yet stored."""
     bill_id = make_bill_id(congress, bill_type, number)
+    ensure_text_versions(congress, bill_type, number)
     try:
         old, new = load_text(bill_id, from_), load_text(bill_id, to)
     except LookupError as error:

@@ -5,6 +5,7 @@ from typing import Any
 import httpx
 
 from app.db import connect, fetch_one
+from app.sync.client import CongressClient
 
 # Some bills run to hundreds of pages, so the download gets the same patience as the explainer
 TEXT_TIMEOUT = 30.0
@@ -42,6 +43,17 @@ def clean_version(bill_id: str, version: dict[str, Any]) -> dict[str, Any]:
         "version_date": version.get("date"),
         **{column: urls.get(name) for name, column in FORMAT_COLUMNS.items()},
     }
+
+
+def refresh_text_versions(
+    client: CongressClient, bill_id: str, congress: int, bill_type: str, number: int
+) -> None:
+    """Fetch one bill's list of text versions and store it, without downloading any text."""
+    versions = client.get(f"/bill/{congress}/{bill_type}/{number}/text").get("textVersions", [])
+    with connect() as conn:
+        conn.cursor().executemany(
+            SAVE_VERSION_SQL, [clean_version(bill_id, version) for version in versions]
+        )
 
 
 def load_text(bill_id: str, version_type: str) -> str | None:
