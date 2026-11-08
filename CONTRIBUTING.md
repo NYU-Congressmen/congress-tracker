@@ -64,6 +64,10 @@ New endpoints go in a module under `backend/app/routes/` and are registered in `
 
 `backend/app/db.py` keeps a small pool of database connections, because opening a Supabase connection takes longer than most queries. Keep using `with connect() as conn`, which commits on success and rolls back on error.
 
+Routes that act for a user depend on `current_uid` in `backend/app/auth.py`, the one place that will verify Firebase tokens. Until sign-in exists it refuses every request, and tests stand in a user through FastAPI's dependency overrides.
+
+Every model call goes through `ask` in `backend/app/ai/service.py`, which answers from the `ai_results` cache when it can and logs each real call in `ai_calls` with its tokens and cost. The cache key covers the feature, prompt version, model and exact messages, so changed input regenerates by itself. Bump a feature's prompt version when its prompt changes. A failed call is logged and raised, never cached.
+
 Code that talks to Congress.gov lives in `backend/app/sync/`. The list sync in `bills.py`, `members.py` and `summaries.py` fills the tables cheaply, and `cache.py` fetches a single bill's or member's details when an endpoint needs them, so new endpoints should read from the database and call the cache rather than Congress.gov directly. Tests that need a database use the `db` fixture in `backend/tests/conftest.py`, and [SETUP.md](SETUP.md#database-tests) explains how to run them locally.
 
 Public response models live in `backend/app/models.py` and appear in FastAPI's `/docs` and `/openapi.json`. Update them alongside endpoint changes so frontend code depends on a documented response rather than every column in a database row. The Congress.gov client has a synchronous interface and owns an event loop for cancellable HTTP requests, so use it from synchronous routes and jobs.
@@ -72,9 +76,11 @@ To add a package, run `uv add --directory backend package-name` for Python or `n
 
 ## API responses
 
-Bill lists return `total`, `page`, `limit` and `data`, ordered by latest action date descending and then bill ID ascending. The secondary order resolves date ties, although a sync that changes records between requests can still move records between pages. Member profiles include sponsored bills from the configured current Congress only. Bill detail actions retain Congress.gov's supplied sequence, including actions sharing a date.
+Bill lists return `total`, `page`, `limit` and `data`, ordered by latest action date descending and then bill ID ascending. The secondary order resolves date ties, although a sync that changes records between requests can still move records between pages. Member profiles include sponsored bills from the configured current Congress only. Bill detail actions retain Congress.gov's supplied sequence, including actions sharing a date. `GET /api/feed` returns the same shape for the bills matching one or more `issue_id` values from `GET /api/issues`, by keyword over titles and CRS summaries.
 
-Opening a bill stores its list of text versions. `GET /api/bills/{congress}/{type}/{number}/texts` lists them, oldest first, and `.../diff?from=&to=` compares two by version name, downloading and caching each text the first time it is needed.
+`PUT /api/bills/{congress}/{type}/{number}/review` replaces the signed-in user's whole review, so a client sends every field, and anything left out returns to its default. `GET` on the same path returns that review.
+
+Opening a bill stores its list of text versions, and the texts and diff endpoints fetch that list themselves when none is stored yet. `GET /api/bills/{congress}/{type}/{number}/texts` lists them, oldest first, and `.../diff?from=&to=` compares two by version name, downloading and caching each text the first time it is needed.
 
 Both detail endpoints include a `cache` object. `complete` means the bill's details and actions, or the member's entire sponsored-bill list, were fetched successfully. It does not guarantee that the upstream source itself is complete. `stale` means that the detail version is behind the latest recorded bill version or that sponsored bills are older than a day, and is also true for a missing cache. `refreshed_at` is the last successful local fetch time. `refresh_failed` records an unsuccessful refresh, and `retry_after` gives the earliest retry time. Successful refreshes clear the failure state.
 

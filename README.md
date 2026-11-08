@@ -61,7 +61,7 @@ congress-tracker/
 │   │   ├── migrate.py       Runs Alembic, or skips without a database
 │   │   ├── db.py            Database connection and query helpers
 │   │   ├── models.py        Public API response models
-│   │   ├── routes/          Health, member and bill endpoints
+│   │   ├── routes/          Health, member, bill, feed and review endpoints
 │   │   └── sync/            Congress.gov client, list sync, cache and status rules
 │   ├── alembic/versions/    Database migrations, written as SQL
 │   └── tests/               Unit tests, plus database tests that need PostgreSQL
