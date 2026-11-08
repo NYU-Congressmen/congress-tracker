@@ -1,4 +1,4 @@
-"""Explain a bill in plain language from its text, status and committees."""
+"""Explain a bill in plain language from its CRS summary or text, status and committees."""
 
 from dataclasses import dataclass
 
@@ -6,12 +6,16 @@ import httpx
 from openai import OpenAI
 from pydantic import BaseModel, Field
 
-from app.config import settings
+from app.ai.service import ask
+from app.db import fetch_one
+from app.sync.bills import make_bill_id
 from app.sync.client import CongressClient
 from app.sync.texts import plain_text
 
 TEXT_TIMEOUT = 30.0
-LLM_TIMEOUT = 60.0
+
+# Bump when SYSTEM_PROMPT changes, so explanations from the old prompt are not reused
+PROMPT_VERSION = "explainer-v1"
 
 SYSTEM_PROMPT = (
     "You explain bills in the U.S. Congress to ordinary people who are not lawyers.\n"
@@ -49,6 +53,7 @@ class Explanation(BaseModel):
 class BillContext:
     """Hold what the explainer tells the model about one bill."""
 
+    bill_id: str
     label: str
     title: str
     sponsor: str
@@ -57,17 +62,20 @@ class BillContext:
     related: list[str]
     text_version: str
     text: str
+    from_summary: bool = False
 
 
 @dataclass
 class ExplainResult:
-    """Hold an explanation with its source label and the tokens it cost."""
+    """Hold an explanation with its source label, what it cost and whether it was cached."""
 
     explanation: Explanation
     source: str
     model: str
+    cached: bool
     input_tokens: int
     output_tokens: int
+    cost_usd: float | None
 
 
 def related_line(related: dict) -> str:
@@ -80,30 +88,55 @@ def related_line(related: dict) -> str:
     )
 
 
-def fetch_bill(client: CongressClient, congress: int, bill_type: str, number: int) -> BillContext:
-    """Fetch a bill's details, committees, related bills and earliest text and return them."""
-    path = f"/bill/{congress}/{bill_type}/{number}"
-    bill = client.get(path)["bill"]
-    committees = client.get(f"{path}/committees")["committees"]
-    related = client.get(f"{path}/relatedbills")["relatedBills"]
+def latest_summary(bill_id: str) -> dict | None:
+    """Return a bill's current CRS summary, or None when it has no summary yet."""
+    # Thirteen bills have two summaries dated the same day, so the later version code breaks ties
+    return fetch_one(
+        """
+        SELECT action_desc, text FROM bill_summaries WHERE bill_id = %s
+        ORDER BY action_date DESC NULLS LAST, version_code DESC LIMIT 1
+        """,
+        (bill_id,),
+    )
+
+
+def fetch_introduced_text(client: CongressClient, path: str) -> tuple[str, str]:
+    """Return the name and plain text of a bill's earliest text version."""
     versions = client.get(f"{path}/text")["textVersions"]
     if not versions:
-        raise LookupError(f"{bill_type.upper()} {number} has no published text yet.")
+        raise LookupError(f"{path} has no published text yet.")
     # Congress.gov lists the newest version first, and the demo bills have only the introduced one
     version = versions[-1]
     url = next(f["url"] for f in version["formats"] if f["type"] == "Formatted Text")
     page = httpx.get(url, follow_redirects=True, timeout=TEXT_TIMEOUT)
     page.raise_for_status()
+    return version["type"], plain_text(page.text)
+
+
+def fetch_bill(client: CongressClient, congress: int, bill_type: str, number: int) -> BillContext:
+    """Fetch a bill's details, committees, related bills and its CRS summary or earliest text."""
+    path = f"/bill/{congress}/{bill_type}/{number}"
+    bill_id = make_bill_id(congress, bill_type, number)
+    bill = client.get(path)["bill"]
+    committees = client.get(f"{path}/committees")["committees"]
+    related = client.get(f"{path}/relatedbills")["relatedBills"]
+    summary = latest_summary(bill_id)
+    if summary:
+        version, text = summary["action_desc"] or "latest", plain_text(summary["text"])
+    else:
+        version, text = fetch_introduced_text(client, path)
     action = bill.get("latestAction") or {}
     return BillContext(
+        bill_id=bill_id,
         label=f"{bill['type']} {bill['number']}",
         title=bill["title"],
         sponsor=", ".join(s["fullName"] for s in bill.get("sponsors", [])),
         latest_action=f"{action.get('actionDate', '')}: {action.get('text', '')}",
         committees=[f"{c['name']} ({c['chamber']})" for c in committees],
         related=[related_line(r) for r in related],
-        text_version=version["type"],
-        text=plain_text(page.text),
+        text_version=version,
+        text=text,
+        from_summary=summary is not None,
     )
 
 
@@ -116,42 +149,31 @@ def user_message(bill: BillContext) -> str:
         f"Committees: {'; '.join(bill.committees) or 'none yet'}\n"
         f"Related bills: {'; '.join(bill.related) or 'none'}\n"
         f"Text version: {bill.text_version}\n\n"
-        f"Bill text:\n{bill.text}"
+        f"{'CRS summary' if bill.from_summary else 'Bill text'}:\n{bill.text}"
     )
 
 
-def llm_client() -> OpenAI:
-    """Return a client for the model endpoint configured in .env."""
-    if not settings.llm_api_key:
-        raise RuntimeError("LLM_API_KEY is not set. Add it to the .env file at the repo root.")
-    # The SDK's default of ten minutes per request hides a stalled provider for far too long
-    return OpenAI(
-        api_key=settings.llm_api_key,
-        base_url=settings.llm_base_url,
-        timeout=LLM_TIMEOUT,
-        max_retries=2,
-    )
-
-
-def explain(bill: BillContext, client: OpenAI, model: str) -> ExplainResult:
-    """Ask the model for a structured explanation of the bill and return it with its tokens."""
-    completion = client.chat.completions.parse(
-        model=model,
-        messages=[
+def explain(bill: BillContext, client: OpenAI | None = None) -> ExplainResult:
+    """Return a structured explanation of the bill from the cache or the model."""
+    answer = ask(
+        "explanation",
+        bill.bill_id,
+        PROMPT_VERSION,
+        [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_message(bill)},
         ],
-        response_format=Explanation,
+        Explanation,
+        client,
     )
-    explanation = completion.choices[0].message.parsed
-    if explanation is None:
-        raise RuntimeError("The model returned no explanation.")
-    usage = completion.usage
+    origin = "the CRS summary" if bill.from_summary else "the bill text"
     return ExplainResult(
-        explanation=explanation,
-        # Neither demo bill has a CRS summary, so readers are told the explanation's source
-        source=f"Explained from the bill text ({bill.text_version})",
-        model=model,
-        input_tokens=usage.prompt_tokens if usage else 0,
-        output_tokens=usage.completion_tokens if usage else 0,
+        explanation=answer.value,
+        # Readers are told whether a nonpartisan summary or the bill's own text was used
+        source=f"Explained from {origin} ({bill.text_version})",
+        model=answer.model,
+        cached=answer.cached,
+        input_tokens=answer.input_tokens,
+        output_tokens=answer.output_tokens,
+        cost_usd=answer.cost_usd,
     )

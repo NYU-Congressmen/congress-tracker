@@ -66,6 +66,8 @@ New endpoints go in a module under `backend/app/routes/` and are registered in `
 
 Routes that act for a user depend on `current_uid` in `backend/app/auth.py`, the one place that will verify Firebase tokens. Until sign-in exists it refuses every request, and tests stand in a user through FastAPI's dependency overrides.
 
+Every model call goes through `ask` in `backend/app/ai/service.py`, which answers from the `ai_results` cache when it can and logs each real call in `ai_calls` with its tokens and cost. The cache key covers the feature, prompt version, model and exact messages, so changed input regenerates by itself. Bump a feature's prompt version when its prompt changes. A failed call is logged and raised, never cached.
+
 Code that talks to Congress.gov lives in `backend/app/sync/`. The list sync in `bills.py`, `members.py` and `summaries.py` fills the tables cheaply, and `cache.py` fetches a single bill's or member's details when an endpoint needs them, so new endpoints should read from the database and call the cache rather than Congress.gov directly. Tests that need a database use the `db` fixture in `backend/tests/conftest.py`, and [SETUP.md](SETUP.md#database-tests) explains how to run them locally.
 
 Public response models live in `backend/app/models.py` and appear in FastAPI's `/docs` and `/openapi.json`. Update them alongside endpoint changes so frontend code depends on a documented response rather than every column in a database row. The Congress.gov client has a synchronous interface and owns an event loop for cancellable HTTP requests, so use it from synchronous routes and jobs.
