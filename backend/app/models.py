@@ -71,6 +71,9 @@ class Member(BaseModel):
     district: int | None
     image_url: str | None
     is_current: bool
+    office_phone: str | None
+    office_address: str | None
+    website_url: str | None
 
 
 class MemberList(BaseModel):
