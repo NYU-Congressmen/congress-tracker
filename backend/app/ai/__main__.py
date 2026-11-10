@@ -21,8 +21,11 @@ def main(argv: list[str]) -> int:
     result = explain(bill)
     parts = result.explanation
     print(f"{bill.label}: {bill.title}\n{result.source}\n")
+    does = "What it does (official CRS summary)" if result.from_summary else "What it does"
+    if bill.missing:
+        print(f"Congress.gov did not return: {', '.join(bill.missing)}\n")
     for heading, body in (
-        ("What it does", parts.does),
+        (does, parts.does),
         ("What it doesn't do", parts.does_not),
         ("Where it stands", parts.stands),
         ("Who decides", parts.decides),
