@@ -3,6 +3,7 @@ import { ApiError } from '../api/client'
 import { BILL_TYPES, getBill } from '../api/bills'
 import type { BillType } from '../api/bills'
 import { ActionTimeline } from '../components/bills/ActionTimeline'
+import { BillExplanation } from '../components/bills/BillExplanation'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { ChamberFlags } from '../components/ui/ChamberFlags'
 import { CacheNotice } from '../components/ui/CacheNotice'
@@ -107,6 +108,8 @@ export default function BillDetailPage() {
         </header>
 
         <CacheNotice cache={bill.cache} what="This bill's full record" />
+
+        <BillExplanation congress={bill.congress} type={bill.type} number={bill.number} title={bill.title} />
 
         <div className="bill-detail__grid">
           <section className="panel" aria-label="Sponsor">

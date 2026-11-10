@@ -31,6 +31,7 @@ class FakeModel:
 
     def parse(self, **request):
         self.calls += 1
+        self.request = request
         if self.error:
             raise self.error
         if self.before_return:
@@ -157,3 +158,14 @@ def test_missing_model_is_reported(bill, monkeypatch):
 
     with pytest.raises(RuntimeError, match="LLM_MODEL is not set"):
         ask("explanation", bill, "v1", MESSAGES, Answer, FakeModel())
+
+
+def test_luna_runs_at_reasoning_effort_none_and_other_models_get_no_setting(bill, monkeypatch):
+    model = FakeModel()
+    ask("explanation", bill, "v1", MESSAGES, Answer, model)
+    assert model.request["reasoning_effort"] == "none"
+
+    monkeypatch.setattr(settings, "llm_model", "gemini-flash")
+    other = FakeModel()
+    ask("explanation", bill, "v1", MESSAGES, Answer, other)
+    assert "reasoning_effort" not in other.request

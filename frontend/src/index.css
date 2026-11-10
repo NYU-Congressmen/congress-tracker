@@ -1325,6 +1325,79 @@ a.chip:hover {
   color: var(--blue-70);
 }
 
+/* ----------------------------------------------------------- explanation */
+
+.explain-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.explain-part {
+  border: 1px solid var(--gray-10);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem;
+}
+
+.explain-part--wide {
+  grid-column: 1 / -1;
+}
+
+.explain-part p {
+  margin: 0 0 0.6rem;
+}
+
+.explain-part p:last-child {
+  margin-bottom: 0;
+}
+
+.explain-part__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.6rem;
+}
+
+.explain-part__head h3 {
+  font-size: 1.05rem;
+}
+
+.explain-tag {
+  padding: 0.12rem 0.6rem;
+  border-radius: 999px;
+  background: var(--gray-05);
+  color: var(--gray-70);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.explain-tag--official {
+  background: var(--blue-05);
+  color: var(--blue-70);
+}
+
+.explain-note {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  color: var(--gray-70);
+}
+
+.explain-more {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--blue-70);
+}
+
+@media (max-width: 760px) {
+  .explain-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ------------------------------------------------------------ state bits */
 
 .state {
