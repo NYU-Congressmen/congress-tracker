@@ -1392,12 +1392,6 @@ a.chip:hover {
   color: var(--blue-70);
 }
 
-.explain-source {
-  margin: 1rem 0 0;
-  font-size: 0.82rem;
-  color: var(--gray-50);
-}
-
 @media (max-width: 760px) {
   .explain-grid {
     grid-template-columns: 1fr;

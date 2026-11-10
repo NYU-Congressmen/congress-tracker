@@ -34,13 +34,13 @@ describe('BillExplanation', () => {
     expect(screen.getAllByText('AI-generated')).toHaveLength(3)
     // The summary's first paragraph only repeats the title, so it is not shown
     expect(screen.queryByText('Example Act')).toBeNull()
-    expect(screen.queryByText(/No official summary/)).toBeNull()
+    expect(screen.queryByText('Official summary not yet available.')).toBeNull()
   })
 
-  test('says every part is AI-generated when there is no official summary', async () => {
+  test('notes the missing official summary and tags every part as AI-generated', async () => {
     renderPart({ ...BASE, does: 'Requires reports.', does_source: 'ai', source: 'Explained from the bill text (Introduced in Senate)' })
 
-    expect(await screen.findByText(/No official summary has been published/)).toBeTruthy()
+    expect(await screen.findByText('Official summary not yet available.')).toBeTruthy()
     expect(screen.getAllByText('AI-generated')).toHaveLength(4)
   })
 
@@ -54,10 +54,10 @@ describe('BillExplanation', () => {
     expect(screen.getByRole('button', { name: 'Show less' })).toBeTruthy()
   })
 
-  test('tells the reader about missing lookups and a saved explanation', async () => {
+  test('notes missing lookups and a saved version briefly', async () => {
     renderPart({ ...BASE, does: 'Requires reports.', does_source: 'ai', source: 'Explained from the bill text', missing: ['committees'], from_stored: true })
 
-    expect(await screen.findByText(/did not return the bill's committees/)).toBeTruthy()
-    expect(screen.getByText(/last saved explanation/)).toBeTruthy()
+    expect(await screen.findByText(/Committees unavailable\./)).toBeTruthy()
+    expect(screen.getByText(/Showing the last saved version\./)).toBeTruthy()
   })
 })

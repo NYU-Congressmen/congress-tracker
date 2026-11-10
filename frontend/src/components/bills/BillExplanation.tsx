@@ -58,16 +58,16 @@ export function BillExplanation({ congress, type, number, title }: BillExplanati
 
   if (loading) {
     return (
-      <section className="panel" aria-label="Plain-language explanation">
-        <h2>In plain language</h2>
-        <LoadingState message="Writing a plain-language explanation. The first one for a bill can take half a minute." />
+      <section className="panel" aria-label="Explanation">
+        <h2>Explanation</h2>
+        <LoadingState message="Loading the explanation…" />
       </section>
     )
   }
   if (error || !data) {
     return (
-      <section className="panel" aria-label="Plain-language explanation">
-        <h2>In plain language</h2>
+      <section className="panel" aria-label="Explanation">
+        <h2>Explanation</h2>
         <ErrorState
           title="The explanation could not be loaded"
           message={error?.message}
@@ -82,30 +82,27 @@ export function BillExplanation({ congress, type, number, title }: BillExplanati
   const shortened = official && paragraphs.join(' ').split(/\s+/).length > SUMMARY_PREVIEW_WORDS
   const shown = shortened && !expanded ? preview(paragraphs) : paragraphs
   const notes: string[] = []
-  if (!official) {
-    notes.push('No official summary has been published for this bill yet, so all four parts are AI-generated from its text.')
-  }
+  if (!official) notes.push('Official summary not yet available.')
   if (data.missing.length > 0) {
-    notes.push(`Congress.gov did not return the bill's ${data.missing.join(' or ')} this time, so the last two parts may be incomplete.`)
+    const missing = data.missing.join(' and ')
+    notes.push(`${missing.charAt(0).toUpperCase()}${missing.slice(1)} unavailable.`)
   }
-  if (data.from_stored) {
-    notes.push('Congress.gov or the AI service could not be reached, so this is the last saved explanation.')
-  }
+  if (data.from_stored) notes.push('Showing the last saved version.')
 
   const aiParts: [string, string][] = [
-    ["What it doesn't do", data.does_not],
-    ['Where it stands', data.stands],
-    ['Who decides', data.decides],
+    ['Limits', data.does_not],
+    ['Status', data.stands],
+    ['Next steps', data.decides],
   ]
 
   return (
-    <section className="panel" aria-label="Plain-language explanation">
-      <h2>In plain language</h2>
+    <section className="panel" aria-label="Explanation">
+      <h2>Explanation</h2>
       {notes.length > 0 ? <p className="explain-note">{notes.join(' ')}</p> : null}
       <div className="explain-grid">
         <article className="explain-part explain-part--wide">
           <div className="explain-part__head">
-            <h3>What it does</h3>
+            <h3>Summary</h3>
             <SourceTag official={official} />
           </div>
           {shown.map((paragraph, index) => (
@@ -127,9 +124,6 @@ export function BillExplanation({ congress, type, number, title }: BillExplanati
           </article>
         ))}
       </div>
-      <p className="explain-source">
-        {data.source}. AI parts written by {data.model}.
-      </p>
     </section>
   )
 }
