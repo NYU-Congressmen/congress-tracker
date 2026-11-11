@@ -17,6 +17,11 @@ LLM_TIMEOUT = 60.0
 # Dollars per million input and output tokens. Models not listed log their tokens with no cost.
 PRICES = {"gpt-6-luna": (0.10, 0.50)}
 
+# Reasoning effort per model. At none, gpt-6-luna answers in 2 to 4 seconds instead of 5 to 15, and
+# with the bill's stage given it explained bills at five stages as accurately as at its default.
+# Models not listed get no setting, since some OpenAI-compatible providers reject it.
+REASONING_EFFORT = {"gpt-6-luna": "none"}
+
 SAVE_RESULT_SQL = """
     INSERT INTO ai_results (cache_key, feature, bill_id, model, prompt_version, result)
     VALUES (%(key)s, %(feature)s, %(bill_id)s, %(model)s, %(prompt_version)s, %(result)s)
@@ -101,8 +106,9 @@ def ask[Result: BaseModel](
     call = {"feature": feature, "bill_id": bill_id, "model": model}
     started = monotonic()
     try:
+        options = {"reasoning_effort": REASONING_EFFORT[model]} if model in REASONING_EFFORT else {}
         completion = (client or llm_client()).chat.completions.parse(
-            model=model, messages=messages, response_format=schema
+            model=model, messages=messages, response_format=schema, **options
         )
         value = completion.choices[0].message.parsed
         if value is None:

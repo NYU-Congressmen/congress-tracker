@@ -110,3 +110,27 @@ export function searchBills(params: BillSearchParams = {}): Promise<BillPage> {
 export function getBill(congress: number, type: BillType, number: number): Promise<BillDetail> {
   return request<BillDetail>(`/api/bills/${congress}/${type}/${number}`)
 }
+
+// Describe a bill explained in four plain-language parts, each labeled with its source.
+export interface BillExplanation {
+  bill_id: string
+  does: string
+  does_not: string
+  stands: string
+  decides: string
+  does_source: 'crs_summary' | 'ai'
+  source: string
+  model: string
+  cached: boolean
+  missing: string[]
+  from_stored: boolean
+}
+
+// Return a bill's plain-language explanation, which the backend writes on the first request.
+export function getExplanation(
+  congress: number,
+  type: BillType,
+  number: number,
+): Promise<BillExplanation> {
+  return request<BillExplanation>(`/api/bills/${congress}/${type}/${number}/explanation`)
+}

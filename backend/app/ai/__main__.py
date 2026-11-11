@@ -21,11 +21,14 @@ def main(argv: list[str]) -> int:
     result = explain(bill)
     parts = result.explanation
     print(f"{bill.label}: {bill.title}\n{result.source}\n")
+    does = "Summary (official CRS summary)" if result.from_summary else "Summary"
+    if bill.missing:
+        print(f"Congress.gov did not return: {', '.join(bill.missing)}\n")
     for heading, body in (
-        ("What it does", parts.does),
-        ("What it doesn't do", parts.does_not),
-        ("Where it stands", parts.stands),
-        ("Who decides", parts.decides),
+        (does, parts.does),
+        ("Limits", parts.does_not),
+        ("Status", parts.stands),
+        ("Next steps", parts.decides),
     ):
         print(f"{heading}\n{body}\n")
     if result.cached:

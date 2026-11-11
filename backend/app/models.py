@@ -123,6 +123,25 @@ class BillDiff(BaseModel):
     changes: list[str]
 
 
+class BillExplanation(BaseModel):
+    """A bill explained in four plain-language parts, each labeled with where it came from."""
+
+    bill_id: str
+    does: str
+    does_not: str
+    stands: str
+    decides: str
+    # The CRS summary is shown as what the bill does when one exists, and the AI writes the rest
+    does_source: Literal["crs_summary", "ai"]
+    source: str
+    model: str
+    cached: bool
+    # Facts Congress.gov could not provide this time, such as committees or related bills
+    missing: list[str]
+    # True when Congress.gov or the model failed and the bill's last saved explanation is shown
+    from_stored: bool
+
+
 class ReviewIn(BaseModel):
     """Describe what a user writes when reviewing a bill."""
 
