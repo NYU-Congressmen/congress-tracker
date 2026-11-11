@@ -225,6 +225,7 @@ def test_member_profile_caches_current_sponsored_bills(api):
                 "district": 1,
                 "image_url": None,
                 "is_current": True,
+                "update_date": None,
             }
         ],
     )
@@ -260,6 +261,7 @@ def seed_member():
                 "district": 1,
                 "image_url": None,
                 "is_current": True,
+                "update_date": None,
             }
         ],
     )
