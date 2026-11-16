@@ -3,7 +3,9 @@ import { ApiError } from '../api/client'
 import { BILL_TYPES, getBill } from '../api/bills'
 import type { BillType } from '../api/bills'
 import { ActionTimeline } from '../components/bills/ActionTimeline'
+import { BillDiff } from '../components/bills/BillDiff'
 import { BillExplanation } from '../components/bills/BillExplanation'
+import { ReviewPanel } from '../components/bills/ReviewPanel'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { ChamberFlags } from '../components/ui/ChamberFlags'
 import { CacheNotice } from '../components/ui/CacheNotice'
@@ -109,8 +111,6 @@ export default function BillDetailPage() {
 
         <CacheNotice cache={bill.cache} what="This bill's full record" />
 
-        <BillExplanation congress={bill.congress} type={bill.type} number={bill.number} title={bill.title} />
-
         <div className="bill-detail__grid">
           <section className="panel" aria-label="Sponsor">
             <h2>Sponsor</h2>
@@ -137,6 +137,39 @@ export default function BillDetailPage() {
             ) : (
               <p className="muted">The sponsor has not been recorded for this bill yet.</p>
             )}
+
+            <div className="sponsor-panel__cosponsors">
+              <h3>Co-sponsors</h3>
+              {(bill.co_sponsors ?? []).length > 0 ? (
+                <ul className="cosponsor-grid" aria-label="Co-sponsor list">
+                  {(bill.co_sponsors ?? []).map((member) => (
+                    <li key={member.bioguide_id}>
+                      <Link to={`/members/${member.bioguide_id}`} className="cosponsor-card">
+                        <span className="cosponsor-card__photo">
+                          {member.image_url ? (
+                            <img src={member.image_url} alt="" />
+                          ) : (
+                            <span className="cosponsor-card__initials" aria-hidden="true">
+                              {initialsOf(member.name)}
+                            </span>
+                          )}
+                        </span>
+                        <span className="cosponsor-card__body">
+                          <span className="cosponsor-card__name">{member.name}</span>
+                          <span className="cosponsor-card__meta">
+                            {[member.chamber, districtLabel(member.district), member.state].filter(Boolean).join(' · ')}
+                          </span>
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="muted">
+                  No co-sponsors on record yet. They appear here once the tracker records them from Congress.gov.
+                </p>
+              )}
+            </div>
           </section>
 
           <section className="panel" aria-label="Action history">
@@ -149,6 +182,12 @@ export default function BillDetailPage() {
             <ActionTimeline actions={bill.actions} />
           </section>
         </div>
+
+        <BillExplanation congress={bill.congress} type={bill.type} number={bill.number} title={bill.title} />
+
+        <BillDiff congress={bill.congress} type={bill.type} number={bill.number} />
+
+        <ReviewPanel congress={bill.congress} type={bill.type} number={bill.number} />
       </article>
     </div>
   )

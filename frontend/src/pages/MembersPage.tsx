@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { listMembers } from '../api/members'
+import type { Member } from '../api/members'
 import { MemberCard } from '../components/members/MemberCard'
 import { EmptyState } from '../components/ui/EmptyState'
 import { ErrorState } from '../components/ui/ErrorState'
@@ -9,6 +10,9 @@ import { LoadingState } from '../components/ui/LoadingState'
 import { SelectField } from '../components/ui/Fields'
 import { useApi } from '../hooks/useApi'
 import { CHAMBER_OPTIONS, PARTY_OPTIONS, STATE_OPTIONS, CONGRESS_NUMBER } from '../lib/constants'
+import { districtHeading, representativesForDistrict, stateName } from '../lib/districts'
+import { useProfile } from '../profile/ProfileContext'
+import { initialsOf } from '../lib/format'
 
 interface FilterValues {
   state: string
@@ -77,23 +81,130 @@ function MembersFiltersForm({ initial, hasFilters, onApply }: MembersFiltersForm
   )
 }
 
+// The person's representatives from the directory: the House member for the
+// district and the state's senators, each with their role labeled.
+function MyRepresentativesView() {
+  const { profile } = useProfile()
+  const district = profile?.district ?? null
+
+  const { data, loading, error, refetch } = useApi(
+    () => (district ? listMembers({ state: district.state }) : Promise.resolve(null)),
+    [district?.state],
+  )
+
+  if (!district) {
+    return (
+      <div>
+        <EmptyState
+          title="No district on your profile yet"
+          hint="Pick your congressional district and this view lists the House member and senators who represent you."
+        />
+        <p>
+          <Link to="/onboarding" className="btn btn--primary">
+            Set up my district
+          </Link>
+        </p>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return <LoadingState message="Finding your representatives…" />
+  }
+
+  if (error) {
+    return <ErrorState title="Your representatives could not be loaded" message={error.message} onRetry={refetch} />
+  }
+
+  const { house, senate } = representativesForDistrict(data?.data ?? [], district.state, district.district)
+  const mine = [
+    ...house.map((member) => ({ member, role: 'Your House member' })),
+    ...senate.map((member) => ({ member, role: 'Your senator' })),
+  ]
+
+  if (mine.length === 0) {
+    return (
+      <EmptyState
+        title="No representatives on record"
+        hint={`The directory has no current representatives for ${stateName(district.state)} yet.`}
+      />
+    )
+  }
+
+  return (
+    <div className="mymembers">
+      <p className="mymembers__heading" aria-live="polite">
+        {districtHeading(district.state, district.district)} · {mine.length} representatives
+      </p>
+      <ul className="member-grid mymembers__grid">
+        {mine.map(({ member, role }) => (
+          <MemberCardWithRole key={member.bioguide_id} member={member} role={role} />
+        ))}
+      </ul>
+      <p className="muted mymembers__hint">
+        Your senators represent the whole of {stateName(district.state)}
+        {district.district !== null ? `; your House member represents District ${district.district}.` : ', who represent you directly.'}
+      </p>
+    </div>
+  )
+}
+
+// A directory card with the representative's role labeled, for the
+// "My representatives" view.
+function MemberCardWithRole({ member, role }: { member: Member; role: string }) {
+  const partyClass = member.party ? ` member-card--${member.party.toLowerCase()}` : ''
+  return (
+    <li className={`member-card${partyClass}`}>
+      <Link to={`/members/${member.bioguide_id}`} className="member-card__link">
+        <span className="member-card__photo">
+          {member.image_url ? (
+            <img src={member.image_url} alt="" loading="lazy" />
+          ) : (
+            <span className="member-card__initials" aria-hidden="true">
+              {initialsOf(member.name)}
+            </span>
+          )}
+        </span>
+        <span className="member-card__body">
+          <span className="member-card__name">{member.name}</span>
+          <span className="member-card__meta">{role}</span>
+        </span>
+      </Link>
+    </li>
+  )
+}
+
 // The directory with state, party and chamber filters, kept in the URL so a
-// filtered view can be shared.
+// filtered view can be shared, plus a "My representatives" view driven by the
+// signed-in person's district.
 export default function MembersPage() {
   const [params, setParams] = useSearchParams()
+  const view = params.get('view') ?? 'all'
   const state = params.get('state') ?? ''
   const party = params.get('party') ?? ''
   const chamber = params.get('chamber') ?? ''
 
   const { data, loading, error, refetch } = useApi(
     () =>
-      listMembers({
-        state: state || undefined,
-        party: party || undefined,
-        chamber: chamber || undefined,
-      }),
-    [state, party, chamber],
+      view === 'all'
+        ? listMembers({
+            state: state || undefined,
+            party: party || undefined,
+            chamber: chamber || undefined,
+          })
+        : Promise.resolve(null),
+    [view, state, party, chamber],
   )
+
+  function setView(next: string) {
+    const search = new URLSearchParams(params)
+    if (next === 'all') {
+      search.delete('view')
+    } else {
+      search.set('view', next)
+    }
+    setParams(search)
+  }
 
   function applyFilters(values: FilterValues) {
     const search = new URLSearchParams()
@@ -115,34 +226,57 @@ export default function MembersPage() {
         </p>
       </header>
 
-      <MembersFiltersForm
-        key={filtersKey}
-        initial={{ state, party, chamber }}
-        hasFilters={hasFilters}
-        onApply={applyFilters}
-      />
+      <div className="page-views" role="group" aria-label="Choose a view">
+        <button
+          type="button"
+          className={`btn btn--sm ${view === 'all' ? 'btn--primary' : 'btn--ghost'}`}
+          onClick={() => setView('all')}
+        >
+          All members
+        </button>
+        <button
+          type="button"
+          className={`btn btn--sm ${view === 'mine' ? 'btn--primary' : 'btn--ghost'}`}
+          onClick={() => setView('mine')}
+        >
+          My representatives
+        </button>
+      </div>
 
-      {error ? (
-        <ErrorState title="Members could not be loaded" message={error.message} onRetry={refetch} />
-      ) : loading ? (
-        <LoadingState message="Loading the directory…" />
-      ) : data && data.data.length === 0 ? (
-        <EmptyState
-          title="No members match those filters"
-          hint="Try a different state, party or chamber combination."
-        />
-      ) : data ? (
+      {view === 'mine' ? (
+        <MyRepresentativesView />
+      ) : (
         <>
-          <p className="results-count" aria-live="polite">
-            {data.total.toLocaleString()} {data.total === 1 ? 'member' : 'members'}
-          </p>
-          <ul className="member-grid">
-            {data.data.map((member) => (
-              <MemberCard key={member.bioguide_id} member={member} />
-            ))}
-          </ul>
+          <MembersFiltersForm
+            key={filtersKey}
+            initial={{ state, party, chamber }}
+            hasFilters={hasFilters}
+            onApply={applyFilters}
+          />
+
+          {error ? (
+            <ErrorState title="Members could not be loaded" message={error.message} onRetry={refetch} />
+          ) : loading ? (
+            <LoadingState message="Loading the directory…" />
+          ) : data && data.data.length === 0 ? (
+            <EmptyState
+              title="No members match those filters"
+              hint="Try a different state, party or chamber combination."
+            />
+          ) : data ? (
+            <>
+              <p className="results-count" aria-live="polite">
+                {data.total.toLocaleString()} {data.total === 1 ? 'member' : 'members'}
+              </p>
+              <ul className="member-grid">
+                {data.data.map((member) => (
+                  <MemberCard key={member.bioguide_id} member={member} />
+                ))}
+              </ul>
+            </>
+          ) : null}
         </>
-      ) : null}
+      )}
     </div>
   )
 }

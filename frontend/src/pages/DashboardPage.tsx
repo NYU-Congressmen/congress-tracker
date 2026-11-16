@@ -5,12 +5,15 @@ import { BILL_STATUSES, searchBills } from '../api/bills'
 import { listMembers } from '../api/members'
 import { BillListItem } from '../components/bills/BillListItem'
 import { PartyComposition } from '../components/members/PartyComposition'
+import { DistrictBills } from '../components/dashboard/DistrictBills'
+import { TopicFeed } from '../components/dashboard/TopicFeed'
 import { AlertIcon } from '../components/icons'
 import { EmptyState } from '../components/ui/EmptyState'
 import { LoadingState } from '../components/ui/LoadingState'
 import { useApi } from '../hooks/useApi'
 import { STATUS_META, CONGRESS_NUMBER } from '../lib/constants'
 import { countByParty } from '../lib/stats'
+import { useProfile } from '../profile/ProfileContext'
 import type { BillStatus } from '../api/bills'
 import type { MemberList } from '../api/members'
 
@@ -58,6 +61,12 @@ export default function DashboardPage() {
 
   const liveUnreachable = latestError !== null
 
+  // The signed-in person's district and topics drive the personalized
+  // section, laid out exactly like the main dashboard below it.
+  const { profile } = useProfile()
+  const district = profile?.district ?? null
+  const topics = profile?.topics ?? []
+
   return (
     <div className="dashboard">
       <section className="hero">
@@ -93,6 +102,32 @@ export default function DashboardPage() {
           </ul>
         </div>
       </section>
+
+      {district ? (
+        <div className="container dashboard__grid" aria-label="Your dashboard">
+          <section className="panel dashboard__panel" aria-label="Your district">
+            <DistrictBills state={district.state} district={district.district} />
+          </section>
+          <div className="dashboard__side">
+            <section className="panel" aria-label="Topics you follow">
+              <TopicFeed topicIds={topics} />
+            </section>
+          </div>
+        </div>
+      ) : (
+        <section className="container dashboard__setup" aria-label="Set up your profile">
+          <div className="panel dashboard__setup-panel">
+            <h2>Make this dashboard yours</h2>
+            <p className="muted">
+              Pick your congressional district and Pull follows your representatives and the bills that concern your
+              district — plus the topics you choose to track.
+            </p>
+            <Link to="/onboarding" className="btn btn--primary">
+              Set up my profile
+            </Link>
+          </div>
+        </section>
+      )}
 
       {liveUnreachable ? (
         <div className="container dashboard__offline">

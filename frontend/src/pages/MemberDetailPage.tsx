@@ -9,10 +9,12 @@ import { LoadingState } from '../components/ui/LoadingState'
 import { useApi } from '../hooks/useApi'
 import { districtLabel, initialsOf, memberUrl } from '../lib/format'
 import { PARTY_LABELS } from '../lib/constants'
+import { useProfile } from '../profile/ProfileContext'
 
 export default function MemberDetailPage() {
   const { bioguideId } = useParams()
   const id = bioguideId ?? ''
+  const { profile } = useProfile()
 
   const { data: member, loading, error, refetch } = useApi(() => getMember(id), [id])
 
@@ -42,6 +44,20 @@ export default function MemberDetailPage() {
     )
   }
 
+  // Flag the member when they sit in the signed-in person's district, so the
+  // profile page doubles as the "my representatives" detail view.
+  const district = profile?.district ?? null
+  const isMine =
+    district !== null &&
+    (member.state ?? '').toUpperCase() === district.state.toUpperCase() &&
+    ((member.chamber === 'Senate') ||
+      (district.district !== null && member.district === district.district) ||
+      (district.district === null && member.district === null))
+
+  // The backend records co-sponsorship once Congress.gov reports it; the
+  // section is here either way, ready to fill in.
+  const coSponsored = member.co_sponsored_bills ?? []
+
   return (
     <div className="container page">
       <nav className="breadcrumbs" aria-label="Breadcrumb">
@@ -65,6 +81,7 @@ export default function MemberDetailPage() {
           </div>
           <div className="member-detail__info">
             <h1 className="member-detail__name">{member.name}</h1>
+            {isMine ? <span className="member-detail__mine">Your representative</span> : null}
             <p className="member-detail__meta">
               {[
                 member.chamber,
@@ -102,6 +119,29 @@ export default function MemberDetailPage() {
             <EmptyState
               title="No sponsored bills recorded yet"
               hint="Bills sponsored in the current Congress appear here once Congress.gov reports them."
+            />
+          )}
+        </section>
+
+        <section className="panel member-detail__bills" aria-label="Co-sponsored bills">
+          <div className="panel__heading-row">
+            <h2>Co-sponsored bills, 119th Congress</h2>
+            <span className="panel__count">
+              {coSponsored.length > 0
+                ? `${coSponsored.length} ${coSponsored.length === 1 ? 'bill' : 'bills'}`
+                : ''}
+            </span>
+          </div>
+          {coSponsored.length > 0 ? (
+            <ul className="bill-list">
+              {coSponsored.map((bill) => (
+                <BillListItem key={bill.bill_id} bill={bill} showLatestAction={false} />
+              ))}
+            </ul>
+          ) : (
+            <EmptyState
+              title="No co-sponsored bills on record yet"
+              hint="Bills this member has co-sponsored appear here once the tracker records them from Congress.gov."
             />
           )}
         </section>

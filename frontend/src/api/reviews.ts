@@ -1,0 +1,48 @@
+import { request } from './client'
+import type { BillType } from './bills'
+
+// Keep these types in step with the models in backend/app/models.py
+
+export type Stance = 'support' | 'oppose' | 'unsure'
+
+export const STANCES: readonly Stance[] = ['support', 'oppose', 'unsure']
+
+export const STANCE_LABELS: Record<Stance, string> = {
+  support: 'Support',
+  oppose: 'Oppose',
+  unsure: 'Unsure',
+}
+
+// Describe what a user writes when reviewing a bill.
+export interface ReviewIn {
+  stance: Stance
+  story?: string | null
+  action_taken?: string | null
+  consent_to_share: boolean
+}
+
+// Describe a saved review of one bill by the signed-in user.
+export interface Review extends ReviewIn {
+  bill_id: string
+  created_at: string
+  updated_at: string
+}
+
+// Return the signed-in user's review of a bill.
+export function getReview(congress: number, type: BillType, number: number): Promise<Review> {
+  return request<Review>(`/api/bills/${congress}/${type}/${number}/review`)
+}
+
+// Create or replace the signed-in user's review of a bill and return it.
+export function saveReview(
+  congress: number,
+  type: BillType,
+  number: number,
+  review: ReviewIn,
+): Promise<Review> {
+  return request<Review>(`/api/bills/${congress}/${type}/${number}/review`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(review),
+  })
+}
