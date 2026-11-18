@@ -1,6 +1,4 @@
-// The shape of a person's profile on this device. The backend will own
-// accounts once sign-in is live; until then the profile lives in localStorage
-// and the onboarding flow fills it in.
+// Define the profile data stored in the browser.
 
 // A connected social media account, e.g. { platform: 'bluesky', handle: 'maya.bsky.social' }
 export interface SocialProfile {
@@ -9,9 +7,7 @@ export interface SocialProfile {
 }
 
 // Where the person lives, for matching their representatives and bills.
-// `district` is null only for at-large delegates (the District of Columbia
-// and the territories); single-district states like Wyoming keep district 1,
-// matching how the member data numbers them.
+// Store at-large seats with a null district to match the member directory.
 export interface DistrictSelection {
   state: string
   district: number | null
@@ -28,9 +24,4 @@ export interface Profile {
   socials: SocialProfile[]
   created_at: string
   updated_at: string
-}
-
-// The stored form adds the password; the profile handed to pages never does.
-export interface Account extends Profile {
-  password: string
 }

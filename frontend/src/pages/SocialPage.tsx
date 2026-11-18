@@ -24,10 +24,16 @@ interface SelectedBill extends BillSummary {
 // profiles, their stance on a bill and the story behind it, and the bills
 // moving now that are worth weighing in on.
 export default function SocialPage() {
+  const { profile } = useProfile()
+  return <SocialContent key={profile?.username ?? ''} />
+}
+
+function SocialContent() {
   const { profile, updateProfile } = useProfile()
+  const username = profile?.username ?? null
   const [params] = useSearchParams()
 
-  // Connected profiles
+  // Saved social handles
   const [socials, setSocials] = useState<SocialProfile[]>(profile?.socials ?? [])
   const [platform, setPlatform] = useState(PLATFORMS[0].id)
   const [handle, setHandle] = useState('')
@@ -41,12 +47,11 @@ export default function SocialPage() {
   const [stance, setStance] = useState<string>('')
   const [story, setStory] = useState('')
   const [actionTaken, setActionTaken] = useState('')
-  const [consent, setConsent] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitNotice, setSubmitNotice] = useState<{ kind: 'ok' | 'draft' | 'error'; text: string } | null>(null)
 
   // Local discussion records, newest first
-  const [records, setRecords] = useState(() => listDiscussions())
+  const [records, setRecords] = useState(() => listDiscussions(username))
 
   // Preselect a bill when the reader arrives from a bill page's "your stance" link.
   const preselect = params.get('bill')
@@ -104,9 +109,9 @@ export default function SocialPage() {
         stance: stance as (typeof STANCES)[number],
         story: story.trim() || null,
         action_taken: actionTaken.trim() || null,
-        consent_to_share: consent && socials.length > 0,
+        consent_to_share: false,
       })
-      recordDiscussion({
+      recordDiscussion(username, {
         bill: {
           congress: selected.congress,
           type: selected.type,
@@ -116,18 +121,17 @@ export default function SocialPage() {
         stance: stance as (typeof STANCES)[number],
         story: story.trim() || null,
         action_taken: actionTaken.trim() || null,
-        consent: consent && socials.length > 0,
+        consent: false,
         saved: true,
         at: new Date().toISOString(),
       })
-      setRecords(listDiscussions())
+      setRecords(listDiscussions(username))
       setStory('')
       setActionTaken('')
-      setConsent(false)
       setSubmitNotice({ kind: 'ok', text: 'Your review is saved. That is how your stance shows on the bill page.' })
     } catch (cause) {
       const isAuth = cause instanceof ApiError && cause.status === 401
-      recordDiscussion({
+      recordDiscussion(username, {
         bill: {
           congress: selected.congress,
           type: selected.type,
@@ -137,14 +141,14 @@ export default function SocialPage() {
         stance: stance as (typeof STANCES)[number],
         story: story.trim() || null,
         action_taken: actionTaken.trim() || null,
-        consent: consent && socials.length > 0,
+        consent: false,
         saved: false,
         at: new Date().toISOString(),
       })
-      setRecords(listDiscussions())
+      setRecords(listDiscussions(username))
       setSubmitNotice(
         isAuth
-          ? { kind: 'draft', text: 'Sign-in through the backend is not live yet, so this is saved as a draft on this device. It will sync to your account when sign-in goes live.' }
+          ? { kind: 'draft', text: 'Draft saved in this browser.' }
           : { kind: 'error', text: cause instanceof Error ? cause.message : 'The review could not be saved right now.' },
       )
     } finally {
@@ -161,7 +165,7 @@ export default function SocialPage() {
       return
     }
     if (socials.some((social) => social.platform === platform)) {
-      setSocialError(`You already connected ${platformName(platform)}.`)
+      setSocialError(`You already saved a handle for ${platformName(platform)}.`)
       return
     }
     const next = [...socials, { platform, handle: value }]
@@ -190,8 +194,7 @@ export default function SocialPage() {
         <div className="social__prompt panel">
           <h2>Join the discussion</h2>
           <p className="muted">
-            Set up your profile and your stances attach to your account, with the option to share them to your social
-            profiles.
+            Save your discussion drafts with a profile in this browser.
           </p>
           <Link to="/onboarding" className="btn btn--primary">
             Set up my profile
@@ -203,11 +206,11 @@ export default function SocialPage() {
         <div className="panel__heading-row">
           <h2>Your social profiles</h2>
           <span className="panel__count">
-            {socials.length > 0 ? `${socials.length} ${socials.length === 1 ? 'connected' : 'connected'}` : ''}
+            {socials.length > 0 ? `${socials.length} saved` : ''}
           </span>
         </div>
         {socials.length > 0 ? (
-          <ul className="social-list" aria-label="Connected profiles">
+          <ul className="social-list" aria-label="Saved social handles">
             {socials.map((social) => (
               <li key={social.platform} className="social-list__item">
                 <span className="social-list__platform">{platformName(social.platform)}</span>
@@ -220,7 +223,7 @@ export default function SocialPage() {
           </ul>
         ) : (
           <p className="muted">
-            No profiles connected. Connect one and Pull can sign the reviews you choose to share.
+            No social handles saved.
           </p>
         )}
         <form className="social-add" onSubmit={addSocial}>
@@ -244,7 +247,7 @@ export default function SocialPage() {
             />
           </label>
           <button type="submit" className="btn btn--secondary">
-            Connect
+            Add handle
           </button>
         </form>
         {socialError ? (
@@ -348,17 +351,6 @@ export default function SocialPage() {
               onChange={(event) => setActionTaken(event.target.value)}
             />
           </label>
-
-          {socials.length > 0 ? (
-            <label className="social-consent">
-              <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} />
-              Share this to my social profiles ({socials.map((social) => platformName(social.platform)).join(', ')})
-            </label>
-          ) : (
-            <p className="muted social-consent-hint">
-              Connect a social profile above to share your reviews there.
-            </p>
-          )}
 
           <button type="submit" className="btn btn--primary btn--lg" disabled={submitting}>
             {submitting ? 'Saving…' : 'Save my stance'}

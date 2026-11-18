@@ -1,6 +1,4 @@
-// The person's discussion records on this device. The backend keeps the
-// official copy once sign-in is live; this local list keeps the thread visible
-// in the meantime and remembers which drafts are still unsaved.
+// Keep a local discussion history for each profile in the browser.
 
 import type { BillType } from '../api/bills'
 import type { Stance } from '../api/reviews'
@@ -19,9 +17,13 @@ export interface DiscussionRecord {
 const KEY = 'pull:discussions'
 const MAX_RECORDS = 50
 
-export function listDiscussions(): DiscussionRecord[] {
+function storageKey(username: string | null): string {
+  return username === null ? KEY : `${KEY}:${username}`
+}
+
+export function listDiscussions(username: string | null): DiscussionRecord[] {
   try {
-    const raw = localStorage.getItem(KEY)
+    const raw = localStorage.getItem(storageKey(username))
     if (!raw) return []
     const parsed = JSON.parse(raw)
     return Array.isArray(parsed) ? (parsed as DiscussionRecord[]) : []
@@ -32,16 +34,12 @@ export function listDiscussions(): DiscussionRecord[] {
 
 // One record per bill: a second review of the same bill replaces the first,
 // matching the backend's one-review-per-bill rule.
-export function recordDiscussion(record: DiscussionRecord): void {
-  const rest = listDiscussions().filter(
+export function recordDiscussion(username: string | null, record: DiscussionRecord): void {
+  const rest = listDiscussions(username).filter(
     (existing) =>
       existing.bill.congress !== record.bill.congress ||
       existing.bill.type !== record.bill.type ||
       existing.bill.number !== record.bill.number,
   )
-  localStorage.setItem(KEY, JSON.stringify([record, ...rest].slice(0, MAX_RECORDS)))
-}
-
-export function clearDiscussions(): void {
-  localStorage.removeItem(KEY)
+  localStorage.setItem(storageKey(username), JSON.stringify([record, ...rest].slice(0, MAX_RECORDS)))
 }

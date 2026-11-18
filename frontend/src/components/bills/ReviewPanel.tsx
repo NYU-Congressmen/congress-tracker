@@ -55,14 +55,12 @@ export function ReviewPanel({ congress, type, number }: ReviewPanelProps) {
           {data.action_taken ? <p className="review__action">What they did: {data.action_taken}</p> : null}
           <p className="muted review__meta">
             Saved {timeAgo(data.updated_at) || 'recently'}
-            {data.consent_to_share ? ' · Shared to your social profiles' : ''}
           </p>
         </div>
       ) : notFound ? (
         <p className="muted">
           You haven’t reviewed this bill yet.{' '}
-          <Link to={`/social?bill=${congress}-${type}-${number}`}>Say where you stand</Link> and, if you choose, Pull
-          signs the post to your social profiles.
+          <Link to={`/social?bill=${congress}-${type}-${number}`}>Say where you stand</Link>.
         </p>
       ) : notSignedIn ? (
         <p className="muted">

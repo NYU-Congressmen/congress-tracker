@@ -4,18 +4,18 @@ import { DistrictMap } from './DistrictMap'
 import type { FeatureCollection } from '../../geo/simplify'
 
 // Two adjacent square districts sharing the edge x=1, like the map of a tiny
-// state. District numbers come from the CD120 property.
+// state. District numbers come from the CD119 property.
 const FEATURES: FeatureCollection = {
   type: 'FeatureCollection',
   features: [
     {
       type: 'Feature',
-      properties: { CD120: '1' },
+      properties: { CD119: '1' },
       geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]] },
     },
     {
       type: 'Feature',
-      properties: { CD120: '2' },
+      properties: { CD119: '2' },
       geometry: { type: 'Polygon', coordinates: [[[1, 0], [2, 0], [2, 1], [1, 1], [1, 0]]] },
     },
   ],

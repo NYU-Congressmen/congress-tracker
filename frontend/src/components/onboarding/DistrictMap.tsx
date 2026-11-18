@@ -20,9 +20,9 @@ type View = [number, number, number, number]
 function districtOf(feature: GeoFeature): number | null {
   const props = feature.properties as Record<string, unknown> | null
   if (!props) return null
-  for (const key of ['CD120', 'CD', 'DISTRICT', 'district']) {
-    const value = Number(props[key])
-    if (Number.isInteger(value) && value > 0) return value
+  for (const key of ['CD119', 'CD', 'DISTRICT', 'district']) {
+    const value = Number(props[key] ?? undefined)
+    if (Number.isInteger(value) && value >= 0) return value
   }
   return null
 }
@@ -276,7 +276,7 @@ export function DistrictMap({ features, state, selected, onSelect }: DistrictMap
                   data-district={district}
                   role="button"
                   tabIndex={0}
-                  aria-label={`District ${district}`}
+                  aria-label={district === 0 ? 'At-large district' : `District ${district}`}
                   aria-pressed={isSelected}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter' || event.key === ' ') {

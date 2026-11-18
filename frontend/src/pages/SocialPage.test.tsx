@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import SocialPage from './SocialPage'
+import { listDiscussions, recordDiscussion } from '../social/drafts'
 import { mockApi } from '../test/fetchMock'
 
 const BILL_PAGE = {
@@ -70,7 +71,7 @@ describe('SocialPage', () => {
     expect(await screen.findByRole('heading', { name: 'Your social profiles' })).toBeTruthy()
     const input = screen.getByLabelText(/handle or profile/i)
     fireEvent.change(input, { target: { value: 'maya.bsky.social' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add handle' }))
 
     expect(await screen.findByText('maya.bsky.social')).toBeTruthy()
   })
@@ -97,12 +98,28 @@ describe('SocialPage', () => {
 
     // The backend sign-in is not live, so the review lands as a local draft
     expect(
-      await screen.findByText(/saved as a draft on this device/i),
+      await screen.findByText(/draft saved in this browser/i),
     ).toBeTruthy()
     const discussions = await screen.findByText('Your discussions', { selector: 'h2' })
     expect(discussions).toBeTruthy()
     expect(screen.getAllByText('To expand hospital coverage').length).toBeGreaterThan(1)
     expect(screen.getByText('Draft')).toBeTruthy()
+  })
+
+  test('keeps discussion drafts with their local profile', () => {
+    recordDiscussion('maya', {
+      bill: { congress: 119, type: 'hr', number: 7, title: BILL.title },
+      stance: 'support',
+      story: 'My family used this service.',
+      action_taken: null,
+      consent: false,
+      saved: false,
+      at: '2026-11-11T12:00:00Z',
+    })
+
+    expect(listDiscussions('maya')).toHaveLength(1)
+    expect(listDiscussions('sam')).toHaveLength(0)
+    expect(listDiscussions(null)).toHaveLength(0)
   })
 
   test('reports a saved review when the backend accepts it', async () => {

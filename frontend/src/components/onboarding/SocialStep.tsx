@@ -9,8 +9,7 @@ interface SocialStepProps {
   onDone: (socials: SocialProfile[]) => void
 }
 
-// Step four: connect the social profiles the person shares from, so Pull can
-// sign their posts later. Skipping is always allowed.
+// Save optional social handles with the local profile.
 export function SocialStep({ initial, onDone }: SocialStepProps) {
   const [socials, setSocials] = useState<SocialProfile[]>(initial)
   const [platform, setPlatform] = useState(PLATFORMS[0].id)
@@ -25,7 +24,7 @@ export function SocialStep({ initial, onDone }: SocialStepProps) {
       return
     }
     if (socials.some((social) => social.platform === platform)) {
-      setError(`You already connected ${platformName(platform)} on this profile.`)
+      setError(`You already saved a handle for ${platformName(platform)} on this profile.`)
       return
     }
     setSocials([...socials, { platform, handle: value }])
@@ -41,8 +40,7 @@ export function SocialStep({ initial, onDone }: SocialStepProps) {
   return (
     <div className="onboard-step">
       <p className="muted">
-        Connect the accounts you post from. Pull signs your shared reviews with these handles, and you can change
-        or remove them any time from the Social page. This step is optional.
+        Save the handles you use on social platforms. You can edit them on the Social page.
       </p>
 
       <form className="onboard-social__form" onSubmit={add}>
@@ -61,12 +59,12 @@ export function SocialStep({ initial, onDone }: SocialStepProps) {
           placeholder={PLATFORMS.find((option) => option.id === platform)?.handleHint ?? 'Your handle'}
         />
         <button type="submit" className="btn btn--secondary">
-          Connect
+          Add handle
         </button>
       </form>
 
       {socials.length > 0 ? (
-        <ul className="onboard-social__list" aria-label="Connected profiles">
+        <ul className="onboard-social__list" aria-label="Saved social handles">
           {socials.map((social) => (
             <li key={social.platform} className="onboard-social__item">
               <span className="onboard-social__platform">{platformName(social.platform)}</span>
@@ -78,7 +76,7 @@ export function SocialStep({ initial, onDone }: SocialStepProps) {
           ))}
         </ul>
       ) : (
-        <p className="muted onboard-social__empty">No profiles connected yet.</p>
+        <p className="muted onboard-social__empty">No social handles saved.</p>
       )}
 
       {error ? (

@@ -2213,7 +2213,6 @@ a.chip:hover {
 }
 
 .onboard-form,
-.onboard-address__form,
 .onboard-social__form {
   display: flex;
   flex-direction: column;
@@ -2221,32 +2220,8 @@ a.chip:hover {
   align-items: flex-start;
 }
 
-/* Street runs the full width; city and state share a row; the ZIP sits
-   below. On very narrow screens everything stacks in a single column. */
-.onboard-address__grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.9rem;
-  width: 100%;
-}
-
-.onboard-address__grid > .field:first-child {
-  grid-column: 1 / -1;
-}
-
-@media (max-width: 26em) {
-  .onboard-address__grid {
-    grid-template-columns: 1fr;
-  }
-
-  .onboard-address__grid > .field:first-child {
-    grid-column: auto;
-  }
-}
-
-.onboard-note {
-  max-width: 34rem;
-  font-size: 0.9rem;
+.onboard-form + .onboard-form {
+  margin-top: 1rem;
 }
 
 .onboard-step__actions {
@@ -2257,9 +2232,7 @@ a.chip:hover {
   margin-top: 0.8rem;
 }
 
-.onboard-note,
 .onboard-form p,
-.onboard-address p,
 .onboard-map p,
 .onboard-number p,
 .onboard-social p {
@@ -2946,23 +2919,6 @@ a.chip:hover {
   min-height: 6.5rem;
   resize: vertical;
   font-family: inherit;
-}
-
-.social-consent {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.92rem;
-}
-
-.social-consent input {
-  width: 1.1rem;
-  height: 1.1rem;
-}
-
-.social-consent-hint {
-  margin: 0;
-  font-size: 0.88rem;
 }
 
 .social-notice {

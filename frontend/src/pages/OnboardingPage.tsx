@@ -5,30 +5,24 @@ import { DistrictStep } from '../components/onboarding/DistrictStep'
 import { SocialStep } from '../components/onboarding/SocialStep'
 import { TopicsStep } from '../components/onboarding/TopicsStep'
 import { useProfile } from '../profile/ProfileContext'
-import { isUsernameTaken } from '../profile/store'
-import { platformName } from '../profile/platforms'
 import type { DistrictSelection, SocialProfile } from '../profile/types'
 import { districtHeading } from '../lib/districts'
 
 type Step = 'account' | 'district' | 'topics' | 'social' | 'done'
 
 const STEPS: { id: Step; label: string }[] = [
-  { id: 'account', label: 'Account' },
+  { id: 'account', label: 'Profile' },
   { id: 'district', label: 'District' },
   { id: 'topics', label: 'Topics' },
   { id: 'social', label: 'Social' },
 ]
 
-// The setup flow: a username and password, the person's district (by address,
-// map or number), the topics to follow, and the social profiles to connect.
-// Each step is its own component, so a later release can add steps without
-// touching the wizard.
+// Set up the local profile and dashboard preferences.
 export default function OnboardingPage() {
-  const { profile, signUp, signIn, signOut, updateProfile } = useProfile()
+  const { profile, createProfile, selectProfile, leaveProfile, updateProfile } = useProfile()
   const navigate = useNavigate()
   const [step, setStep] = useState<Step>(() => (profile ? 'district' : 'account'))
   const [username, setUsername] = useState(profile?.username ?? '')
-  const [password, setPassword] = useState<string | null>(null)
   const [district, setDistrict] = useState<DistrictSelection | null>(profile?.district ?? null)
   const [topics, setTopics] = useState<number[]>(profile?.topics ?? [])
   const [socials, setSocials] = useState<SocialProfile[]>(profile?.socials ?? [])
@@ -37,20 +31,9 @@ export default function OnboardingPage() {
   function finish(nextDistrict: DistrictSelection | null, nextTopics: number[], nextSocials: SocialProfile[]) {
     setError(null)
     try {
-      if (password !== null) {
-        if (isUsernameTaken(username)) {
-          // The name is on this device already. A matching password means it
-          // is the same person, so carry the new setup onto their account
-          // instead of failing the finish; a different password throws a
-          // readable error from signIn.
-          signIn(username, password)
-          updateProfile({ district: nextDistrict, topics: nextTopics, socials: nextSocials })
-        } else {
-          signUp(username, password, { district: nextDistrict, topics: nextTopics, socials: nextSocials })
-        }
-      } else {
-        updateProfile({ district: nextDistrict, topics: nextTopics, socials: nextSocials })
-      }
+      const details = { district: nextDistrict, topics: nextTopics, socials: nextSocials }
+      if (profile?.username === username) updateProfile(details)
+      else createProfile(username, details)
       setStep('done')
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Something went wrong while saving your profile.')
@@ -64,8 +47,7 @@ export default function OnboardingPage() {
       <header className="page__header">
         <h1>{profile ? 'Edit your profile' : 'Set up your profile'}</h1>
         <p className="page__lede">
-          Four short steps: an account, your congressional district, the topics you follow, and the social profiles
-          you post from.
+          Choose your congressional district and the topics you follow.
         </p>
       </header>
 
@@ -88,23 +70,34 @@ export default function OnboardingPage() {
       <div className="panel onboard__panel">
         {step === 'account' ? (
           <AccountStep
-            onDone={(name, secret) => {
-              if (secret === null) {
-                // Signed in: carry the existing profile forward.
-                setUsername(name)
-                setPassword(null)
-              } else {
-                setUsername(name)
-                setPassword(secret)
-              }
+            onCreate={(name) => {
+              leaveProfile()
+              setError(null)
+              setUsername(name)
+              setDistrict(null)
+              setTopics([])
+              setSocials([])
               setStep('district')
+            }}
+            onSelect={(name) => {
+              try {
+                const saved = selectProfile(name)
+                setError(null)
+                setUsername(name)
+                setDistrict(saved.district)
+                setTopics(saved.topics)
+                setSocials(saved.socials)
+                setStep('district')
+              } catch (cause) {
+                setError(cause instanceof Error ? cause.message : 'The profile could not be opened.')
+              }
             }}
           />
         ) : null}
 
         {step === 'district' ? (
           <DistrictStep
-            initial={profile?.district ?? null}
+            initial={district}
             onDone={(selection) => {
               setDistrict(selection)
               setStep('topics')
@@ -114,7 +107,7 @@ export default function OnboardingPage() {
 
         {step === 'topics' ? (
           <TopicsStep
-            initial={profile?.topics ?? []}
+            initial={topics}
             onDone={(nextTopics) => {
               setTopics(nextTopics)
               setStep('social')
@@ -124,7 +117,7 @@ export default function OnboardingPage() {
 
         {step === 'social' ? (
           <SocialStep
-            initial={profile?.socials ?? []}
+            initial={socials}
             onDone={(nextSocials) => {
               setSocials(nextSocials)
               finish(district, topics, nextSocials)
@@ -140,7 +133,6 @@ export default function OnboardingPage() {
                 ? `Your dashboard now follows ${districtHeading(district.state, district.district)}`
                 : 'Your dashboard is ready'}
               {topics.length > 0 ? ' and the newest bills on your topics' : ''}.
-              {socials.length > 0 ? ` Your posts will be signed by ${socials.map((social) => platformName(social.platform)).join(', ')}.` : ''}
             </p>
             <div className="onboard-done__actions">
               <button type="button" className="btn btn--primary btn--lg" onClick={() => navigate('/')}>
@@ -164,7 +156,10 @@ export default function OnboardingPage() {
             <button
               type="button"
               className="btn btn--ghost"
-              onClick={() => setStep(step === 'social' ? 'topics' : step === 'topics' ? 'district' : 'account')}
+              onClick={() => {
+                setError(null)
+                setStep(step === 'social' ? 'topics' : step === 'topics' ? 'district' : 'account')
+              }}
             >
               Back
             </button>
@@ -174,17 +169,16 @@ export default function OnboardingPage() {
 
       {profile ? (
         <div className="onboard-signout">
-          <span className="muted">Signed in as {profile.username}.</span>
+          <span className="muted">Active profile is {profile.username}.</span>
           <button
             type="button"
             className="btn btn--ghost btn--sm"
             onClick={() => {
-              signOut()
+              leaveProfile()
               setStep('account')
-              setPassword(null)
             }}
           >
-            Sign in as someone else
+            Switch profile
           </button>
         </div>
       ) : null}
