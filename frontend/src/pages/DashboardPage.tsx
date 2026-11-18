@@ -4,20 +4,24 @@ import { Link, useNavigate } from 'react-router-dom'
 import { BILL_STATUSES, searchBills } from '../api/bills'
 import { listMembers } from '../api/members'
 import { BillListItem } from '../components/bills/BillListItem'
-import { PartyComposition } from '../components/members/PartyComposition'
+import { ChamberComposition } from '../components/dashboard/ChamberComposition'
+import { DistrictBills } from '../components/dashboard/DistrictBills'
+import { TopicFeed } from '../components/dashboard/TopicFeed'
 import { AlertIcon } from '../components/icons'
 import { EmptyState } from '../components/ui/EmptyState'
 import { LoadingState } from '../components/ui/LoadingState'
 import { useApi } from '../hooks/useApi'
 import { STATUS_META, CONGRESS_NUMBER } from '../lib/constants'
-import { countByParty } from '../lib/stats'
+import { countByChamber } from '../lib/stats'
+import type { ChamberCounts } from '../lib/stats'
+import { useProfile } from '../profile/ProfileContext'
 import type { BillStatus } from '../api/bills'
 import type { MemberList } from '../api/members'
 
 interface Overview {
   totalBills: number
   byStatus: Record<BillStatus, number>
-  members: { total: number; counts: { total: number; R: number; D: number; I: number } } | null
+  members: ChamberCounts | null
 }
 
 export default function DashboardPage() {
@@ -45,7 +49,7 @@ export default function DashboardPage() {
     const result: Overview = {
       totalBills: total.total,
       byStatus: byStage,
-      members: members ? { total: members.length, counts: countByParty(members) } : null,
+      members: members ? countByChamber(members) : null,
     }
     return result
   }, [])
@@ -57,6 +61,12 @@ export default function DashboardPage() {
   }
 
   const liveUnreachable = latestError !== null
+
+  // The signed-in person's district and topics drive the personalized
+  // panels, which sit between "At a glance" and "Latest activity".
+  const { profile } = useProfile()
+  const district = profile?.district ?? null
+  const topics = profile?.topics ?? []
 
   return (
     <div className="dashboard">
@@ -112,79 +122,114 @@ export default function DashboardPage() {
           </div>
         </div>
       ) : (
-        <div className="container dashboard__grid" aria-busy={latestLoading || overviewLoading}>
-          <section className="panel dashboard__panel" aria-label="Latest bill activity">
-            <div className="panel__heading-row">
-              <h2>Latest activity</h2>
-              <Link to="/bills" className="link-more">
-                View all bills
-              </Link>
-            </div>
-            {latestLoading ? (
-              <LoadingState message="Loading the latest bills…" />
-            ) : latest && latest.data.length > 0 ? (
-              <ul className="bill-list bill-list--compact">
-                {latest.data.map((bill) => (
-                  <BillListItem key={bill.bill_id} bill={bill} />
-                ))}
-              </ul>
-            ) : (
-              <EmptyState
-                title="No bills in the database yet"
-                hint="Run the list sync with `npm run sync` to fill the database, or check the About page for API status."
-              />
-            )}
-          </section>
+        <>
+          {/* Panel 1 · At a glance: the bills-by-stage tally and the chamber
+              composition, full width. */}
+          <div className="container dashboard__top">
+            <section className="panel" aria-label="At a glance" aria-busy={overviewLoading}>
+              <h2>At a glance</h2>
 
-          <div className="dashboard__side">
-            <section className="panel" aria-label="Bills by stage">
-              <h2>Bills by stage</h2>
-              {overview ? (
-                <>
-                  <p className="panel__count">
-                    {overview.totalBills.toLocaleString()} bills tracked in the {CONGRESS_NUMBER}th Congress
-                  </p>
-                  <ul className="stage-list">
-                    {STATUS_META.map((meta) => {
-                      const count = overview.byStatus[meta.value] ?? 0
-                      const percent = overview.totalBills > 0 ? Math.round((count / overview.totalBills) * 100) : 0
-                      return (
-                        <li key={meta.value}>
-                          <Link to={`/bills?status=${meta.value}`} className="stage-row">
-                            <span className="stage-row__label">
-                              <span className={`stage-dot stage-dot--${meta.value}`} aria-hidden="true" />
-                              {meta.label}
+              <div className="glance__block">
+                <h3>Bills by stage</h3>
+                {overview ? (
+                  <>
+                    <p className="panel__count">
+                      {overview.totalBills.toLocaleString()} bills tracked in the {CONGRESS_NUMBER}th Congress
+                    </p>
+                    <ul className="stage-list">
+                      {STATUS_META.map((meta) => {
+                        const count = overview.byStatus[meta.value] ?? 0
+                        const percent = overview.totalBills > 0 ? Math.round((count / overview.totalBills) * 100) : 0
+                        return (
+                          <li key={meta.value}>
+                            <Link to={`/bills?status=${meta.value}`} className="stage-row">
+                              <span className="stage-row__label">
+                                <span className={`stage-dot stage-dot--${meta.value}`} aria-hidden="true" />
+                                {meta.label}
+                              </span>
+                              <span className="stage-row__count">{count.toLocaleString()}</span>
+                            </Link>
+                            <span className="stage-bar" aria-hidden="true">
+                              <span className="stage-bar__fill" style={{ width: `${percent}%` }} />
                             </span>
-                            <span className="stage-row__count">{count.toLocaleString()}</span>
-                          </Link>
-                          <span className="stage-bar" aria-hidden="true">
-                            <span className="stage-bar__fill" style={{ width: `${percent}%` }} />
-                          </span>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                </>
-              ) : (
-                <LoadingState message="Tallying bills by stage…" />
-              )}
-            </section>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  </>
+                ) : (
+                  <LoadingState message="Tallying bills by stage…" />
+                )}
+              </div>
 
-            <section className="panel" aria-label="Chamber composition">
-              <div className="panel__heading-row">
-                <h2>Chamber composition</h2>
-                <Link to="/members" className="link-more">
-                  All members
+              <div className="glance__block">
+                <div className="glance__heading-row">
+                  <h3>Chamber composition</h3>
+                  <Link to="/members" className="link-more">
+                    All members
+                  </Link>
+                </div>
+                {overview?.members ? (
+                  <ChamberComposition counts={overview.members} />
+                ) : (
+                  <LoadingState message="Counting current members…" />
+                )}
+              </div>
+            </section>
+          </div>
+
+          {/* Panels 2–3 · The personalized section, one full-width panel
+              each, in the order: your district, then your topics. */}
+          {district ? (
+            <div className="container">
+              <section className="panel" aria-label="Your district">
+                <DistrictBills state={district.state} district={district.district} />
+              </section>
+              <section className="panel" aria-label="Topics you follow">
+                <TopicFeed topicIds={topics} />
+              </section>
+            </div>
+          ) : (
+            <section className="container dashboard__setup" aria-label="Set up your profile">
+              <div className="panel dashboard__setup-panel">
+                <h2>Make this dashboard yours</h2>
+                <p className="muted">
+                  Pick your congressional district and Pull follows your representatives and the bills that concern
+                  your district — plus the topics you choose to track.
+                </p>
+                <Link to="/onboarding" className="btn btn--primary">
+                  Set up my profile
                 </Link>
               </div>
-              {overview?.members ? (
-                <PartyComposition counts={overview.members.counts} />
+            </section>
+          )}
+
+          {/* Panel 4 · Latest activity, full width. */}
+          <div className="container">
+            <section className="panel" aria-label="Latest bill activity" aria-busy={latestLoading}>
+              <div className="panel__heading-row">
+                <h2>Latest activity</h2>
+                <Link to="/bills" className="link-more">
+                  View all bills
+                </Link>
+              </div>
+              {latestLoading ? (
+                <LoadingState message="Loading the latest bills…" />
+              ) : latest && latest.data.length > 0 ? (
+                <ul className="bill-list bill-list--compact">
+                  {latest.data.map((bill) => (
+                    <BillListItem key={bill.bill_id} bill={bill} />
+                  ))}
+                </ul>
               ) : (
-                <LoadingState message="Counting current members…" />
+                <EmptyState
+                  title="No bills in the database yet"
+                  hint="Run the list sync with `npm run sync` to fill the database, or check the About page for API status."
+                />
               )}
             </section>
           </div>
-        </div>
+        </>
       )}
     </div>
   )

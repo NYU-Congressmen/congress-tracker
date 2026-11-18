@@ -144,5 +144,6 @@ export const NAV_ITEMS: { to: string; label: string }[] = [
   { to: '/', label: 'Home' },
   { to: '/bills', label: 'Bills' },
   { to: '/members', label: 'Members' },
+  { to: '/social', label: 'Social' },
   { to: '/about', label: 'About' },
 ]

@@ -22,8 +22,11 @@ export interface MemberList {
 }
 
 // Describe a member with current-Congress sponsored bills and their cache freshness.
+// Co-sponsored bills are optional: the backend records them once Congress.gov
+// reports them, and the member page shows the section either way.
 export interface MemberDetail extends Member {
   sponsored_bills: BillSummary[]
+  co_sponsored_bills?: BillSummary[]
   cache: CacheInfo
 }
 
