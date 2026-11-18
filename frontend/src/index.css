@@ -911,91 +911,10 @@ a.chip:hover {
 
 /* ------------------------------------------------------------ party mix */
 
-.party-list,
 .stage-list {
   list-style: none;
   margin: 0;
   padding: 0;
-}
-
-.party-row {
-  padding: 0.55rem 0;
-  border-bottom: 1px solid var(--gray-05);
-}
-
-.party-row:last-child {
-  border-bottom: none;
-}
-
-.party-row__label {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--gray-70);
-}
-
-.party-row__count {
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: var(--ink);
-}
-
-.party-dot {
-  width: 0.7rem;
-  height: 0.7rem;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-.party-row--r {
-  color: var(--red-50);
-}
-
-.party-row--r .party-row__label,
-.party-row--r .party-row__count {
-  color: var(--ink);
-}
-
-.party-row--d {
-  color: var(--blue-50);
-}
-
-.party-row--d .party-row__label,
-.party-row--d .party-row__count {
-  color: var(--ink);
-}
-
-.party-row--i {
-  color: var(--gray-50);
-}
-
-.party-row--i .party-row__label,
-.party-row--i .party-row__count {
-  color: var(--ink);
-}
-
-.party-row--total {
-  border-top: 2px solid var(--gray-10);
-  margin-top: 0.25rem;
-  padding-top: 0.75rem;
-}
-
-.party-bar {
-  display: block;
-  height: 0.45rem;
-  background: var(--gray-05);
-  border-radius: 999px;
-  margin-top: 0.35rem;
-  overflow: hidden;
-}
-
-.party-bar span {
-  display: block;
-  height: 100%;
-  border-radius: 999px;
-  background: currentColor;
 }
 
 /* stage list on the dashboard */
@@ -1076,26 +995,144 @@ a.chip:hover {
 
 /* -------------------------------------------------------------- dashboard */
 
-.dashboard__grid {
-  display: grid;
-  grid-template-columns: 1.6fr 1fr;
-  gap: 1.4rem;
-  align-items: start;
-  padding-top: 2rem;
-}
+/* The dashboard is a single stack of full-width panels, read top to bottom:
+   "At a glance" first, then the personalized panels ("Your district",
+   "Topics you follow") and "Latest activity" last. Every panel spans the
+   full width of the container, so nothing sits side by side. The panels
+   keep their usual .panel margins for the rhythm between them. */
 
-.dashboard__side .panel {
-  margin-bottom: 1.4rem;
+.dashboard__top {
+  padding-top: 2rem;
 }
 
 .dashboard__offline {
   padding-top: 2rem;
 }
 
-@media (max-width: 60em) {
-  .dashboard__grid {
-    grid-template-columns: 1fr;
-  }
+/* "At a glance" stacks its two blocks full width: bills by stage on top,
+   chamber composition below, separated by a rule. */
+.glance__block + .glance__block {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--gray-10);
+}
+
+.glance__block h3 {
+  font-size: 1.05rem;
+  margin: 0 0 0.75rem;
+}
+
+.glance__heading-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.glance__heading-row h3 {
+  margin-bottom: 0;
+}
+
+/* The chamber switch reuses the page-view buttons from the Members page. */
+.composition-switch {
+  margin-bottom: 1.1rem;
+}
+
+/* One circle per member, arranged the way the parties sit on the political
+   spectrum: Democrats (left-leaning) in the left columns, Independents at
+   the interface, Republicans (right-leaning) in the right columns — no
+   party stacked above another. The component sets --composition-rows and
+   --composition-cols from the square root of the membership (so the grid
+   visibly shrinks from both chambers to a single chamber) and places every
+   circle explicitly: the grid's rows × cols can exceed the membership, and
+   that shortfall is split between the end columns — missing circles sit at
+   the top of the first column and the bottom of the last, keeping the
+   outline even. On narrow screens the wrapper scrolls instead of squashing
+   the circles. */
+.composition-scroll {
+  overflow-x: auto;
+  margin-bottom: 1rem;
+}
+
+.composition-grid {
+  display: grid;
+  grid-template-rows: repeat(var(--composition-rows, 10), 1fr);
+  grid-template-columns: repeat(var(--composition-cols, 10), 1.9rem);
+  gap: 0.3rem;
+  list-style: none;
+  margin: 0 auto;
+  padding: 0;
+  height: calc(var(--composition-rows, 10) * 1.9rem + (var(--composition-rows, 10) - 1) * 0.3rem);
+  width: max-content;
+}
+
+.composition-dot {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 1px solid transparent;
+}
+
+/* Same party tokens as the directory cards on the Members page. */
+.composition-dot--d {
+  background: var(--card-d-bg);
+  border-color: var(--card-d-border);
+}
+
+.composition-dot--i {
+  background: var(--card-i-bg);
+  border-color: var(--card-i-border);
+}
+
+.composition-dot--r {
+  background: var(--card-r-bg);
+  border-color: var(--card-r-border);
+}
+
+/* Text legend: each party's circle, name and count for the active view. */
+.composition-legend {
+  list-style: none;
+  display: flex;
+  gap: 0.75rem 1.25rem;
+  flex-wrap: wrap;
+  margin: 0 0 0.8rem;
+  padding: 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--gray-70);
+}
+
+.composition-legend__item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.composition-legend__item .composition-dot {
+  width: 0.7rem;
+  height: 0.7rem;
+  flex: none;
+}
+
+.composition-legend__count {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* The "current members" row: the count follows the chamber in view. */
+.composition-total {
+  margin: 0;
+  padding-top: 0.75rem;
+  border-top: 2px solid var(--gray-10);
+  font-size: 0.9rem;
+  color: var(--gray-70);
+}
+
+.composition-total__count {
+  font-weight: 700;
+  color: var(--ink);
 }
 
 /* ---------------------------------------------------------- bill detail */
@@ -2434,8 +2471,9 @@ a.chip:hover {
 
 /* ---------------------------------------------------------------- dashboard */
 
-/* The personalized section (your district + your topics) reuses the main
-   dashboard grid: .dashboard__grid, .dashboard__panel and .dashboard__side. */
+/* The personalized section ("your district" + "topics you follow") is part
+   of the dashboard's full-width panel stack, so it keeps the plain .panel
+   styling; see the dashboard section above for the stack rules. */
 
 .dashboard__setup {
   margin-top: 1.4rem;
