@@ -1,0 +1,175 @@
+/* Design tokens for the Paper Pop look.
+   Light mode is paper: a cool off-white ground, ink text, and stage colors taken
+   from the paper a bill is printed on (white, gray, House blue, parchment).
+   Dark mode uses the same stocks at night. One highlight color, marker yellow,
+   is reserved for laws, the current stage and the main action. */
+
+:root {
+  color-scheme: light dark;
+  --font: 'Figtree', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  --hl: #ffd23f;
+  --hl-ink: #0f172a;
+
+  --bg: #f5f6f8;
+  --card: #ffffff;
+  --ink: #0f172a;
+  --ink-2: #475569;
+  --ink-3: #5b6678;
+  --line: rgba(15, 23, 42, 0.09);
+  --link: #1d4f91;
+  --focus: #2f6fd0;
+  --btn: #0f172a;
+  --btn-ink: #ffffff;
+  --num: #0f172a;
+  --fill: #0f172a;
+  --icon-ink: #0f172a;
+  --bubble: #eef1f5;
+
+  --glass: rgba(255, 255, 255, 0.86);
+  --glass-strong: rgba(255, 255, 255, 0.95);
+  --glass-border: rgba(255, 255, 255, 0.95);
+  --edge: rgba(15, 23, 42, 0.08);
+  --shadow: 0 1px 2px rgba(15, 23, 42, 0.05), 0 14px 34px -18px rgba(15, 23, 42, 0.22);
+  --chip: rgba(255, 255, 255, 0.88);
+  --chip-border: rgba(15, 23, 42, 0.1);
+
+  /* Paper stocks by stage: introduced, committee, passed one chamber (House blue),
+     passed both (parchment), with the President, became law (highlight). */
+  --s1: #ffffff;
+  --s2: #e3e6eb;
+  --s3: #c6daf1;
+  --s4: #efe4c6;
+  --s5: #e2cd94;
+  --s6: var(--hl);
+  --stage-bg: #c6daf1;
+  --stage-ink: #123a66;
+  --stage-ink-2: #1d3f6b;
+
+  /* The dot header uses the same stocks a step quieter, with laws in the highlight. */
+  --d1: #d2d8e2;
+  --d2: #b7c1cf;
+  --d3: #83a8dc;
+  --d4: #e3d3a6;
+  --d5: #9c8a6c;
+  --d6: var(--hl);
+  --d6-ring: rgba(15, 23, 42, 0.35);
+  --band-mask: linear-gradient(to bottom, #000 66%, transparent 100%);
+
+  /* Party colors always travel with a letter, never alone. */
+  --r: #d1453b;
+  --d: #2f5fb3;
+  --i: #7b8190;
+
+  --error-bg: #fdecea;
+  --error-ink: #8a1c13;
+  --error-line: #f2c4bf;
+  --note-bg: #eaf1fa;
+  --ok-bg: #e5f3e9;
+  --ok-ink: #17552e;
+
+  --radius: 22px;
+  --radius-sm: 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #0c1016;
+    --card: #121821;
+    --ink: #edf1f6;
+    --ink-2: #b3bdcb;
+    --ink-3: #95a0b0;
+    --line: rgba(255, 255, 255, 0.08);
+    --link: #9fc2f0;
+    --focus: #8db4f0;
+    --btn: #edf1f6;
+    --btn-ink: #0c1016;
+    --num: #9fc2f0;
+    --fill: #3a63a8;
+    --icon-ink: #edf1f6;
+    --bubble: #1b222c;
+    --glass: rgba(17, 22, 30, 0.72);
+    --glass-strong: rgba(17, 22, 30, 0.88);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --edge: rgba(0, 0, 0, 0.45);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 16px 40px -18px rgba(0, 0, 0, 0.75);
+    --chip: rgba(255, 255, 255, 0.07);
+    --chip-border: rgba(255, 255, 255, 0.12);
+    --s1: #1a2029;
+    --s2: #252d39;
+    --s3: #1d3a5e;
+    --s4: #3a3322;
+    --s5: #54451f;
+    --stage-bg: #1d3a5e;
+    --stage-ink: #d8e7f9;
+    --stage-ink-2: #b9cfe9;
+    --d1: #1b222c;
+    --d2: #283241;
+    --d3: #2a5185;
+    --d4: #5a4b25;
+    --d5: #6b5a3d;
+    --d6-ring: transparent;
+    --r: #ff7b72;
+    --d: #86a8ef;
+    --i: #a3a8b2;
+    --error-bg: #2a1614;
+    --error-ink: #ffb4ab;
+    --error-line: #5c2a25;
+    --note-bg: #16233a;
+    --ok-bg: #12261a;
+    --ok-ink: #9fdcb1;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --bg: #0c1016;
+  --card: #121821;
+  --ink: #edf1f6;
+  --ink-2: #b3bdcb;
+  --ink-3: #95a0b0;
+  --line: rgba(255, 255, 255, 0.08);
+  --link: #9fc2f0;
+  --focus: #8db4f0;
+  --btn: #edf1f6;
+  --btn-ink: #0c1016;
+  --num: #9fc2f0;
+  --fill: #3a63a8;
+  --icon-ink: #edf1f6;
+  --bubble: #1b222c;
+  --glass: rgba(17, 22, 30, 0.72);
+  --glass-strong: rgba(17, 22, 30, 0.88);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --edge: rgba(0, 0, 0, 0.45);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 16px 40px -18px rgba(0, 0, 0, 0.75);
+  --chip: rgba(255, 255, 255, 0.07);
+  --chip-border: rgba(255, 255, 255, 0.12);
+  --s1: #1a2029;
+  --s2: #252d39;
+  --s3: #1d3a5e;
+  --s4: #3a3322;
+  --s5: #54451f;
+  --stage-bg: #1d3a5e;
+  --stage-ink: #d8e7f9;
+  --stage-ink-2: #b9cfe9;
+  --d1: #1b222c;
+  --d2: #283241;
+  --d3: #2a5185;
+  --d4: #5a4b25;
+  --d5: #6b5a3d;
+  --d6-ring: transparent;
+  --r: #ff7b72;
+  --d: #86a8ef;
+  --i: #a3a8b2;
+  --error-bg: #2a1614;
+  --error-ink: #ffb4ab;
+  --error-line: #5c2a25;
+  --note-bg: #16233a;
+  --ok-bg: #12261a;
+  --ok-ink: #9fdcb1;
+  color-scheme: dark;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+}

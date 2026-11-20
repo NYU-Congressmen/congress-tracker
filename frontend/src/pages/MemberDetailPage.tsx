@@ -1,15 +1,30 @@
 import { Link, useParams } from 'react-router-dom'
 import { getMember } from '../api/members'
+import { PageBand } from '../components/layout/PageBand'
 import { BillListItem } from '../components/bills/BillListItem'
-import { ExternalLinkIcon } from '../components/icons'
+import { ChevronLeftIcon, ExternalLinkIcon } from '../components/icons'
 import { CacheNotice } from '../components/ui/CacheNotice'
 import { EmptyState } from '../components/ui/EmptyState'
 import { ErrorState } from '../components/ui/ErrorState'
 import { LoadingState } from '../components/ui/LoadingState'
 import { useApi } from '../hooks/useApi'
-import { districtLabel, initialsOf, memberUrl } from '../lib/format'
-import { PARTY_LABELS } from '../lib/constants'
+import { initialsOf, memberUrl, stateName } from '../lib/format'
+import { CONGRESS_NUMBER, PARTY_LABELS } from '../lib/constants'
 import { useProfile } from '../profile/ProfileContext'
+
+function BackLink() {
+  return (
+    <Link to="/members" className="back">
+      <ChevronLeftIcon />
+      Members
+    </Link>
+  )
+}
+
+// Show the site without its scheme: "hill.house.gov".
+function displayUrl(url: string): string {
+  return url.replace(/^https?:\/\//, '').replace(/\/$/, '')
+}
 
 export default function MemberDetailPage() {
   const { bioguideId } = useParams()
@@ -21,28 +36,33 @@ export default function MemberDetailPage() {
   if (error) {
     const notFound = error.status === 404
     return (
-      <div className="container page">
+      <PageBand>
+        <BackLink />
         <ErrorState
           title={notFound ? 'Member not found' : 'This member could not be loaded'}
           message={error.message}
           onRetry={notFound ? undefined : refetch}
         />
-        <p>
-          <Link to="/members" className="btn btn--secondary">
-            Back to all members
-          </Link>
-        </p>
-      </div>
+      </PageBand>
     )
   }
 
   if (loading || !member) {
     return (
-      <div className="container page">
+      <PageBand>
+        <BackLink />
         <LoadingState message="Loading the member profile…" />
-      </div>
+      </PageBand>
     )
   }
+
+  const chips = [
+    member.party ? (PARTY_LABELS[member.party] ?? member.party) : null,
+    stateName(member.state),
+    member.chamber === 'House' && member.district !== null ? `District ${member.district}` : null,
+    member.chamber,
+  ].filter((chip): chip is string => Boolean(chip))
+  const hasContacts = Boolean(member.office_phone || member.office_address || member.website_url)
 
   // Flag the member when they sit in the signed-in person's district, so the
   // profile page doubles as the "my representatives" detail view.
@@ -50,7 +70,7 @@ export default function MemberDetailPage() {
   const isMine =
     district !== null &&
     (member.state ?? '').toUpperCase() === district.state.toUpperCase() &&
-    ((member.chamber === 'Senate') ||
+    (member.chamber === 'Senate' ||
       (district.district !== null && member.district === district.district) ||
       (district.district === null && member.district === null))
 
@@ -59,93 +79,133 @@ export default function MemberDetailPage() {
   const coSponsored = member.co_sponsored_bills ?? []
 
   return (
-    <div className="container page">
-      <nav className="breadcrumbs" aria-label="Breadcrumb">
-        <Link to="/members">Members</Link>
-        <span className="breadcrumbs__sep" aria-hidden="true">
-          ›
-        </span>
-        <span aria-current="page">{member.name}</span>
-      </nav>
-
-      <article className="member-detail">
-        <header className="member-detail__profile panel">
-          <div className="member-detail__photo">
+    <div className="member-page">
+      <PageBand labelledBy="member-name">
+        <BackLink />
+        <section className="profile glass" aria-labelledby="member-name">
+          <span className="avatar avatar--lg">
             {member.image_url ? (
               <img src={member.image_url} alt={`Official photo of ${member.name}`} />
             ) : (
-              <span className="member-detail__initials" aria-hidden="true">
-                {initialsOf(member.name)}
-              </span>
+              <span aria-hidden="true">{initialsOf(member.name)}</span>
             )}
+            {member.party ? (
+              <i className={`pb pb--${member.party.toLowerCase()}`} aria-hidden="true">
+                {member.party}
+              </i>
+            ) : null}
+          </span>
+          <div className="profile__info">
+            {isMine ? <p className="profile__mine">Your representative</p> : null}
+            <h1 id="member-name" className="profile__name">
+              {member.name}
+            </h1>
+            <ul className="profile__chips" aria-label="Party and seat">
+              {chips.map((chip) => (
+                <li key={chip} className="chip">
+                  {chip}
+                </li>
+              ))}
+            </ul>
+            {!member.is_current ? <p className="profile__note">Not a current member of Congress.</p> : null}
           </div>
-          <div className="member-detail__info">
-            <h1 className="member-detail__name">{member.name}</h1>
-            {isMine ? <span className="member-detail__mine">Your representative</span> : null}
-            <p className="member-detail__meta">
-              {[
-                member.chamber,
-                member.party ? `${PARTY_LABELS[member.party] ?? member.party}` : null,
-                districtLabel(member.district),
-                member.state,
-              ]
-                .filter(Boolean)
-                .join(' · ')}
-            </p>
-            {!member.is_current ? <p className="member-detail__note">Not a current member of Congress.</p> : null}
-            <div className="member-detail__links">
-              <a className="ext-link" href={memberUrl(member.bioguide_id)} target="_blank" rel="noreferrer">
-                View on congress.gov <ExternalLinkIcon size={14} />
+          <div className="profile__actions">
+            <a className="btn btn--hl" href={memberUrl(member.bioguide_id)} target="_blank" rel="noreferrer">
+              View on congress.gov <ExternalLinkIcon size={14} />
+            </a>
+            {member.website_url ? (
+              <a className="btn" href={member.website_url} target="_blank" rel="noreferrer">
+                Official website
               </a>
+            ) : null}
+          </div>
+        </section>
+      </PageBand>
+
+      <div className="container page-body member-grid-page">
+        <div className="member-grid-page__main">
+          <section className="card" aria-labelledby="sponsored-title">
+            <div className="card__head">
+              <h2 id="sponsored-title">Bills they've sponsored</h2>
+              <span className="card__note">
+                {member.sponsored_bills.length} in the {CONGRESS_NUMBER}th Congress
+              </span>
             </div>
-          </div>
-        </header>
+            <CacheNotice cache={member.cache} what="This member's sponsored bills" />
+            {member.sponsored_bills.length > 0 ? (
+              <ul className="bill-list">
+                {member.sponsored_bills.map((bill) => (
+                  <BillListItem key={bill.bill_id} bill={bill} showLatestAction={false} />
+                ))}
+              </ul>
+            ) : (
+              <EmptyState
+                title="No sponsored bills recorded yet"
+                hint="Bills sponsored in the current Congress appear here once Congress.gov reports them."
+              />
+            )}
+          </section>
 
-        <section className="panel member-detail__bills" aria-label="Sponsored bills">
-          <div className="panel__heading-row">
-            <h2>Sponsored bills, 119th Congress</h2>
-            <span className="panel__count">
-              {member.sponsored_bills.length} {member.sponsored_bills.length === 1 ? 'bill' : 'bills'}
-            </span>
-          </div>
-          <CacheNotice cache={member.cache} what="This member's sponsored bills" />
-          {member.sponsored_bills.length > 0 ? (
-            <ul className="bill-list">
-              {member.sponsored_bills.map((bill) => (
-                <BillListItem key={bill.bill_id} bill={bill} showLatestAction={false} />
-              ))}
-            </ul>
+          <section className="card" aria-labelledby="cosponsored-title">
+            <div className="card__head">
+              <h2 id="cosponsored-title">Bills they've co-sponsored</h2>
+              {coSponsored.length > 0 ? (
+                <span className="card__note">
+                  {coSponsored.length} in the {CONGRESS_NUMBER}th Congress
+                </span>
+              ) : null}
+            </div>
+            {coSponsored.length > 0 ? (
+              <ul className="bill-list">
+                {coSponsored.map((bill) => (
+                  <BillListItem key={bill.bill_id} bill={bill} showLatestAction={false} />
+                ))}
+              </ul>
+            ) : (
+              <EmptyState
+                title="No co-sponsored bills on record yet"
+                hint="Bills this member has co-sponsored appear here once the tracker records them from Congress.gov."
+              />
+            )}
+          </section>
+        </div>
+
+        <section className="card" aria-labelledby="office-title">
+          <h2 id="office-title" className="card__title">
+            Reach their office
+          </h2>
+          {hasContacts ? (
+            <dl className="office">
+              {member.office_phone ? (
+                <div>
+                  <dt>Washington office</dt>
+                  <dd className="office__phone">
+                    <a href={`tel:${member.office_phone.replace(/[^\d+]/g, '')}`}>{member.office_phone}</a>
+                  </dd>
+                </div>
+              ) : null}
+              {member.office_address ? (
+                <div>
+                  <dt>Address</dt>
+                  <dd>{member.office_address}</dd>
+                </div>
+              ) : null}
+              {member.website_url ? (
+                <div>
+                  <dt>Website</dt>
+                  <dd>
+                    <a href={member.website_url} target="_blank" rel="noreferrer">
+                      {displayUrl(member.website_url)}
+                    </a>
+                  </dd>
+                </div>
+              ) : null}
+            </dl>
           ) : (
-            <EmptyState
-              title="No sponsored bills recorded yet"
-              hint="Bills sponsored in the current Congress appear here once Congress.gov reports them."
-            />
+            <p className="muted">No office contact is on file for this member yet.</p>
           )}
         </section>
-
-        <section className="panel member-detail__bills" aria-label="Co-sponsored bills">
-          <div className="panel__heading-row">
-            <h2>Co-sponsored bills, 119th Congress</h2>
-            <span className="panel__count">
-              {coSponsored.length > 0
-                ? `${coSponsored.length} ${coSponsored.length === 1 ? 'bill' : 'bills'}`
-                : ''}
-            </span>
-          </div>
-          {coSponsored.length > 0 ? (
-            <ul className="bill-list">
-              {coSponsored.map((bill) => (
-                <BillListItem key={bill.bill_id} bill={bill} showLatestAction={false} />
-              ))}
-            </ul>
-          ) : (
-            <EmptyState
-              title="No co-sponsored bills on record yet"
-              hint="Bills this member has co-sponsored appear here once the tracker records them from Congress.gov."
-            />
-          )}
-        </section>
-      </article>
+      </div>
     </div>
   )
 }

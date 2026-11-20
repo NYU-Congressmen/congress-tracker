@@ -6,25 +6,20 @@ import { useProfile } from '../../profile/ProfileContext'
 import { initialsOf } from '../../lib/format'
 import { districtHeading } from '../../lib/districts'
 
-// Show the wordmark and primary navigation.
+// The floating glass bar: wordmark, primary navigation and the theme toggle.
+// On phones the links move to the tab bar at the bottom of the screen.
 export function SiteHeader() {
   const { profile } = useProfile()
   return (
     <header className="site-header">
-      <div className="site-header__main">
-        <div className="container site-header__row">
+      <div className="container">
+        <div className="site-header__bar glass">
           <Link to="/" className="brand" aria-label="Pull, home">
-            <span className="brand__mark">
-              <CapitolIcon />
-            </span>
-            <span className="brand__text">
-              <span className="brand__name">Pull</span>
-              <span className="brand__tag">Get a seat at the review</span>
-            </span>
+            <CapitolIcon size={24} />
+            <span className="brand__name">Pull</span>
+            <span className="brand__tag">Get a seat at the review</span>
           </Link>
           <nav className="site-nav" aria-label="Primary">
-            {/* Light/dark toggle sits at the left edge of the nav, before Home */}
-            <ThemeToggle />
             {NAV_ITEMS.map((item) => (
               <NavLink
                 key={item.to}
@@ -35,6 +30,8 @@ export function SiteHeader() {
                 {item.label}
               </NavLink>
             ))}
+          </nav>
+          <div className="site-header__end">
             {profile ? (
               <Link to="/onboarding" className="site-user" title="Edit your profile">
                 <span className="site-user__avatar" aria-hidden="true">
@@ -48,11 +45,12 @@ export function SiteHeader() {
                 </span>
               </Link>
             ) : (
-              <Link to="/onboarding" className="btn btn--primary btn--sm site-user-cta">
+              <Link to="/onboarding" className="btn btn--ink btn--sm site-user-cta">
                 Get started
               </Link>
             )}
-          </nav>
+            <ThemeToggle />
+          </div>
         </div>
       </div>
     </header>

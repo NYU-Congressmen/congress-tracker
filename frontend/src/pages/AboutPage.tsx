@@ -2,6 +2,7 @@ import { getHealth } from '../api/health'
 import { LoadingState } from '../components/ui/LoadingState'
 import { ErrorState } from '../components/ui/ErrorState'
 import { useApi } from '../hooks/useApi'
+import { PageBand } from '../components/layout/PageBand'
 import { CONGRESS_NUMBER } from '../lib/constants'
 
 function ApiStatusPanel() {
@@ -53,16 +54,18 @@ const ROADMAP: { week: string; starts: string; focus: string }[] = [
 
 export default function AboutPage() {
   return (
-    <div className="container page about">
-      <header className="page__header">
-        <h1>About Pull</h1>
-        <p className="page__lede">
+    <div className="about">
+      <PageBand labelledBy="about-title">
+        <h1 id="about-title" className="page-title">
+          About Pull
+        </h1>
+        <p className="page-lede">
           A web app for following U.S. legislation: search bills, follow members of Congress, and see how
           legislation moves through the {CONGRESS_NUMBER}th Congress.
         </p>
-      </header>
+      </PageBand>
 
-      <div className="about__grid">
+      <div className="container page-body about__grid">
         <div className="about__prose">
           <section className="panel">
             <h2>How the data works</h2>

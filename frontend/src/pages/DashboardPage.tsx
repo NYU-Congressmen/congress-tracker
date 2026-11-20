@@ -1,27 +1,82 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { BILL_STATUSES, searchBills } from '../api/bills'
+import { BILL_STATUSES, searchBills, type BillStatus, type BillSummary } from '../api/bills'
 import { listMembers } from '../api/members'
-import { BillListItem } from '../components/bills/BillListItem'
+import { PageBand } from '../components/layout/PageBand'
 import { ChamberComposition } from '../components/dashboard/ChamberComposition'
 import { DistrictBills } from '../components/dashboard/DistrictBills'
 import { TopicFeed } from '../components/dashboard/TopicFeed'
-import { AlertIcon } from '../components/icons'
+import { AlertIcon, ChevronRightIcon, SearchIcon } from '../components/icons'
 import { EmptyState } from '../components/ui/EmptyState'
 import { LoadingState } from '../components/ui/LoadingState'
 import { useApi } from '../hooks/useApi'
-import { STATUS_META, CONGRESS_NUMBER } from '../lib/constants'
+import { CONGRESS_NUMBER, STATUS_META } from '../lib/constants'
+import { billNumber, billTypeShort, formatShortDate } from '../lib/format'
+import { loadStageCounts, totalOf } from '../lib/stageCounts'
 import { countByChamber } from '../lib/stats'
-import type { ChamberCounts } from '../lib/stats'
 import { useProfile } from '../profile/ProfileContext'
-import type { BillStatus } from '../api/bills'
-import type { MemberList } from '../api/members'
 
-interface Overview {
-  totalBills: number
-  byStatus: Record<BillStatus, number>
-  members: ChamberCounts | null
+// Keyword shortcuts under the search box. They run an ordinary title search.
+const TOPICS: { label: string; q: string }[] = [
+  { label: 'Crypto', q: 'crypto' },
+  { label: 'Student loans', q: 'student loan' },
+  { label: 'Elections', q: 'election' },
+  { label: 'Health care', q: 'health' },
+]
+
+// The dot colors, in stage order, for the key under the header.
+const DOT_KEY: { label: string; token: string }[] = [
+  { label: 'Introduced or in committee', token: '--d2' },
+  { label: 'Passed the House or Senate', token: '--d3' },
+  { label: 'Passed both', token: '--d4' },
+  { label: 'With the President', token: '--d5' },
+  { label: 'Law', token: '--d6' },
+]
+
+// What happened to a bill most recently, in a few words.
+function eventLabel(bill: BillSummary): string {
+  switch (bill.status) {
+    case 'became_law':
+      return 'Became law'
+    case 'to_president':
+      return 'Sent to the President'
+    case 'passed_both_chambers':
+      return 'Passed both chambers'
+    case 'passed_one_chamber':
+      return bill.passed_senate && !bill.passed_house ? 'Passed the Senate' : 'Passed the House'
+    case 'committee':
+      return 'In committee'
+    default:
+      return 'Introduced'
+  }
+}
+
+function stageNumber(status: BillStatus): number {
+  return BILL_STATUSES.indexOf(status) + 1
+}
+
+// One update in the home feed, shaped like a phone notification.
+function UpdateCard({ bill }: { bill: BillSummary }) {
+  const law = bill.status === 'became_law'
+  return (
+    <li>
+      <Link to={`/bills/${bill.congress}/${bill.type}/${bill.number}`} className="note glass">
+        <span className={`note__icon note__icon--s${stageNumber(bill.status)}`} aria-hidden="true">
+          {law ? 'LAW' : billTypeShort(bill.type)}
+        </span>
+        <span className="note__title">{bill.title}</span>
+        {bill.latest_action_date ? (
+          <time className="note__time" dateTime={bill.latest_action_date}>
+            {formatShortDate(bill.latest_action_date)}
+          </time>
+        ) : null}
+        <span className="note__meta">
+          {billNumber(bill.type, bill.number)} · {eventLabel(bill)}
+        </span>
+      </Link>
+    </li>
+  )
 }
 
 export default function DashboardPage() {
@@ -29,30 +84,12 @@ export default function DashboardPage() {
   const [query, setQuery] = useState('')
 
   const { data: latest, loading: latestLoading, error: latestError, refetch } = useApi(
-    () => searchBills({ limit: 8 }),
+    () => searchBills({ limit: 4 }),
     [],
   )
-
-  // One aggregate request per stage plus the membership gives the dashboard
-  // its tallies, and each call returns just a total, so they stay cheap.
-  const { data: overview, loading: overviewLoading } = useApi(async () => {
-    const [total, ...byStatus] = await Promise.all([
-      searchBills({ limit: 1 }),
-      ...BILL_STATUSES.map((status) => searchBills({ status, limit: 1 })),
-    ])
-    const memberList: MemberList | null = await listMembers().catch(() => null)
-    const members = memberList?.data ?? null
-    const byStage = {} as Record<BillStatus, number>
-    BILL_STATUSES.forEach((status, index) => {
-      byStage[status] = byStatus[index].total
-    })
-    const result: Overview = {
-      totalBills: total.total,
-      byStatus: byStage,
-      members: members ? countByChamber(members) : null,
-    }
-    return result
-  }, [])
+  // One aggregate request per stage gives the tallies; each returns just a total.
+  const { data: counts } = useApi(loadStageCounts, [])
+  const { data: memberList } = useApi(() => listMembers(), [])
 
   function onSearch(event: FormEvent) {
     event.preventDefault()
@@ -60,7 +97,8 @@ export default function DashboardPage() {
     navigate(keyword ? `/bills?q=${encodeURIComponent(keyword)}` : '/bills')
   }
 
-  const liveUnreachable = latestError !== null
+  const total = counts ? totalOf(counts) : null
+  const chambers = memberList ? countByChamber(memberList.data) : null
 
   // The signed-in person's district and topics drive the personalized
   // panels, which sit between "At a glance" and "Latest activity".
@@ -69,167 +107,163 @@ export default function DashboardPage() {
   const topics = profile?.topics ?? []
 
   return (
-    <div className="dashboard">
-      <section className="hero">
-        <div className="container hero__inner">
-          <h1 className="hero__title">Follow the work of the {CONGRESS_NUMBER}th Congress</h1>
-          <p className="hero__lede">
-            Search every bill, find your members of Congress, and watch legislation move from introduction to law.
-          </p>
-          <form className="hero__search" role="search" onSubmit={onSearch}>
-            <label className="sr-only" htmlFor="hero-search">
-              Search bills by keyword
-            </label>
-            <input
-              id="hero-search"
-              className="hero__search-input"
-              type="search"
-              placeholder="Search bills by keyword, for example “clean water”"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-            <button type="submit" className="btn btn--primary btn--lg">
-              Search bills
-            </button>
-          </form>
-          <ul className="hero__chips" aria-label="Filter bills by stage">
-            {STATUS_META.map((meta) => (
-              <li key={meta.value}>
-                <Link to={`/bills?status=${meta.value}`} className="chip">
-                  {meta.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
-
-      {liveUnreachable ? (
-        <div className="container dashboard__offline">
-          <div className="state state--error" role="alert">
-            <span className="state__icon">
-              <AlertIcon />
-            </span>
-            <div className="state__body">
-              <h3>Live data unavailable</h3>
-              <p>
-                {latestError?.message} Start the backend with <code>npm run dev</code> to see bills and members.
-              </p>
-            </div>
-            <button type="button" className="btn btn--secondary" onClick={refetch}>
-              Try again
-            </button>
-          </div>
-        </div>
-      ) : (
-        <>
-          {/* Panel 1 · At a glance: the bills-by-stage tally and the chamber
-              composition, full width. */}
-          <div className="container dashboard__top">
-            <section className="panel" aria-label="At a glance" aria-busy={overviewLoading}>
-              <h2>At a glance</h2>
-
-              <div className="glance__block">
-                <h3>Bills by stage</h3>
-                {overview ? (
-                  <>
-                    <p className="panel__count">
-                      {overview.totalBills.toLocaleString()} bills tracked in the {CONGRESS_NUMBER}th Congress
-                    </p>
-                    <ul className="stage-list">
-                      {STATUS_META.map((meta) => {
-                        const count = overview.byStatus[meta.value] ?? 0
-                        const percent = overview.totalBills > 0 ? Math.round((count / overview.totalBills) * 100) : 0
-                        return (
-                          <li key={meta.value}>
-                            <Link to={`/bills?status=${meta.value}`} className="stage-row">
-                              <span className="stage-row__label">
-                                <span className={`stage-dot stage-dot--${meta.value}`} aria-hidden="true" />
-                                {meta.label}
-                              </span>
-                              <span className="stage-row__count">{count.toLocaleString()}</span>
-                            </Link>
-                            <span className="stage-bar" aria-hidden="true">
-                              <span className="stage-bar__fill" style={{ width: `${percent}%` }} />
-                            </span>
-                          </li>
-                        )
-                      })}
-                    </ul>
-                  </>
-                ) : (
-                  <LoadingState message="Tallying bills by stage…" />
-                )}
-              </div>
-
-              <div className="glance__block">
-                <div className="glance__heading-row">
-                  <h3>Chamber composition</h3>
-                  <Link to="/members" className="link-more">
-                    All members
+    <div className="home">
+      <PageBand labelledBy="home-title">
+        <div className="home__hero">
+          <div className="home__intro">
+            <h1 id="home-title" className="home__title">
+              What's Congress up to?
+            </h1>
+            <p className="home__lede">
+              {total !== null ? `${total.toLocaleString()} bills` : 'Every bill'} in the {CONGRESS_NUMBER}th Congress,
+              one dot each. The ones that <mark>stand out</mark> became law.
+            </p>
+            <form className="home__search glass" role="search" onSubmit={onSearch}>
+              <SearchIcon size={20} />
+              <label className="sr-only" htmlFor="home-search">
+                Search bills by keyword
+              </label>
+              <input
+                id="home-search"
+                type="search"
+                placeholder="Search a bill or topic, like student loans"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+              <button type="submit" className="btn btn--hl">
+                Search
+              </button>
+            </form>
+            <ul className="home__topics" aria-label="Try a topic">
+              <li aria-hidden="true">Try</li>
+              {TOPICS.map((topic) => (
+                <li key={topic.q}>
+                  <Link to={`/bills?q=${encodeURIComponent(topic.q)}`} className="chip">
+                    {topic.label}
                   </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <section className="home__feed" aria-labelledby="updates-title" aria-busy={latestLoading}>
+            <h2 id="updates-title" className="home__feed-title">
+              Latest updates
+            </h2>
+            {latestError ? (
+              <div className="state state--error" role="alert">
+                <span className="state__icon">
+                  <AlertIcon />
+                </span>
+                <div className="state__body">
+                  <h3>Live data unavailable</h3>
+                  <p>
+                    {latestError.message} Start the backend with <code>npm run dev</code> to see bills and members.
+                  </p>
                 </div>
-                {overview?.members ? (
-                  <ChamberComposition counts={overview.members} />
-                ) : (
-                  <LoadingState message="Counting current members…" />
-                )}
+                <button type="button" className="btn btn--secondary" onClick={refetch}>
+                  Try again
+                </button>
               </div>
+            ) : latestLoading ? (
+              <LoadingState message="Loading the latest bills…" />
+            ) : latest && latest.data.length > 0 ? (
+              <>
+                <ul className="notes">
+                  {latest.data.map((bill) => (
+                    <UpdateCard key={bill.bill_id} bill={bill} />
+                  ))}
+                </ul>
+                <Link to="/bills" className="more home__more">
+                  See all bills
+                </Link>
+              </>
+            ) : (
+              <EmptyState
+                title="No bills in the database yet"
+                hint="Run the list sync with `npm run sync` to fill the database, or check the About page for API status."
+              />
+            )}
+          </section>
+        </div>
+
+        <ul className="home__key" aria-label="What the dot colors mean">
+          {DOT_KEY.map((item) => (
+            <li key={item.token}>
+              <i style={{ background: `var(${item.token})` }} aria-hidden="true" />
+              {item.label}
+            </li>
+          ))}
+        </ul>
+      </PageBand>
+
+      {latestError ? null : (
+        <div className="container page-body home__body">
+          <div className="home__grid">
+            <section className="card" aria-labelledby="stages-title">
+              <div className="card__head">
+                <h2 id="stages-title">Where bills are at</h2>
+                <Link to="/bills" className="more">
+                  See all bills
+                </Link>
+              </div>
+              {counts ? (
+                <ul className="stages">
+                  {STATUS_META.map((meta) => (
+                    <li key={meta.value}>
+                      <Link to={`/bills?status=${meta.value}`} className="stages__row" title={meta.description}>
+                        <span className={`stages__icon note__icon--s${stageNumber(meta.value)}`} aria-hidden="true">
+                          {stageNumber(meta.value)}
+                        </span>
+                        <span className="stages__label">{meta.label}</span>
+                        <span className="stages__count">{counts[meta.value].toLocaleString()}</span>
+                        <ChevronRightIcon className="stages__chev" />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <LoadingState message="Tallying bills by stage…" />
+              )}
+            </section>
+
+            <section className="card" aria-labelledby="chambers-title">
+              <div className="card__head">
+                <h2 id="chambers-title">Who's in Congress</h2>
+                <Link to="/members" className="more">
+                  All members
+                </Link>
+              </div>
+              {chambers ? <ChamberComposition counts={chambers} /> : <LoadingState message="Counting current members…" />}
             </section>
           </div>
 
-          {/* Panels 2–3 · The personalized section, one full-width panel
-              each, in the order: your district, then your topics. */}
+          {/* The personal panels follow the signed-in person's district and
+              topics; without a profile, one card invites them to set it up. */}
           {district ? (
-            <div className="container">
-              <section className="panel" aria-label="Your district">
+            <div className="home__mine">
+              <section className="card" aria-label="Your district">
                 <DistrictBills state={district.state} district={district.district} />
               </section>
-              <section className="panel" aria-label="Topics you follow">
+              <section className="card" aria-label="Topics you follow">
                 <TopicFeed topicIds={topics} />
               </section>
             </div>
           ) : (
-            <section className="container dashboard__setup" aria-label="Set up your profile">
-              <div className="panel dashboard__setup-panel">
-                <h2>Make this dashboard yours</h2>
-                <p className="muted">
+            <section className="card home__setup" aria-labelledby="setup-title">
+              <div>
+                <h2 id="setup-title">Make this dashboard yours</h2>
+                <p>
                   Pick your congressional district and Pull follows your representatives and the bills that concern
-                  your district — plus the topics you choose to track.
+                  your district, plus the topics you choose to track.
                 </p>
-                <Link to="/onboarding" className="btn btn--primary">
-                  Set up my profile
-                </Link>
               </div>
+              <Link to="/onboarding" className="btn btn--ink">
+                Set up my profile
+              </Link>
             </section>
           )}
-
-          {/* Panel 4 · Latest activity, full width. */}
-          <div className="container">
-            <section className="panel" aria-label="Latest bill activity" aria-busy={latestLoading}>
-              <div className="panel__heading-row">
-                <h2>Latest activity</h2>
-                <Link to="/bills" className="link-more">
-                  View all bills
-                </Link>
-              </div>
-              {latestLoading ? (
-                <LoadingState message="Loading the latest bills…" />
-              ) : latest && latest.data.length > 0 ? (
-                <ul className="bill-list bill-list--compact">
-                  {latest.data.map((bill) => (
-                    <BillListItem key={bill.bill_id} bill={bill} />
-                  ))}
-                </ul>
-              ) : (
-                <EmptyState
-                  title="No bills in the database yet"
-                  hint="Run the list sync with `npm run sync` to fill the database, or check the About page for API status."
-                />
-              )}
-            </section>
-          </div>
-        </>
+        </div>
       )}
     </div>
   )

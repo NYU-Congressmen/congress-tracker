@@ -1,4 +1,5 @@
 import type { BillType } from '../api/bills'
+import { STATE_OPTIONS } from './constants'
 
 const BILL_TYPE_LABELS: Record<BillType, string> = {
   hr: 'H.R.',
@@ -14,6 +15,37 @@ const BILL_TYPE_LABELS: Record<BillType, string> = {
 // Render a bill's type and number the way Congress.gov displays it: "H.R. 1234".
 export function billNumber(type: BillType, number: number): string {
   return `${BILL_TYPE_LABELS[type] ?? type} ${number}`
+}
+
+const BILL_TYPE_SHORT: Record<BillType, string> = {
+  hr: 'H.R.',
+  s: 'S.',
+  hjres: 'H.J.',
+  sjres: 'S.J.',
+  hconres: 'H.Con',
+  sconres: 'S.Con',
+  hres: 'H.Res',
+  sres: 'S.Res',
+}
+
+// A short type label that fits a small icon: "H.R.", "S.", "H.Res".
+export function billTypeShort(type: BillType): string {
+  return BILL_TYPE_SHORT[type] ?? type.toUpperCase()
+}
+
+// The chamber a bill starts in, read from its type.
+export function originChamber(type: BillType): 'House' | 'Senate' {
+  return type.startsWith('h') ? 'House' : 'Senate'
+}
+
+// "1st Session" or "2nd Session" of a Congress, from a date in it. Each
+// Congress meets for two years, and the 1st Congress began in 1789.
+export function sessionLabel(congress: number, date: string | null): string | null {
+  const year = date ? Number(date.slice(0, 4)) : NaN
+  const session = year - (1787 + 2 * congress) + 1
+  if (session === 1) return '1st Session'
+  if (session === 2) return '2nd Session'
+  return null
 }
 
 export function billUrl(congress: number, type: BillType, number: number): string {
@@ -49,6 +81,15 @@ export function formatDate(value: string | null | undefined): string {
   if (!value) return ''
   const date = parseIsoDate(value)
   return date ? DATE_FORMAT.format(date) : ''
+}
+
+const SHORT_DATE_FORMAT = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' })
+
+// "Jul 18": for places where the year is clear from context.
+export function formatShortDate(value: string | null | undefined): string {
+  if (!value) return ''
+  const date = parseIsoDate(value)
+  return date ? SHORT_DATE_FORMAT.format(date) : ''
 }
 
 export function formatDateTime(value: string | null | undefined): string {
@@ -91,4 +132,19 @@ export function initialsOf(name: string): string {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() ?? '')
     .join('')
+}
+
+const STATE_NAMES = new Map(STATE_OPTIONS.map((option) => [option.value, option.label]))
+
+// "New York" for "NY"; anything else is returned as stored.
+export function stateName(state: string | null): string | null {
+  if (!state) return null
+  return STATE_NAMES.get(state) ?? state
+}
+
+// "New York · District 14 · House" or "Texas · Senate".
+export function seatLabel(state: string | null, chamber: string | null, district: number | null): string {
+  return [stateName(state), chamber === 'House' && district !== null ? `District ${district}` : null, chamber]
+    .filter(Boolean)
+    .join(' · ')
 }

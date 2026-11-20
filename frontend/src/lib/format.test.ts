@@ -1,5 +1,17 @@
 import { describe, expect, test } from 'vitest'
-import { billNumber, billUrl, formatDate, districtLabel, initialsOf, memberUrl, timeAgo } from './format'
+import {
+  billNumber,
+  billTypeShort,
+  billUrl,
+  formatDate,
+  formatShortDate,
+  districtLabel,
+  initialsOf,
+  memberUrl,
+  originChamber,
+  sessionLabel,
+  timeAgo,
+} from './format'
 
 describe('billNumber', () => {
   test('renders the congressional abbreviation', () => {
@@ -48,5 +60,31 @@ describe('members', () => {
     expect(initialsOf('Alexandria Ocasio-Cortez')).toBe('AO')
     expect(initialsOf('Ted Cruz')).toBe('TC')
     expect(initialsOf('   ')).toBe('')
+  })
+})
+
+describe('bill page helpers', () => {
+  test('gives a short type label for small icons', () => {
+    expect(billTypeShort('hr')).toBe('H.R.')
+    expect(billTypeShort('sres')).toBe('S.Res')
+  })
+
+  test('reads the chamber a bill starts in from its type', () => {
+    expect(originChamber('hr')).toBe('House')
+    expect(originChamber('hconres')).toBe('House')
+    expect(originChamber('s')).toBe('Senate')
+    expect(originChamber('sjres')).toBe('Senate')
+  })
+
+  test('names the session of a Congress from a date in it', () => {
+    expect(sessionLabel(119, '2025-05-29')).toBe('1st Session')
+    expect(sessionLabel(119, '2026-02-03')).toBe('2nd Session')
+    expect(sessionLabel(119, '2024-12-01')).toBeNull()
+    expect(sessionLabel(119, null)).toBeNull()
+  })
+
+  test('formats a short date without the year', () => {
+    expect(formatShortDate('2025-07-18')).toBe('Jul 18')
+    expect(formatShortDate(null)).toBe('')
   })
 })
