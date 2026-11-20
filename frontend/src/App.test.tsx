@@ -40,9 +40,9 @@ test('renders the dashboard with the live bills and members', async () => {
 
   render(<App />)
 
-  // Chrome
-  expect(screen.getByRole('link', { name: 'Bills' })).toBeTruthy()
-  expect(screen.getByRole('link', { name: 'Members' })).toBeTruthy()
+  // Chrome: the header links, repeated in the phone tab bar
+  expect(screen.getAllByRole('link', { name: 'Bills' })).toHaveLength(2)
+  expect(screen.getAllByRole('link', { name: 'Members' })).toHaveLength(2)
 
   // Hero
   expect(await screen.findByText('Follow the work of the 119th Congress')).toBeTruthy()

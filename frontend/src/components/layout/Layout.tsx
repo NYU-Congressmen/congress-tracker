@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { SiteHeader } from './SiteHeader'
 import { SiteFooter } from './SiteFooter'
+import { TabBar } from './TabBar'
 
 // Return to the top of the page whenever the route changes. The scrollY
 // check keeps the call a no-op at the top of the page and in test
@@ -14,8 +15,9 @@ function ScrollToTop() {
   return null
 }
 
-// Shared page shell: header, main content area and footer.
-// New routes render through the <Outlet /> below, so the chrome never changes.
+// Shared page shell: header, main content area, footer, and the tab bar that
+// takes over navigation on phones. New routes render through the <Outlet />
+// below, so the chrome never changes.
 export function Layout() {
   return (
     <div className="site-shell">
@@ -28,6 +30,7 @@ export function Layout() {
         <Outlet />
       </main>
       <SiteFooter />
+      <TabBar />
     </div>
   )
 }

@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import type { BillSummary } from '../../api/bills'
 import { billNumber, formatDate } from '../../lib/format'
 import { StatusBadge } from '../ui/StatusBadge'
-import { ChamberFlags } from '../ui/ChamberFlags'
+import { StageStrip } from '../ui/StageStrip'
 
 interface BillListItemProps {
   bill: BillSummary
@@ -10,29 +10,25 @@ interface BillListItemProps {
   showLatestAction?: boolean
 }
 
-// One bill in a list: number, stage, chamber flags, title and latest action.
+// One bill in a list. The bill number leads, the way reporters cite bills,
+// with the stage strip and label under it and the title and latest action beside.
 export function BillListItem({ bill, showLatestAction = true }: BillListItemProps) {
   const to = `/bills/${bill.congress}/${bill.type}/${bill.number}`
   return (
     <li className="bill-list__item">
-      <Link to={to} className="bill-list__link">
-        <span className="bill-list__top">
-          <span className="bill-list__id">{billNumber(bill.type, bill.number)}</span>
+      <Link to={to} className="entry">
+        <span className="entry__num">{billNumber(bill.type, bill.number)}</span>
+        <span className="entry__stage">
+          <StageStrip status={bill.status} />
           <StatusBadge status={bill.status} />
-          <ChamberFlags passedHouse={bill.passed_house} passedSenate={bill.passed_senate} />
         </span>
-        <span className="bill-list__title">{bill.title}</span>
+        <span className="entry__title">{bill.title}</span>
         {showLatestAction && bill.latest_action_text ? (
-          <span className="bill-list__action">
+          <span className="entry__action">
             {bill.latest_action_date ? (
-              <>
-                <time dateTime={bill.latest_action_date}>{formatDate(bill.latest_action_date)}</time>
-                <span className="bill-list__dot" aria-hidden="true">
-                  ·
-                </span>
-              </>
+              <time dateTime={bill.latest_action_date}>{formatDate(bill.latest_action_date)}</time>
             ) : null}
-            <span className="bill-list__action-text">{bill.latest_action_text}</span>
+            {bill.latest_action_text}
           </span>
         ) : null}
       </Link>
