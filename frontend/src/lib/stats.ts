@@ -7,7 +7,7 @@ export interface PartyCounts {
   I: number
 }
 
-// Count current members by party for the dashboard composition panel.
+// Count current members by party.
 export function countByParty(members: Member[]): PartyCounts {
   const counts: PartyCounts = { total: members.length, R: 0, D: 0, I: 0 }
   for (const member of members) {
@@ -16,4 +16,12 @@ export function countByParty(members: Member[]): PartyCounts {
     else if (member.party === 'I') counts.I += 1
   }
   return counts
+}
+
+// Party counts for each chamber, for the home page's House and Senate bars.
+export function countByChamber(members: Member[]): { House: PartyCounts; Senate: PartyCounts } {
+  return {
+    House: countByParty(members.filter((member) => member.chamber === 'House')),
+    Senate: countByParty(members.filter((member) => member.chamber === 'Senate')),
+  }
 }

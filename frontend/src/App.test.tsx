@@ -45,11 +45,16 @@ test('renders the dashboard with the live bills and members', async () => {
   expect(screen.getAllByRole('link', { name: 'Members' })).toHaveLength(2)
 
   // Hero
-  expect(await screen.findByText('Follow the work of the 119th Congress')).toBeTruthy()
+  expect(await screen.findByText("What's Congress up to?")).toBeTruthy()
 
-  // Latest activity from the API
+  // Latest updates from the API, each with its number and stage
   expect(await screen.findByText('To amend the Clean Air Act')).toBeTruthy()
-  expect(screen.getAllByText('In committee').length).toBeGreaterThan(0)
+  expect(screen.getByText('H.R. 1 · In committee')).toBeTruthy()
+
+  // Stage tallies and the chamber split
+  expect(await screen.findByText('Where bills are at')).toBeTruthy()
+  expect((await screen.findAllByText('In committee')).length).toBeGreaterThan(0)
+  expect(await screen.findByRole('img', { name: /House: 0 Republicans, 1 Democrats/ })).toBeTruthy()
 })
 
 test('shows a helpful offline state when the API is down', async () => {

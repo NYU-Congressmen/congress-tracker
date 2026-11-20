@@ -16,6 +16,37 @@ export function billNumber(type: BillType, number: number): string {
   return `${BILL_TYPE_LABELS[type] ?? type} ${number}`
 }
 
+const BILL_TYPE_SHORT: Record<BillType, string> = {
+  hr: 'H.R.',
+  s: 'S.',
+  hjres: 'H.J.',
+  sjres: 'S.J.',
+  hconres: 'H.Con',
+  sconres: 'S.Con',
+  hres: 'H.Res',
+  sres: 'S.Res',
+}
+
+// A short type label that fits a small icon: "H.R.", "S.", "H.Res".
+export function billTypeShort(type: BillType): string {
+  return BILL_TYPE_SHORT[type] ?? type.toUpperCase()
+}
+
+// The chamber a bill starts in, read from its type.
+export function originChamber(type: BillType): 'House' | 'Senate' {
+  return type.startsWith('h') ? 'House' : 'Senate'
+}
+
+// "1st Session" or "2nd Session" of a Congress, from a date in it. Each
+// Congress meets for two years, and the 1st Congress began in 1789.
+export function sessionLabel(congress: number, date: string | null): string | null {
+  const year = date ? Number(date.slice(0, 4)) : NaN
+  const session = year - (1787 + 2 * congress) + 1
+  if (session === 1) return '1st Session'
+  if (session === 2) return '2nd Session'
+  return null
+}
+
 export function billUrl(congress: number, type: BillType, number: number): string {
   return `https://www.congress.gov/bill/${congress}th-congress/${type}/${number}`
 }
@@ -49,6 +80,15 @@ export function formatDate(value: string | null | undefined): string {
   if (!value) return ''
   const date = parseIsoDate(value)
   return date ? DATE_FORMAT.format(date) : ''
+}
+
+const SHORT_DATE_FORMAT = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' })
+
+// "Jul 18": for places where the year is clear from context.
+export function formatShortDate(value: string | null | undefined): string {
+  if (!value) return ''
+  const date = parseIsoDate(value)
+  return date ? SHORT_DATE_FORMAT.format(date) : ''
 }
 
 export function formatDateTime(value: string | null | undefined): string {
