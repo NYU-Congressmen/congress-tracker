@@ -4,6 +4,7 @@ import { AccountStep } from '../components/onboarding/AccountStep'
 import { DistrictStep } from '../components/onboarding/DistrictStep'
 import { SocialStep } from '../components/onboarding/SocialStep'
 import { TopicsStep } from '../components/onboarding/TopicsStep'
+import { PageBand } from '../components/layout/PageBand'
 import { useProfile } from '../profile/ProfileContext'
 import type { DistrictSelection, SocialProfile } from '../profile/types'
 import { districtHeading } from '../lib/districts'
@@ -43,145 +44,147 @@ export default function OnboardingPage() {
   const stepIndex = STEPS.findIndex((item) => item.id === step)
 
   return (
-    <div className="container page onboard">
-      <header className="page__header">
-        <h1>{profile ? 'Edit your profile' : 'Set up your profile'}</h1>
-        <p className="page__lede">
-          Choose your congressional district and the topics you follow.
-        </p>
-      </header>
+    <div className="onboard-page">
+      <PageBand labelledBy="onboard-title">
+        <h1 id="onboard-title" className="page-title">
+          {profile ? 'Edit your profile' : 'Set up your profile'}
+        </h1>
+        <p className="page-lede">Choose your congressional district and the topics you follow.</p>
 
-      {step !== 'done' ? (
-        <ol className="onboard-steps" aria-label="Setup steps">
-          {STEPS.map((item, index) => (
-            <li
-              key={item.id}
-              className={`onboard-steps__item${index === stepIndex ? ' is-current' : ''}${index < stepIndex ? ' is-done' : ''}`}
-            >
-              <span className="onboard-steps__number" aria-hidden="true">
-                {index < stepIndex ? '✓' : index + 1}
-              </span>
-              {item.label}
-            </li>
-          ))}
-        </ol>
-      ) : null}
+        {step !== 'done' ? (
+          <ol className="onboard-steps" aria-label="Setup steps">
+            {STEPS.map((item, index) => (
+              <li
+                key={item.id}
+                className={`onboard-steps__item${index === stepIndex ? ' is-current' : ''}${index < stepIndex ? ' is-done' : ''}`}
+              >
+                <span className="onboard-steps__number" aria-hidden="true">
+                  {index < stepIndex ? '✓' : index + 1}
+                </span>
+                {item.label}
+              </li>
+            ))}
+          </ol>
+        ) : null}
+      </PageBand>
 
-      <div className="panel onboard__panel">
-        {step === 'account' ? (
-          <AccountStep
-            onCreate={(name) => {
-              leaveProfile()
-              setError(null)
-              setUsername(name)
-              setDistrict(null)
-              setTopics([])
-              setSocials([])
-              setStep('district')
-            }}
-            onSelect={(name) => {
-              try {
-                const saved = selectProfile(name)
+      <div className="container page-body onboard">
+        <div className="panel onboard__panel">
+          {step === 'account' ? (
+            <AccountStep
+              onCreate={(name) => {
+                leaveProfile()
                 setError(null)
                 setUsername(name)
-                setDistrict(saved.district)
-                setTopics(saved.topics)
-                setSocials(saved.socials)
+                setDistrict(null)
+                setTopics([])
+                setSocials([])
                 setStep('district')
-              } catch (cause) {
-                setError(cause instanceof Error ? cause.message : 'The profile could not be opened.')
-              }
-            }}
-          />
-        ) : null}
+              }}
+              onSelect={(name) => {
+                try {
+                  const saved = selectProfile(name)
+                  setError(null)
+                  setUsername(name)
+                  setDistrict(saved.district)
+                  setTopics(saved.topics)
+                  setSocials(saved.socials)
+                  setStep('district')
+                } catch (cause) {
+                  setError(cause instanceof Error ? cause.message : 'The profile could not be opened.')
+                }
+              }}
+            />
+          ) : null}
 
-        {step === 'district' ? (
-          <DistrictStep
-            initial={district}
-            onDone={(selection) => {
-              setDistrict(selection)
-              setStep('topics')
-            }}
-          />
-        ) : null}
+          {step === 'district' ? (
+            <DistrictStep
+              initial={district}
+              onDone={(selection) => {
+                setDistrict(selection)
+                setStep('topics')
+              }}
+            />
+          ) : null}
 
-        {step === 'topics' ? (
-          <TopicsStep
-            initial={topics}
-            onDone={(nextTopics) => {
-              setTopics(nextTopics)
-              setStep('social')
-            }}
-          />
-        ) : null}
+          {step === 'topics' ? (
+            <TopicsStep
+              initial={topics}
+              onDone={(nextTopics) => {
+                setTopics(nextTopics)
+                setStep('social')
+              }}
+            />
+          ) : null}
 
-        {step === 'social' ? (
-          <SocialStep
-            initial={socials}
-            onDone={(nextSocials) => {
-              setSocials(nextSocials)
-              finish(district, topics, nextSocials)
-            }}
-          />
-        ) : null}
+          {step === 'social' ? (
+            <SocialStep
+              initial={socials}
+              onDone={(nextSocials) => {
+                setSocials(nextSocials)
+                finish(district, topics, nextSocials)
+              }}
+            />
+          ) : null}
 
-        {step === 'done' ? (
-          <div className="onboard-done">
-            <h2>All set, {username || 'there'}</h2>
-            <p>
-              {district
-                ? `Your dashboard now follows ${districtHeading(district.state, district.district)}`
-                : 'Your dashboard is ready'}
-              {topics.length > 0 ? ' and the newest bills on your topics' : ''}.
-            </p>
-            <div className="onboard-done__actions">
-              <button type="button" className="btn btn--primary btn--lg" onClick={() => navigate('/')}>
-                Go to my dashboard
-              </button>
-              <Link to="/social" className="btn btn--secondary">
-                Open the Social page
-              </Link>
+          {step === 'done' ? (
+            <div className="onboard-done">
+              <h2>All set, {username || 'there'}</h2>
+              <p>
+                {district
+                  ? `Your dashboard now follows ${districtHeading(district.state, district.district)}`
+                  : 'Your dashboard is ready'}
+                {topics.length > 0 ? ' and the newest bills on your topics' : ''}.
+              </p>
+              <div className="onboard-done__actions">
+                <button type="button" className="btn btn--primary btn--lg" onClick={() => navigate('/')}>
+                  Go to my dashboard
+                </button>
+                <Link to="/social" className="btn btn--secondary">
+                  Open the Social page
+                </Link>
+              </div>
             </div>
-          </div>
-        ) : null}
+          ) : null}
 
-        {error && step !== 'done' ? (
-          <p className="form-error" role="alert">
-            {error}
-          </p>
-        ) : null}
+          {error && step !== 'done' ? (
+            <p className="form-error" role="alert">
+              {error}
+            </p>
+          ) : null}
 
-        {step !== 'done' && step !== 'account' ? (
-          <div className="onboard-back">
+          {step !== 'done' && step !== 'account' ? (
+            <div className="onboard-back">
+              <button
+                type="button"
+                className="btn btn--ghost"
+                onClick={() => {
+                  setError(null)
+                  setStep(step === 'social' ? 'topics' : step === 'topics' ? 'district' : 'account')
+                }}
+              >
+                Back
+              </button>
+            </div>
+          ) : null}
+        </div>
+
+        {profile ? (
+          <div className="onboard-signout">
+            <span className="muted">Active profile is {profile.username}.</span>
             <button
               type="button"
-              className="btn btn--ghost"
+              className="btn btn--ghost btn--sm"
               onClick={() => {
-                setError(null)
-                setStep(step === 'social' ? 'topics' : step === 'topics' ? 'district' : 'account')
+                leaveProfile()
+                setStep('account')
               }}
             >
-              Back
+              Switch profile
             </button>
           </div>
         ) : null}
       </div>
-
-      {profile ? (
-        <div className="onboard-signout">
-          <span className="muted">Active profile is {profile.username}.</span>
-          <button
-            type="button"
-            className="btn btn--ghost btn--sm"
-            onClick={() => {
-              leaveProfile()
-              setStep('account')
-            }}
-          >
-            Switch profile
-          </button>
-        </div>
-      ) : null}
     </div>
   )
 }

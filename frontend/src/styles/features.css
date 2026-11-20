@@ -1,0 +1,1059 @@
+/* Profile, onboarding, social, co-sponsors, text diffs and stances, drawn in
+   the Paper Pop tokens so they sit with the rest of the site. Selected
+   states use ink, not the highlight; the highlight stays for laws, the
+   current stage and the main action. */
+
+/* ------------------------------------------------------------ header */
+
+.site-header__end {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.site-header__end .theme-toggle {
+  margin-left: 0;
+}
+
+.site-user {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 15rem;
+  min-height: 40px;
+  padding: 3px 12px 3px 3px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.site-user:hover {
+  background: var(--line);
+}
+
+.site-user__avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--btn);
+  color: var(--btn-ink);
+  font-size: 12.5px;
+  font-weight: 800;
+}
+
+.site-user__text {
+  display: grid;
+  min-width: 0;
+  line-height: 1.15;
+}
+
+.site-user__name,
+.site-user__district {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.site-user__name {
+  font-weight: 800;
+  font-size: 13.5px;
+}
+
+.site-user__district {
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+@media (max-width: 1100px) {
+  .brand__tag {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .site-user {
+    padding-right: 3px;
+  }
+  .site-user__text {
+    display: none;
+  }
+}
+
+/* ------------------------------------------------- segmented switches */
+
+/* The Members view switch, the chamber switch and the district-method tabs
+   share one look: a pill track with the chosen option in ink. */
+.page-views,
+.onboard-step__modes {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--chip);
+  border: 1px solid var(--chip-border);
+}
+
+.page-views .btn,
+.onboard-step__modes .btn {
+  min-height: 36px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--ink-2);
+}
+
+.page-views .btn:hover,
+.onboard-step__modes .btn:hover {
+  transform: none;
+  color: var(--ink);
+}
+
+.page-views .btn--primary,
+.onboard-step__modes .btn--primary {
+  background: var(--btn);
+  color: var(--btn-ink);
+}
+
+.page-views .btn--primary:hover,
+.onboard-step__modes .btn--primary:hover {
+  color: var(--btn-ink);
+}
+
+.band .page-views {
+  margin-top: 22px;
+}
+
+.onboard-step__modes {
+  margin-bottom: 18px;
+}
+
+.btn--lg {
+  min-height: 52px;
+  padding: 0 24px;
+  font-size: 16px;
+}
+
+.form-error {
+  margin-top: 12px;
+  font-weight: 700;
+  color: var(--error-ink);
+}
+
+.bill-list--compact .entry {
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+/* --------------------------------------------------------------- home */
+
+.home__body {
+  display: grid;
+  gap: 28px;
+}
+
+.home__mine {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+
+.home__setup {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px 28px;
+  background: var(--note-bg);
+}
+
+.home__setup p {
+  margin-top: 6px;
+  max-width: 60ch;
+  color: var(--ink-2);
+}
+
+@media (max-width: 960px) {
+  .home__mine {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* --------------------------------------------- chamber composition */
+
+/* One dot per member, Democrats on the left and Republicans on the right.
+   The component sets the row and column counts; the grid keeps the dots
+   square and shrinks to fit the card. */
+.composition-switch {
+  margin-bottom: 18px;
+}
+
+.composition-scroll {
+  margin-bottom: 16px;
+}
+
+.composition-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--composition-cols, 10), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--composition-rows, 10), minmax(0, 1fr));
+  gap: 3px;
+  width: min(100%, calc(var(--composition-cols, 10) * 13px));
+  aspect-ratio: var(--composition-cols, 10) / var(--composition-rows, 10);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.composition-dot {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+}
+
+.composition-dot--d {
+  background: var(--d);
+}
+
+.composition-dot--i {
+  background: var(--i);
+}
+
+.composition-dot--r {
+  background: var(--r);
+}
+
+.composition-legend {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink-2);
+}
+
+.composition-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.composition-legend__item .composition-dot {
+  width: 10px;
+  height: 10px;
+  flex: none;
+}
+
+.composition-legend__count,
+.composition-total__count {
+  font-weight: 900;
+  color: var(--ink);
+}
+
+.composition-total {
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+  color: var(--ink-2);
+}
+
+/* --------------------------------------------------------- bill page */
+
+.bill-body {
+  display: grid;
+  gap: 28px;
+}
+
+.bill-body > .cache-notice {
+  margin-bottom: 0;
+}
+
+/* On wide screens the chat scrolls inside its card, so a long history does
+   not leave a gap beside the sponsor card. */
+.chat__scroll:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+@media (min-width: 961px) {
+  .bill-body .chat__scroll {
+    max-height: 560px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
+.sponsor-panel__cosponsors {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.sponsor-panel__cosponsors h3 {
+  font-size: 15px;
+  font-weight: 800;
+  margin-bottom: 12px;
+}
+
+.cosponsor-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 8px;
+}
+
+.cosponsor-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.cosponsor-card:hover {
+  background: var(--bubble);
+}
+
+.avatar--sm {
+  width: 38px;
+  height: 38px;
+  font-size: 13px;
+}
+
+.avatar--sm .pb {
+  width: 15px;
+  height: 15px;
+  font-size: 9.5px;
+  border-radius: 5px;
+}
+
+.cosponsor-card__body {
+  display: grid;
+  min-width: 0;
+}
+
+.cosponsor-card__name {
+  font-weight: 800;
+  font-size: 14.5px;
+  line-height: 1.25;
+}
+
+.cosponsor-card__meta {
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+
+/* text versions and the diff between two of them */
+.diff-versions {
+  list-style: none;
+  margin: 0 0 18px;
+  padding: 0;
+}
+
+.diff-versions__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+
+.diff-versions__item:first-child {
+  border-top: 0;
+}
+
+.diff-versions__type {
+  font-weight: 800;
+}
+
+.diff-versions__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--link);
+  text-decoration: none;
+}
+
+.diff-versions__link:hover {
+  text-decoration: underline;
+}
+
+.diff-compare {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.diff-viewer {
+  max-height: 32rem;
+  overflow: auto;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.diff-viewer__head {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--ink-2);
+}
+
+.diff-viewer pre {
+  margin: 0;
+  padding: 10px 14px;
+  font: 13px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  overflow-x: auto;
+}
+
+.diff-line {
+  display: block;
+  white-space: pre-wrap;
+}
+
+.diff-line__file {
+  color: var(--ink-3);
+}
+
+.diff-line__hunk {
+  color: var(--stage-ink);
+  background: var(--note-bg);
+}
+
+.diff-line__add {
+  color: var(--ok-ink);
+  background: var(--ok-bg);
+}
+
+.diff-line__del {
+  color: var(--error-ink);
+  background: var(--error-bg);
+}
+
+/* the reader's stance on a bill */
+.review__stance,
+.discussions__stance {
+  display: inline-block;
+  padding: 3px 11px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.review__stance {
+  margin-bottom: 10px;
+}
+
+.review__stance--support,
+.discussions__stance--support {
+  background: var(--ok-bg);
+  color: var(--ok-ink);
+}
+
+.review__stance--oppose,
+.discussions__stance--oppose {
+  background: var(--error-bg);
+  color: var(--error-ink);
+}
+
+.review__stance--unsure,
+.discussions__stance--unsure {
+  background: var(--bubble);
+  color: var(--ink-2);
+}
+
+.review__story {
+  margin-bottom: 8px;
+}
+
+.review__action {
+  margin-bottom: 8px;
+  color: var(--ink-2);
+}
+
+.review__meta {
+  font-size: 13.5px;
+}
+
+/* -------------------------------------------------------- members */
+
+.member-grid-page__main {
+  display: grid;
+  gap: 28px;
+  min-width: 0;
+}
+
+.profile__mine {
+  display: inline-block;
+  margin-bottom: 10px;
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: var(--btn);
+  color: var(--btn-ink);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.member-card__role {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--link);
+}
+
+.mymembers__heading {
+  margin-bottom: 14px;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.mymembers__hint {
+  margin-top: 16px;
+  font-size: 14px;
+}
+
+.mymembers__empty {
+  display: grid;
+  gap: 16px;
+  justify-items: start;
+}
+
+/* ------------------------------------------------------- onboarding */
+
+.onboard-steps {
+  list-style: none;
+  margin: 22px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.onboard-steps__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 14px 4px 4px;
+  border-radius: 999px;
+  background: var(--chip);
+  border: 1px solid var(--chip-border);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink-2);
+}
+
+.onboard-steps__number {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--bubble);
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.onboard-steps__item.is-current {
+  background: var(--btn);
+  border-color: transparent;
+  color: var(--btn-ink);
+}
+
+.onboard-steps__item.is-current .onboard-steps__number {
+  background: var(--hl);
+  color: var(--hl-ink);
+}
+
+.onboard-steps__item.is-done .onboard-steps__number {
+  background: var(--ok-bg);
+  color: var(--ok-ink);
+}
+
+.onboard__panel {
+  max-width: 760px;
+}
+
+.onboard-step h2 {
+  margin-bottom: 8px;
+}
+
+.onboard-form,
+.onboard-social__form {
+  display: grid;
+  gap: 14px;
+  justify-items: start;
+}
+
+.onboard-form + .onboard-form {
+  margin-top: 18px;
+}
+
+.onboard-form .field,
+.onboard-social__form .field {
+  width: min(100%, 26rem);
+}
+
+.onboard-step__actions {
+  margin-top: 22px;
+}
+
+.onboard-back {
+  margin-top: 14px;
+}
+
+.onboard-choice,
+.onboard-atlarge {
+  margin-top: 18px;
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--note-bg);
+}
+
+.onboard-atlarge {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+}
+
+.onboard-choice__label {
+  font-weight: 800;
+  color: var(--stage-ink);
+}
+
+.onboard-found {
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--ok-bg);
+  color: var(--ok-ink);
+  font-weight: 700;
+}
+
+.onboard-map__controls,
+.onboard-number__controls {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  max-width: 26rem;
+  margin-bottom: 16px;
+}
+
+.onboard-social__list,
+.social-list {
+  list-style: none;
+  margin: 6px 0 16px;
+  padding: 0;
+  width: 100%;
+}
+
+.onboard-social__item,
+.social-list__item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+
+.onboard-social__item:first-child,
+.social-list__item:first-child {
+  border-top: 0;
+}
+
+.onboard-social__platform,
+.social-list__platform {
+  min-width: 8rem;
+  font-weight: 800;
+}
+
+.onboard-social__handle,
+.social-list__handle {
+  flex: 1;
+  color: var(--ink-2);
+  word-break: break-all;
+}
+
+.onboard-done {
+  padding: 12px 0;
+  text-align: center;
+}
+
+.onboard-done p {
+  max-width: 34rem;
+  margin: 8px auto 20px;
+  color: var(--ink-2);
+}
+
+.onboard-done__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.onboard-signout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.topics__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+button.chip {
+  font-family: var(--font);
+  min-height: 36px;
+  cursor: pointer;
+}
+
+/* the district map: House blue districts, the chosen one in ink */
+.district-map {
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  box-shadow: inset 0 0 0 1px var(--line);
+  background: var(--note-bg);
+}
+
+.district-map__canvas {
+  height: 30rem;
+}
+
+.district-map__svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: grab;
+}
+
+.district-map__svg:active {
+  cursor: grabbing;
+}
+
+.district-map__district {
+  fill: var(--s3);
+  stroke: var(--card);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  transition: fill 0.1s ease;
+  outline: none;
+}
+
+.district-map__district:hover {
+  fill: var(--d3);
+}
+
+.district-map__district.is-selected {
+  fill: var(--fill);
+}
+
+.district-map__district:focus-visible {
+  stroke: var(--focus);
+  stroke-width: 2.5;
+}
+
+.district-map__label,
+.district-map__city text {
+  fill: var(--ink);
+  text-anchor: middle;
+  font-family: var(--font);
+  pointer-events: none;
+}
+
+.district-map__label {
+  font-weight: 800;
+}
+
+.district-map__city {
+  pointer-events: none;
+}
+
+.district-map__city circle {
+  fill: var(--ink);
+  stroke: var(--card);
+  stroke-width: 0.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.district-map__city text {
+  font-weight: 700;
+  paint-order: stroke fill;
+  stroke: var(--card);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.district-map__hint {
+  padding: 10px 14px 12px;
+  background: var(--card);
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+/* ----------------------------------------------------------- social */
+
+.social {
+  display: grid;
+  grid-template-columns: minmax(0, 880px);
+  gap: 28px;
+}
+
+.social__prompt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px 24px;
+  background: var(--note-bg);
+}
+
+.social__prompt p {
+  margin-top: 4px;
+  max-width: 36rem;
+}
+
+.social-add,
+.social-find {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.social-add__handle,
+.social-find .field {
+  flex: 1 1 14rem;
+}
+
+.social-bill {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--note-bg);
+}
+
+.social-bill__link,
+.discussions__link {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.social-bill__link:hover .social-bill__title,
+.discussions__link:hover .discussions__title {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.social-bill__id,
+.social-results__id,
+.discussions__id {
+  font-weight: 900;
+  color: var(--num);
+  white-space: nowrap;
+}
+
+.social-bill__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+}
+
+.social-bill-suggest {
+  margin-top: 10px;
+}
+
+.social-results {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.social-results__item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.social-results li:first-child .social-results__item {
+  border-top: 0;
+}
+
+.social-results__item:hover {
+  background: var(--bg);
+}
+
+.social-results__title {
+  color: var(--ink-2);
+}
+
+.social-composer {
+  display: grid;
+  gap: 16px;
+  justify-items: start;
+  margin-top: 20px;
+}
+
+.social-composer .field {
+  width: 100%;
+}
+
+.social-stance {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-inline-size: 0;
+}
+
+.social-stance legend {
+  margin-bottom: 8px;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-2);
+}
+
+.social-stance__option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  margin: 0 8px 8px 0;
+  padding: 0 16px 0 12px;
+  border-radius: 999px;
+  background: var(--chip);
+  border: 1px solid var(--chip-border);
+  font-weight: 700;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.social-stance__option input {
+  margin: 0;
+  accent-color: var(--hl);
+}
+
+.social-stance__option.is-selected {
+  background: var(--btn);
+  border-color: transparent;
+  color: var(--btn-ink);
+}
+
+.social-composer__textarea {
+  width: 100%;
+  min-height: 6.5rem;
+  padding: 10px 12px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.social-notice {
+  margin-top: 14px;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 14.5px;
+}
+
+.social-notice--ok {
+  background: var(--ok-bg);
+  color: var(--ok-ink);
+}
+
+.social-notice--draft {
+  background: var(--s4);
+  color: var(--ink);
+}
+
+.social-notice--error {
+  background: var(--error-bg);
+  color: var(--error-ink);
+  box-shadow: inset 0 0 0 1px var(--error-line);
+}
+
+.discussions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.discussions__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+
+.discussions__item:first-child {
+  border-top: 0;
+}
+
+.discussions__link {
+  flex: 1 1 14rem;
+}
+
+.discussions__status {
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+.discussions__status--draft {
+  font-weight: 800;
+  color: var(--ink-2);
+}
+
+@media (max-width: 640px) {
+  .district-map__canvas {
+    height: 22rem;
+  }
+  .onboard-social__platform,
+  .social-list__platform {
+    min-width: 6rem;
+  }
+}

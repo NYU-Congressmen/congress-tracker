@@ -1,0 +1,124 @@
+/* Smaller pages: About and the 404 page. Bill search uses the shared pieces. */
+
+.about__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+
+.about__prose,
+.about__side {
+  display: grid;
+  gap: 28px;
+  min-width: 0;
+}
+
+.about__prose p {
+  color: var(--ink-2);
+  max-width: 68ch;
+}
+
+.status-list {
+  margin: 0;
+  display: grid;
+}
+
+.status-list__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+  font-size: 14.5px;
+}
+
+.status-list__row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.status-list dt {
+  color: var(--ink-2);
+  font-weight: 600;
+}
+
+.status-list dd {
+  margin: 0;
+  font-weight: 700;
+}
+
+.status-list__ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-list__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #2e9d5b;
+}
+
+.roadmap-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14.5px;
+}
+
+.roadmap-table th {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-3);
+  padding: 0 12px 8px 0;
+}
+
+.roadmap-table td {
+  padding: 10px 12px 10px 0;
+  border-top: 1px solid var(--line);
+  vertical-align: top;
+}
+
+.roadmap-table td:first-child {
+  font-weight: 800;
+}
+
+.stack-list,
+.link-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  color: var(--ink-2);
+}
+
+.link-list a {
+  font-weight: 700;
+}
+
+.notfound .band__in {
+  padding-bottom: 96px;
+}
+
+.notfound__code {
+  font-size: clamp(72px, 12vw, 140px);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.05em;
+  color: var(--hl);
+  -webkit-text-stroke: 2px var(--ink);
+}
+
+.notfound__home {
+  margin-top: 24px;
+}
+
+@media (max-width: 960px) {
+  .about__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

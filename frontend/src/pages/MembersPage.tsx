@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { listMembers } from '../api/members'
-import type { Member } from '../api/members'
+import { PageBand } from '../components/layout/PageBand'
 import { MemberCard } from '../components/members/MemberCard'
 import { EmptyState } from '../components/ui/EmptyState'
 import { ErrorState } from '../components/ui/ErrorState'
@@ -12,7 +12,6 @@ import { useApi } from '../hooks/useApi'
 import { CHAMBER_OPTIONS, PARTY_OPTIONS, STATE_OPTIONS, CONGRESS_NUMBER } from '../lib/constants'
 import { districtHeading, representativesForDistrict, stateName } from '../lib/districts'
 import { useProfile } from '../profile/ProfileContext'
-import { initialsOf } from '../lib/format'
 
 interface FilterValues {
   state: string
@@ -94,16 +93,14 @@ function MyRepresentativesView() {
 
   if (!district) {
     return (
-      <div>
+      <div className="mymembers__empty">
         <EmptyState
           title="No district on your profile yet"
           hint="Pick your congressional district and this view lists the House member and senators who represent you."
         />
-        <p>
-          <Link to="/onboarding" className="btn btn--primary">
-            Set up my district
-          </Link>
-        </p>
+        <Link to="/onboarding" className="btn btn--primary">
+          Set up my district
+        </Link>
       </div>
     )
   }
@@ -134,11 +131,12 @@ function MyRepresentativesView() {
   return (
     <div className="mymembers">
       <p className="mymembers__heading" aria-live="polite">
-        {districtHeading(district.state, district.district)} · {mine.length} representatives
+        {districtHeading(district.state, district.district)} · {mine.length}{' '}
+        {mine.length === 1 ? 'representative' : 'representatives'}
       </p>
       <ul className="member-grid mymembers__grid">
         {mine.map(({ member, role }) => (
-          <MemberCardWithRole key={member.bioguide_id} member={member} role={role} />
+          <MemberCard key={member.bioguide_id} member={member} role={role} />
         ))}
       </ul>
       <p className="muted mymembers__hint">
@@ -146,31 +144,6 @@ function MyRepresentativesView() {
         {district.district !== null ? `; your House member represents District ${district.district}.` : ', who represent you directly.'}
       </p>
     </div>
-  )
-}
-
-// A directory card with the representative's role labeled, for the
-// "My representatives" view.
-function MemberCardWithRole({ member, role }: { member: Member; role: string }) {
-  const partyClass = member.party ? ` member-card--${member.party.toLowerCase()}` : ''
-  return (
-    <li className={`member-card${partyClass}`}>
-      <Link to={`/members/${member.bioguide_id}`} className="member-card__link">
-        <span className="member-card__photo">
-          {member.image_url ? (
-            <img src={member.image_url} alt="" loading="lazy" />
-          ) : (
-            <span className="member-card__initials" aria-hidden="true">
-              {initialsOf(member.name)}
-            </span>
-          )}
-        </span>
-        <span className="member-card__body">
-          <span className="member-card__name">{member.name}</span>
-          <span className="member-card__meta">{role}</span>
-        </span>
-      </Link>
-    </li>
   )
 }
 
@@ -218,65 +191,68 @@ export default function MembersPage() {
   const filtersKey = [state, party, chamber].join('|')
 
   return (
-    <div className="container page">
-      <header className="page__header">
-        <h1>Members of Congress</h1>
-        <p className="page__lede">
-          Every current member of the {CONGRESS_NUMBER}th Congress, with the bills they have sponsored.
+    <div className="members-page">
+      <PageBand labelledBy="members-title">
+        <h1 id="members-title" className="page-title">
+          Who's in Congress
+        </h1>
+        <p className="page-lede">
+          Every current member of the {CONGRESS_NUMBER}th Congress. Find yours, see what they've sponsored, and how to
+          reach their office.
         </p>
-      </header>
-
-      <div className="page-views" role="group" aria-label="Choose a view">
-        <button
-          type="button"
-          className={`btn btn--sm ${view === 'all' ? 'btn--primary' : 'btn--ghost'}`}
-          onClick={() => setView('all')}
-        >
-          All members
-        </button>
-        <button
-          type="button"
-          className={`btn btn--sm ${view === 'mine' ? 'btn--primary' : 'btn--ghost'}`}
-          onClick={() => setView('mine')}
-        >
-          My representatives
-        </button>
-      </div>
-
-      {view === 'mine' ? (
-        <MyRepresentativesView />
-      ) : (
-        <>
+        <div className="page-views" role="group" aria-label="Choose a view">
+          <button
+            type="button"
+            className={`btn btn--sm ${view === 'all' ? 'btn--primary' : 'btn--ghost'}`}
+            aria-pressed={view === 'all'}
+            onClick={() => setView('all')}
+          >
+            All members
+          </button>
+          <button
+            type="button"
+            className={`btn btn--sm ${view === 'mine' ? 'btn--primary' : 'btn--ghost'}`}
+            aria-pressed={view === 'mine'}
+            onClick={() => setView('mine')}
+          >
+            My representatives
+          </button>
+        </div>
+        {view === 'mine' ? null : (
           <MembersFiltersForm
             key={filtersKey}
             initial={{ state, party, chamber }}
             hasFilters={hasFilters}
             onApply={applyFilters}
           />
+        )}
+      </PageBand>
 
-          {error ? (
-            <ErrorState title="Members could not be loaded" message={error.message} onRetry={refetch} />
-          ) : loading ? (
-            <LoadingState message="Loading the directory…" />
-          ) : data && data.data.length === 0 ? (
-            <EmptyState
-              title="No members match those filters"
-              hint="Try a different state, party or chamber combination."
-            />
-          ) : data ? (
-            <>
-              <p className="results-count" aria-live="polite">
-                {data.total.toLocaleString()} {data.total === 1 ? 'member' : 'members'}
-              </p>
-              <ul className="member-grid">
-                {data.data.map((member) => (
-                  <MemberCard key={member.bioguide_id} member={member} />
-                ))}
-              </ul>
-            </>
-          ) : null}
-        </>
-      )}
+      <div className="container page-body">
+        {view === 'mine' ? (
+          <MyRepresentativesView />
+        ) : error ? (
+          <ErrorState title="Members could not be loaded" message={error.message} onRetry={refetch} />
+        ) : loading ? (
+          <LoadingState message="Loading the directory…" />
+        ) : data && data.data.length === 0 ? (
+          <EmptyState
+            title="No members match those filters"
+            hint="Try a different state, party or chamber combination."
+          />
+        ) : data ? (
+          <>
+            <p className="results-count" aria-live="polite">
+              {data.total.toLocaleString()} {data.total === 1 ? 'member' : 'members'}
+            </p>
+            <ul className="member-grid">
+              {data.data.map((member) => (
+                <MemberCard key={member.bioguide_id} member={member} />
+              ))}
+            </ul>
+          </>
+        ) : null}
+      </div>
     </div>
   )
 }

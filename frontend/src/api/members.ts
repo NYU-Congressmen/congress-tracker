@@ -13,6 +13,10 @@ export interface Member {
   district: number | null
   image_url: string | null
   is_current: boolean
+  // Washington office contacts, synced from Congress.gov for current members.
+  office_phone?: string | null
+  office_address?: string | null
+  website_url?: string | null
 }
 
 // Describe the current members matching a set of filters.

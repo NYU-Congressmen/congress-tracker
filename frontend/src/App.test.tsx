@@ -40,16 +40,24 @@ test('renders the dashboard with the live bills and members', async () => {
 
   render(<App />)
 
-  // Chrome
-  expect(screen.getByRole('link', { name: 'Bills' })).toBeTruthy()
-  expect(screen.getByRole('link', { name: 'Members' })).toBeTruthy()
+  // Chrome: the header links, repeated in the phone tab bar
+  expect(screen.getAllByRole('link', { name: 'Bills' })).toHaveLength(2)
+  expect(screen.getAllByRole('link', { name: 'Members' })).toHaveLength(2)
 
   // Hero
-  expect(await screen.findByText('Follow the work of the 119th Congress')).toBeTruthy()
+  expect(await screen.findByText("What's Congress up to?")).toBeTruthy()
 
-  // Latest activity from the API
+  // Latest updates from the API, each with its number and stage
   expect(await screen.findByText('To amend the Clean Air Act')).toBeTruthy()
-  expect(screen.getAllByText('In committee').length).toBeGreaterThan(0)
+  expect(screen.getByText('H.R. 1 · In committee')).toBeTruthy()
+
+  // Stage tallies and the chamber composition, one circle per member
+  expect(await screen.findByText('Where bills are at')).toBeTruthy()
+  expect((await screen.findAllByText('In committee')).length).toBeGreaterThan(0)
+  expect(await screen.findByRole('list', { name: /^1 members, one circle each/ })).toBeTruthy()
+
+  // Without a profile, the home page invites the reader to set one up
+  expect(screen.getByRole('heading', { name: 'Make this dashboard yours' })).toBeTruthy()
 })
 
 test('shows a helpful offline state when the API is down', async () => {
