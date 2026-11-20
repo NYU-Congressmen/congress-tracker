@@ -23,7 +23,7 @@ import {
   sessionLabel,
 } from '../lib/format'
 
-const LADDER_LABELS = ['Intro', 'Cmte', '1 chamber', 'Both', 'Pres.', 'Law']
+const LADDER_LABELS = ['Intro', 'Cmte', 'Chamber', 'Both', 'Pres.', 'Law']
 
 function BackLink() {
   return (
