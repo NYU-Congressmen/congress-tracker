@@ -51,10 +51,13 @@ test('renders the dashboard with the live bills and members', async () => {
   expect(await screen.findByText('To amend the Clean Air Act')).toBeTruthy()
   expect(screen.getByText('H.R. 1 · In committee')).toBeTruthy()
 
-  // Stage tallies and the chamber split
+  // Stage tallies and the chamber composition, one circle per member
   expect(await screen.findByText('Where bills are at')).toBeTruthy()
   expect((await screen.findAllByText('In committee')).length).toBeGreaterThan(0)
-  expect(await screen.findByRole('img', { name: /House: 0 Republicans, 1 Democrats/ })).toBeTruthy()
+  expect(await screen.findByRole('list', { name: /^1 members, one circle each/ })).toBeTruthy()
+
+  // Without a profile, the home page invites the reader to set one up
+  expect(screen.getByRole('heading', { name: 'Make this dashboard yours' })).toBeTruthy()
 })
 
 test('shows a helpful offline state when the API is down', async () => {

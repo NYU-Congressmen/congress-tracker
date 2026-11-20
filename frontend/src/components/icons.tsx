@@ -222,3 +222,11 @@ export function AboutIcon({ size = 22, className }: IconProps) {
     </svg>
   )
 }
+
+export function ChatIcon({ size = 22, className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} className={className} aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.7A8 8 0 1 1 21 12Z" />
+    </svg>
+  )
+}

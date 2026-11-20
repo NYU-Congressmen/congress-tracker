@@ -1,12 +1,13 @@
 import type { ComponentType } from 'react'
 import { NavLink } from 'react-router-dom'
 import { NAV_ITEMS } from '../../lib/constants'
-import { AboutIcon, BillIcon, HomeIcon, PeopleIcon, type IconProps } from '../icons'
+import { AboutIcon, BillIcon, ChatIcon, HomeIcon, PeopleIcon, type IconProps } from '../icons'
 
 const TAB_ICONS: Record<string, ComponentType<IconProps>> = {
   '/': HomeIcon,
   '/bills': BillIcon,
   '/members': PeopleIcon,
+  '/social': ChatIcon,
   '/about': AboutIcon,
 }
 

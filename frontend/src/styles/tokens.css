@@ -65,6 +65,8 @@
   --error-ink: #8a1c13;
   --error-line: #f2c4bf;
   --note-bg: #eaf1fa;
+  --ok-bg: #e5f3e9;
+  --ok-ink: #17552e;
 
   --radius: 22px;
   --radius-sm: 12px;
@@ -114,6 +116,8 @@
     --error-ink: #ffb4ab;
     --error-line: #5c2a25;
     --note-bg: #16233a;
+    --ok-bg: #12261a;
+    --ok-ink: #9fdcb1;
     color-scheme: dark;
   }
 }
@@ -161,6 +165,8 @@
   --error-ink: #ffb4ab;
   --error-line: #5c2a25;
   --note-bg: #16233a;
+  --ok-bg: #12261a;
+  --ok-ink: #9fdcb1;
   color-scheme: dark;
 }
 

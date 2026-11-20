@@ -72,10 +72,13 @@ export interface BillAction {
 }
 
 // Describe a bill with its cached sponsor, action history and freshness.
+// Co-sponsors are optional: the backend records them once Congress.gov
+// reports them, and the bill page shows the section either way.
 export interface BillDetail extends BillSummary {
   policy_area: string | null
   sponsor_id: string | null
   sponsor: Member | null
+  co_sponsors?: Member[]
   actions: BillAction[]
   cache: CacheInfo
 }

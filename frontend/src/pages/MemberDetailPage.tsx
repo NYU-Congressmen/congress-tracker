@@ -10,6 +10,7 @@ import { LoadingState } from '../components/ui/LoadingState'
 import { useApi } from '../hooks/useApi'
 import { initialsOf, memberUrl, stateName } from '../lib/format'
 import { CONGRESS_NUMBER, PARTY_LABELS } from '../lib/constants'
+import { useProfile } from '../profile/ProfileContext'
 
 function BackLink() {
   return (
@@ -28,6 +29,7 @@ function displayUrl(url: string): string {
 export default function MemberDetailPage() {
   const { bioguideId } = useParams()
   const id = bioguideId ?? ''
+  const { profile } = useProfile()
 
   const { data: member, loading, error, refetch } = useApi(() => getMember(id), [id])
 
@@ -62,6 +64,20 @@ export default function MemberDetailPage() {
   ].filter((chip): chip is string => Boolean(chip))
   const hasContacts = Boolean(member.office_phone || member.office_address || member.website_url)
 
+  // Flag the member when they sit in the signed-in person's district, so the
+  // profile page doubles as the "my representatives" detail view.
+  const district = profile?.district ?? null
+  const isMine =
+    district !== null &&
+    (member.state ?? '').toUpperCase() === district.state.toUpperCase() &&
+    (member.chamber === 'Senate' ||
+      (district.district !== null && member.district === district.district) ||
+      (district.district === null && member.district === null))
+
+  // The backend records co-sponsorship once Congress.gov reports it; the
+  // section is here either way, ready to fill in.
+  const coSponsored = member.co_sponsored_bills ?? []
+
   return (
     <div className="member-page">
       <PageBand labelledBy="member-name">
@@ -80,6 +96,7 @@ export default function MemberDetailPage() {
             ) : null}
           </span>
           <div className="profile__info">
+            {isMine ? <p className="profile__mine">Your representative</p> : null}
             <h1 id="member-name" className="profile__name">
               {member.name}
             </h1>
@@ -106,27 +123,52 @@ export default function MemberDetailPage() {
       </PageBand>
 
       <div className="container page-body member-grid-page">
-        <section className="card" aria-labelledby="sponsored-title">
-          <div className="card__head">
-            <h2 id="sponsored-title">Bills they've sponsored</h2>
-            <span className="card__note">
-              {member.sponsored_bills.length} in the {CONGRESS_NUMBER}th Congress
-            </span>
-          </div>
-          <CacheNotice cache={member.cache} what="This member's sponsored bills" />
-          {member.sponsored_bills.length > 0 ? (
-            <ul className="bill-list">
-              {member.sponsored_bills.map((bill) => (
-                <BillListItem key={bill.bill_id} bill={bill} showLatestAction={false} />
-              ))}
-            </ul>
-          ) : (
-            <EmptyState
-              title="No sponsored bills recorded yet"
-              hint="Bills sponsored in the current Congress appear here once Congress.gov reports them."
-            />
-          )}
-        </section>
+        <div className="member-grid-page__main">
+          <section className="card" aria-labelledby="sponsored-title">
+            <div className="card__head">
+              <h2 id="sponsored-title">Bills they've sponsored</h2>
+              <span className="card__note">
+                {member.sponsored_bills.length} in the {CONGRESS_NUMBER}th Congress
+              </span>
+            </div>
+            <CacheNotice cache={member.cache} what="This member's sponsored bills" />
+            {member.sponsored_bills.length > 0 ? (
+              <ul className="bill-list">
+                {member.sponsored_bills.map((bill) => (
+                  <BillListItem key={bill.bill_id} bill={bill} showLatestAction={false} />
+                ))}
+              </ul>
+            ) : (
+              <EmptyState
+                title="No sponsored bills recorded yet"
+                hint="Bills sponsored in the current Congress appear here once Congress.gov reports them."
+              />
+            )}
+          </section>
+
+          <section className="card" aria-labelledby="cosponsored-title">
+            <div className="card__head">
+              <h2 id="cosponsored-title">Bills they've co-sponsored</h2>
+              {coSponsored.length > 0 ? (
+                <span className="card__note">
+                  {coSponsored.length} in the {CONGRESS_NUMBER}th Congress
+                </span>
+              ) : null}
+            </div>
+            {coSponsored.length > 0 ? (
+              <ul className="bill-list">
+                {coSponsored.map((bill) => (
+                  <BillListItem key={bill.bill_id} bill={bill} showLatestAction={false} />
+                ))}
+              </ul>
+            ) : (
+              <EmptyState
+                title="No co-sponsored bills on record yet"
+                hint="Bills this member has co-sponsored appear here once the tracker records them from Congress.gov."
+              />
+            )}
+          </section>
+        </div>
 
         <section className="card" aria-labelledby="office-title">
           <h2 id="office-title" className="card__title">

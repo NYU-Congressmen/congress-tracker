@@ -4,6 +4,9 @@ import { Link, useNavigate } from 'react-router-dom'
 import { BILL_STATUSES, searchBills, type BillStatus, type BillSummary } from '../api/bills'
 import { listMembers } from '../api/members'
 import { PageBand } from '../components/layout/PageBand'
+import { ChamberComposition } from '../components/dashboard/ChamberComposition'
+import { DistrictBills } from '../components/dashboard/DistrictBills'
+import { TopicFeed } from '../components/dashboard/TopicFeed'
 import { AlertIcon, ChevronRightIcon, SearchIcon } from '../components/icons'
 import { EmptyState } from '../components/ui/EmptyState'
 import { LoadingState } from '../components/ui/LoadingState'
@@ -11,7 +14,8 @@ import { useApi } from '../hooks/useApi'
 import { CONGRESS_NUMBER, STATUS_META } from '../lib/constants'
 import { billNumber, billTypeShort, formatShortDate } from '../lib/format'
 import { loadStageCounts, totalOf } from '../lib/stageCounts'
-import { countByChamber, type PartyCounts } from '../lib/stats'
+import { countByChamber } from '../lib/stats'
+import { useProfile } from '../profile/ProfileContext'
 
 // Keyword shortcuts under the search box. They run an ordinary title search.
 const TOPICS: { label: string; q: string }[] = [
@@ -75,45 +79,6 @@ function UpdateCard({ bill }: { bill: BillSummary }) {
   )
 }
 
-// A chamber's party split as one bar, with the counts written out beside letters.
-function ChamberSplit({ name, majority, counts }: { name: string; majority: number; counts: PartyCounts }) {
-  const total = Math.max(counts.total, 1)
-  const share = (count: number) => `${(count / total) * 100}%`
-  return (
-    <div className="split">
-      <div className="split__top">
-        <span>{name}</span>
-        <span className="split__note">{majority} for a majority</span>
-      </div>
-      <div
-        className="split__bar"
-        role="img"
-        aria-label={`${name}: ${counts.R} Republicans, ${counts.D} Democrats, ${counts.I} Independents`}
-      >
-        <span className="split__r" style={{ width: share(counts.R) }} />
-        <span className="split__i" style={{ width: share(counts.I) }} />
-        <span className="split__d" style={{ width: share(counts.D) }} />
-      </div>
-      <div className="split__legend">
-        <span>
-          <i className="pb pb--r">R</i>
-          {counts.R}
-        </span>
-        <span>
-          <i className="pb pb--d">D</i>
-          {counts.D}
-        </span>
-        {counts.I > 0 ? (
-          <span>
-            <i className="pb pb--i">I</i>
-            {counts.I}
-          </span>
-        ) : null}
-      </div>
-    </div>
-  )
-}
-
 export default function DashboardPage() {
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
@@ -134,6 +99,12 @@ export default function DashboardPage() {
 
   const total = counts ? totalOf(counts) : null
   const chambers = memberList ? countByChamber(memberList.data) : null
+
+  // The signed-in person's district and topics drive the personalized
+  // panels, which sit between "At a glance" and "Latest activity".
+  const { profile } = useProfile()
+  const district = profile?.district ?? null
+  const topics = profile?.topics ?? []
 
   return (
     <div className="home">
@@ -227,50 +198,71 @@ export default function DashboardPage() {
       </PageBand>
 
       {latestError ? null : (
-        <div className="container page-body home__grid">
-          <section className="card" aria-labelledby="stages-title">
-            <div className="card__head">
-              <h2 id="stages-title">Where bills are at</h2>
-              <Link to="/bills" className="more">
-                See all bills
-              </Link>
-            </div>
-            {counts ? (
-              <ul className="stages">
-                {STATUS_META.map((meta) => (
-                  <li key={meta.value}>
-                    <Link to={`/bills?status=${meta.value}`} className="stages__row" title={meta.description}>
-                      <span className={`stages__icon note__icon--s${stageNumber(meta.value)}`} aria-hidden="true">
-                        {stageNumber(meta.value)}
-                      </span>
-                      <span className="stages__label">{meta.label}</span>
-                      <span className="stages__count">{counts[meta.value].toLocaleString()}</span>
-                      <ChevronRightIcon className="stages__chev" />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <LoadingState message="Tallying bills by stage…" />
-            )}
-          </section>
-
-          <section className="card" aria-labelledby="chambers-title">
-            <div className="card__head">
-              <h2 id="chambers-title">Who's in Congress</h2>
-              <Link to="/members" className="more">
-                Find yours
-              </Link>
-            </div>
-            {chambers ? (
-              <div className="splits">
-                <ChamberSplit name="House" majority={218} counts={chambers.House} />
-                <ChamberSplit name="Senate" majority={51} counts={chambers.Senate} />
+        <div className="container page-body home__body">
+          <div className="home__grid">
+            <section className="card" aria-labelledby="stages-title">
+              <div className="card__head">
+                <h2 id="stages-title">Where bills are at</h2>
+                <Link to="/bills" className="more">
+                  See all bills
+                </Link>
               </div>
-            ) : (
-              <LoadingState message="Counting current members…" />
-            )}
-          </section>
+              {counts ? (
+                <ul className="stages">
+                  {STATUS_META.map((meta) => (
+                    <li key={meta.value}>
+                      <Link to={`/bills?status=${meta.value}`} className="stages__row" title={meta.description}>
+                        <span className={`stages__icon note__icon--s${stageNumber(meta.value)}`} aria-hidden="true">
+                          {stageNumber(meta.value)}
+                        </span>
+                        <span className="stages__label">{meta.label}</span>
+                        <span className="stages__count">{counts[meta.value].toLocaleString()}</span>
+                        <ChevronRightIcon className="stages__chev" />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <LoadingState message="Tallying bills by stage…" />
+              )}
+            </section>
+
+            <section className="card" aria-labelledby="chambers-title">
+              <div className="card__head">
+                <h2 id="chambers-title">Who's in Congress</h2>
+                <Link to="/members" className="more">
+                  All members
+                </Link>
+              </div>
+              {chambers ? <ChamberComposition counts={chambers} /> : <LoadingState message="Counting current members…" />}
+            </section>
+          </div>
+
+          {/* The personal panels follow the signed-in person's district and
+              topics; without a profile, one card invites them to set it up. */}
+          {district ? (
+            <div className="home__mine">
+              <section className="card" aria-label="Your district">
+                <DistrictBills state={district.state} district={district.district} />
+              </section>
+              <section className="card" aria-label="Topics you follow">
+                <TopicFeed topicIds={topics} />
+              </section>
+            </div>
+          ) : (
+            <section className="card home__setup" aria-labelledby="setup-title">
+              <div>
+                <h2 id="setup-title">Make this dashboard yours</h2>
+                <p>
+                  Pick your congressional district and Pull follows your representatives and the bills that concern
+                  your district, plus the topics you choose to track.
+                </p>
+              </div>
+              <Link to="/onboarding" className="btn btn--ink">
+                Set up my profile
+              </Link>
+            </section>
+          )}
         </div>
       )}
     </div>

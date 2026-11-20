@@ -7,8 +7,8 @@ export interface PartyCounts {
   I: number
 }
 
-// Count current members by party.
-export function countByParty(members: Member[]): PartyCounts {
+// Party split of a group of members.
+function countParties(members: Member[]): PartyCounts {
   const counts: PartyCounts = { total: members.length, R: 0, D: 0, I: 0 }
   for (const member of members) {
     if (member.party === 'R') counts.R += 1
@@ -18,10 +18,25 @@ export function countByParty(members: Member[]): PartyCounts {
   return counts
 }
 
-// Party counts for each chamber, for the home page's House and Senate bars.
-export function countByChamber(members: Member[]): { House: PartyCounts; Senate: PartyCounts } {
+// Count current members by party for the dashboard composition panel.
+export function countByParty(members: Member[]): PartyCounts {
+  return countParties(members)
+}
+
+// The composition the dashboard's chamber view can select: both chambers
+// combined, or a single chamber on its own.
+export interface ChamberCounts {
+  both: PartyCounts
+  house: PartyCounts
+  senate: PartyCounts
+}
+
+// Split the membership by chamber so the dashboard can show the combined
+// composition or the composition of one chamber at a time.
+export function countByChamber(members: Member[]): ChamberCounts {
   return {
-    House: countByParty(members.filter((member) => member.chamber === 'House')),
-    Senate: countByParty(members.filter((member) => member.chamber === 'Senate')),
+    both: countParties(members),
+    house: countParties(members.filter((member) => member.chamber === 'House')),
+    senate: countParties(members.filter((member) => member.chamber === 'Senate')),
   }
 }
