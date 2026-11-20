@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { searchBills, type BillStatus } from '../api/bills'
 import { BillListItem } from '../components/bills/BillListItem'
+import { PageBand } from '../components/layout/PageBand'
 import { EmptyState } from '../components/ui/EmptyState'
 import { ErrorState } from '../components/ui/ErrorState'
 import { LoadingState } from '../components/ui/LoadingState'
@@ -124,53 +125,57 @@ export default function BillsPage() {
   const filtersKey = [q, status, from, to].join('|')
 
   return (
-    <div className="container page">
-      <header className="page__header">
-        <h1>Bills</h1>
-        <p className="page__lede">
+    <div className="bills-page">
+      <PageBand labelledBy="bills-title">
+        <h1 id="bills-title" className="page-title">
+          Bills
+        </h1>
+        <p className="page-lede">
           Search legislation from the 119th Congress by keyword, stage, or the date it was introduced.
         </p>
-      </header>
 
-      <BillsFiltersForm
-        key={filtersKey}
-        initial={{ q, status, from, to }}
-        hasFilters={hasFilters}
-        onApply={applyFilters}
-      />
-
-      {hasFilters ? (
-        <p className="active-filters" aria-live="polite">
-          <span className="active-filters__label">Filtering by:</span>
-          {q ? <span className="chip chip--active">“{q}”</span> : null}
-          {status ? <span className="chip chip--active">{statusLabel ?? status}</span> : null}
-          {from ? <span className="chip chip--active">since {from}</span> : null}
-          {to ? <span className="chip chip--active">through {to}</span> : null}
-        </p>
-      ) : null}
-
-      {error ? (
-        <ErrorState title="Bills could not be loaded" message={error.message} onRetry={refetch} />
-      ) : loading ? (
-        <LoadingState message="Searching bills…" />
-      ) : data && data.data.length === 0 ? (
-        <EmptyState
-          title="No bills match those filters"
-          hint="Try a broader keyword, or clear the stage and date filters."
+        <BillsFiltersForm
+          key={filtersKey}
+          initial={{ q, status, from, to }}
+          hasFilters={hasFilters}
+          onApply={applyFilters}
         />
-      ) : data ? (
-        <>
-          <p className="results-count" aria-live="polite">
-            {data.total.toLocaleString()} {data.total === 1 ? 'bill' : 'bills'} found
+
+        {hasFilters ? (
+          <p className="active-filters" aria-live="polite">
+            <span className="active-filters__label">Filtering by:</span>
+            {q ? <span className="chip chip--active">“{q}”</span> : null}
+            {status ? <span className="chip chip--active">{statusLabel ?? status}</span> : null}
+            {from ? <span className="chip chip--active">since {from}</span> : null}
+            {to ? <span className="chip chip--active">through {to}</span> : null}
           </p>
-          <ul className="bill-list">
-            {data.data.map((bill) => (
-              <BillListItem key={bill.bill_id} bill={bill} />
-            ))}
-          </ul>
-          <Pagination page={page} pageCount={pageCount} onPageChange={onPageChange} />
-        </>
-      ) : null}
+        ) : null}
+      </PageBand>
+
+      <div className="container page-body">
+        {error ? (
+          <ErrorState title="Bills could not be loaded" message={error.message} onRetry={refetch} />
+        ) : loading ? (
+          <LoadingState message="Searching bills…" />
+        ) : data && data.data.length === 0 ? (
+          <EmptyState
+            title="No bills match those filters"
+            hint="Try a broader keyword, or clear the stage and date filters."
+          />
+        ) : data ? (
+          <section className="card" aria-label="Results">
+            <p className="results-count" aria-live="polite">
+              {data.total.toLocaleString()} {data.total === 1 ? 'bill' : 'bills'} found
+            </p>
+            <ul className="bill-list">
+              {data.data.map((bill) => (
+                <BillListItem key={bill.bill_id} bill={bill} />
+              ))}
+            </ul>
+            <Pagination page={page} pageCount={pageCount} onPageChange={onPageChange} />
+          </section>
+        ) : null}
+      </div>
     </div>
   )
 }
