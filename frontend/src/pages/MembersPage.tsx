@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { listMembers } from '../api/members'
+import { PageBand } from '../components/layout/PageBand'
 import { MemberCard } from '../components/members/MemberCard'
 import { EmptyState } from '../components/ui/EmptyState'
 import { ErrorState } from '../components/ui/ErrorState'
@@ -107,42 +108,46 @@ export default function MembersPage() {
   const filtersKey = [state, party, chamber].join('|')
 
   return (
-    <div className="container page">
-      <header className="page__header">
-        <h1>Members of Congress</h1>
-        <p className="page__lede">
-          Every current member of the {CONGRESS_NUMBER}th Congress, with the bills they have sponsored.
+    <div className="members-page">
+      <PageBand labelledBy="members-title">
+        <h1 id="members-title" className="page-title">
+          Who's in Congress
+        </h1>
+        <p className="page-lede">
+          Every current member of the {CONGRESS_NUMBER}th Congress. Find yours, see what they've sponsored, and how to
+          reach their office.
         </p>
-      </header>
-
-      <MembersFiltersForm
-        key={filtersKey}
-        initial={{ state, party, chamber }}
-        hasFilters={hasFilters}
-        onApply={applyFilters}
-      />
-
-      {error ? (
-        <ErrorState title="Members could not be loaded" message={error.message} onRetry={refetch} />
-      ) : loading ? (
-        <LoadingState message="Loading the directory…" />
-      ) : data && data.data.length === 0 ? (
-        <EmptyState
-          title="No members match those filters"
-          hint="Try a different state, party or chamber combination."
+        <MembersFiltersForm
+          key={filtersKey}
+          initial={{ state, party, chamber }}
+          hasFilters={hasFilters}
+          onApply={applyFilters}
         />
-      ) : data ? (
-        <>
-          <p className="results-count" aria-live="polite">
-            {data.total.toLocaleString()} {data.total === 1 ? 'member' : 'members'}
-          </p>
-          <ul className="member-grid">
-            {data.data.map((member) => (
-              <MemberCard key={member.bioguide_id} member={member} />
-            ))}
-          </ul>
-        </>
-      ) : null}
+      </PageBand>
+
+      <div className="container page-body">
+        {error ? (
+          <ErrorState title="Members could not be loaded" message={error.message} onRetry={refetch} />
+        ) : loading ? (
+          <LoadingState message="Loading the directory…" />
+        ) : data && data.data.length === 0 ? (
+          <EmptyState
+            title="No members match those filters"
+            hint="Try a different state, party or chamber combination."
+          />
+        ) : data ? (
+          <>
+            <p className="results-count" aria-live="polite">
+              {data.total.toLocaleString()} {data.total === 1 ? 'member' : 'members'}
+            </p>
+            <ul className="member-grid">
+              {data.data.map((member) => (
+                <MemberCard key={member.bioguide_id} member={member} />
+              ))}
+            </ul>
+          </>
+        ) : null}
+      </div>
     </div>
   )
 }

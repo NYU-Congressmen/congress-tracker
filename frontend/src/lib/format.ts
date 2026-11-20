@@ -1,4 +1,5 @@
 import type { BillType } from '../api/bills'
+import { STATE_OPTIONS } from './constants'
 
 const BILL_TYPE_LABELS: Record<BillType, string> = {
   hr: 'H.R.',
@@ -131,4 +132,19 @@ export function initialsOf(name: string): string {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() ?? '')
     .join('')
+}
+
+const STATE_NAMES = new Map(STATE_OPTIONS.map((option) => [option.value, option.label]))
+
+// "New York" for "NY"; anything else is returned as stored.
+export function stateName(state: string | null): string | null {
+  if (!state) return null
+  return STATE_NAMES.get(state) ?? state
+}
+
+// "New York · District 14 · House" or "Texas · Senate".
+export function seatLabel(state: string | null, chamber: string | null, district: number | null): string {
+  return [stateName(state), chamber === 'House' && district !== null ? `District ${district}` : null, chamber]
+    .filter(Boolean)
+    .join(' · ')
 }
