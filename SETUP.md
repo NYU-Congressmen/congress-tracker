@@ -77,6 +77,12 @@ On Windows, install PostgreSQL from <https://www.postgresql.org/download/windows
 
 The migrations enable the pgvector extension, so the test database needs pgvector installed as well. The commands above include it on Linux and macOS. On Windows, follow the installation steps at <https://github.com/pgvector/pgvector#windows>. CI uses the `pgvector/pgvector:pg17` image, which has it built in.
 
+## Deployment setup
+
+The release workflow uses the `congress-pull` Firebase and Google Cloud project, the default Hosting site and the `pull-api` Cloud Run service in `us-east1`. Cloud Run reads `DATABASE_URL` from a pinned version of the `pull-database-url` Secret Manager secret. The runtime service account needs Secret Manager Secret Accessor on that secret. The Supabase session pooler supplies the IPv4 connection string for Cloud Run. [Cloud Run secrets](https://docs.cloud.google.com/run/docs/configuring/services/secrets) [Supabase connection modes](https://supabase.com/docs/guides/database/connecting-to-postgres)
+
+GitHub Actions uses Workload Identity Federation to impersonate `pull-release@congress-pull.iam.gserviceaccount.com`. The repository variable `PULL_WIF_PROVIDER` holds the full provider resource name. The provider accepts push tokens for this repository's numeric ID on `refs/heads/main` from `.github/workflows/ci.yml`. The release service account uses Cloud Run Source Developer, Service Usage Consumer, Firebase Hosting Admin and API Keys Viewer, with Service Account User on the Cloud Run runtime identity. The Cloud Build identity uses Cloud Run Builder. [Google Cloud federation setup](https://docs.cloud.google.com/iam/docs/workload-identity-federation-with-deployment-pipelines) [Firebase deployment roles](https://firebase.google.com/docs/projects/iam/roles-predefined-product)
+
 ## Troubleshooting
 
 If a command reports that `uv` is not found right after the setup script installed it, open a new terminal. The installer adds uv to your PATH, but terminals that were already open do not see the change.

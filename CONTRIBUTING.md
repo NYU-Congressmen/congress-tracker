@@ -104,6 +104,8 @@ If a conflict is confusing, cancel the merge with `git get-latest --abort` and a
 
 Before each milestone, one person opens a pull request from `develop` into `main` and merges it once CI passes, so `main` always holds the demo version.
 
+The merge runs CI on the exact release commit. After the backend and frontend checks pass, the release job deploys the Cloud Run API and checks its database-backed feed before publishing the frontend build from CI. Firebase Hosting pins the site to that API revision. The final check fetches the public frontend and feed through the Hosting URL. [SETUP.md](SETUP.md#deployment-setup) describes the one-time cloud configuration.
+
 ```bash
 gh pr create --base main --head develop --title "Release for milestone name"
 ```
