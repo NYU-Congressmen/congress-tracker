@@ -64,7 +64,7 @@ New endpoints go in a module under `backend/app/routes/` and are registered in `
 
 `backend/app/db.py` keeps a small pool of database connections, because opening a Supabase connection takes longer than most queries. Keep using `with connect() as conn`, which commits on success and rolls back on error.
 
-Routes that act for a user depend on `current_uid` in `backend/app/auth.py`, the one place that will verify Firebase tokens. Until sign-in exists it refuses every request, and tests stand in a user through FastAPI's dependency overrides.
+Routes that act for a user depend on `current_uid` in `backend/app/auth.py`. It verifies the Firebase ID token for the configured project and returns the UID for the phone session. `PUT /api/account` uses the same verification to create or update the account with Firebase's verified phone number. Route tests use FastAPI dependency overrides, and the account tests cover the token checks and database path with a test verifier.
 
 Every model call goes through `ask` in `backend/app/ai/service.py`, which answers from the `ai_results` cache when it can and logs each real call in `ai_calls` with its tokens and cost. The cache key covers the feature, prompt version, model and exact messages, so changed input regenerates by itself. Bump a feature's prompt version when its prompt changes. A failed call is logged and raised, never cached.
 
@@ -102,7 +102,9 @@ If a conflict is confusing, cancel the merge with `git get-latest --abort` and a
 
 ## Releases
 
-Before each milestone, one person opens a pull request from `develop` into `main` and merges it once CI passes, so `main` always holds the demo version.
+Before each milestone, a pull request from `develop` into `main` carries the demo release. GitHub requires one approving review and passing backend and frontend checks on both branches.
+
+The merge runs CI on the exact release commit. After the backend and frontend checks pass, the release job deploys the Cloud Run API and checks its database-backed feed before publishing the frontend build from CI. Firebase Hosting pins the site to that API revision. The final check fetches the public frontend and feed through the Hosting URL. [SETUP.md](SETUP.md#deployment-setup) describes the one-time cloud configuration.
 
 ```bash
 gh pr create --base main --head develop --title "Release for milestone name"

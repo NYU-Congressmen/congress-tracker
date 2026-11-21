@@ -1,11 +1,9 @@
+import type { User } from '@firebase/auth'
 import { Link } from 'react-router-dom'
-import { getReview } from '../../api/reviews'
 import type { BillType } from '../../api/bills'
-import type { Review } from '../../api/reviews'
-import { ApiError } from '../../api/client'
+import { getReview, STANCE_LABELS } from '../../api/reviews'
+import { useSession } from '../../auth/SessionContext'
 import { useApi } from '../../hooks/useApi'
-import { useProfile } from '../../profile/ProfileContext'
-import { STANCE_LABELS } from '../../api/reviews'
 import { timeAgo } from '../../lib/format'
 
 interface ReviewPanelProps {
@@ -14,64 +12,52 @@ interface ReviewPanelProps {
   number: number
 }
 
-// The reader's own stance on this bill. The backend keeps one review per bill
-// per person; the full discussion flow lives on the Social page.
-export function ReviewPanel({ congress, type, number }: ReviewPanelProps) {
-  const { profile } = useProfile()
-  const { data, loading, error } = useApi(
-    () => getReview(congress, type, number),
-    [congress, type, number],
-  )
-
-  if (!profile) {
-    return (
-      <section className="panel" aria-label="Your stance">
-        <h2>Your stance</h2>
+export function ReviewPanel(props: ReviewPanelProps) {
+  const { user, loading } = useSession()
+  if (user) return <AccountReview key={user.uid} user={user} {...props} />
+  return (
+    <section className="panel" aria-label="Your stance">
+      <h2>Your stance</h2>
+      {loading ? <p className="muted">Checking your account…</p> : (
         <p className="muted">
-          Set up your profile and tell the world where you stand on this bill —{' '}
-          <Link to="/onboarding">get started</Link>.
+          <Link to="/sign-in">Sign in</Link> to view your saved review for this bill.
         </p>
-      </section>
-    )
-  }
+      )}
+    </section>
+  )
+}
 
-  const notFound = error instanceof ApiError && error.status === 404
-  const notSignedIn = error instanceof ApiError && error.status === 401
+function AccountReview({ congress, type, number, user }: ReviewPanelProps & { user: User }) {
+  const { data, loading, error } = useApi(
+    async () => getReview(congress, type, number, await user.getIdToken()),
+    [congress, type, number, user],
+  )
+  const discussionPath = `/social?bill=${congress}-${type}-${number}`
 
   return (
     <section className="panel" aria-label="Your stance">
       <div className="panel__heading-row">
         <h2>Your stance</h2>
-        <Link to={`/social?bill=${congress}-${type}-${number}`} className="link-more">
+        <Link to={discussionPath} className="link-more">
           {data ? 'Edit your review' : 'Share your stance'}
         </Link>
       </div>
       {loading ? (
         <p className="muted">Loading your stance…</p>
+      ) : error?.status === 404 ? (
+        <p className="muted">You haven’t reviewed this bill yet.</p>
+      ) : error?.status === 401 ? (
+        <p className="muted"><Link to="/sign-in">Sign in again</Link> to view your review.</p>
+      ) : error ? (
+        <p className="muted">Your stance could not be loaded right now.</p>
       ) : data ? (
         <div className="review">
           <span className={`review__stance review__stance--${data.stance}`}>{STANCE_LABELS[data.stance]}</span>
           {data.story ? <p className="review__story">{data.story}</p> : null}
           {data.action_taken ? <p className="review__action">What they did: {data.action_taken}</p> : null}
-          <p className="muted review__meta">
-            Saved {timeAgo(data.updated_at) || 'recently'}
-          </p>
+          <p className="muted review__meta">Saved {timeAgo(data.updated_at) || 'recently'}</p>
         </div>
-      ) : notFound ? (
-        <p className="muted">
-          You haven’t reviewed this bill yet.{' '}
-          <Link to={`/social?bill=${congress}-${type}-${number}`}>Say where you stand</Link>.
-        </p>
-      ) : notSignedIn ? (
-        <p className="muted">
-          Sign-in through the backend is not live yet, so your stance can’t be saved to your account. You can still{' '}
-          <Link to={`/social?bill=${congress}-${type}-${number}`}>draft it on the Social page</Link>.
-        </p>
-      ) : error ? (
-        <p className="muted">Your stance could not be loaded right now.</p>
       ) : null}
     </section>
   )
 }
-
-export type { Review }

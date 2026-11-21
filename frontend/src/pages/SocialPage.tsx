@@ -5,6 +5,7 @@ import { ApiError } from '../api/client'
 import { getBill, searchBills } from '../api/bills'
 import type { BillSummary } from '../api/bills'
 import { saveReview, STANCES, STANCE_LABELS } from '../api/reviews'
+import { useSession } from '../auth/SessionContext'
 import { PLATFORMS, platformName } from '../profile/platforms'
 import type { SocialProfile } from '../profile/types'
 import { useProfile } from '../profile/ProfileContext'
@@ -26,12 +27,14 @@ interface SelectedBill extends BillSummary {
 // moving now that are worth weighing in on.
 export default function SocialPage() {
   const { profile } = useProfile()
-  return <SocialContent key={profile?.username ?? ''} />
+  const { user } = useSession()
+  return <SocialContent key={JSON.stringify([profile?.username, user?.uid])} />
 }
 
 function SocialContent() {
   const { profile, updateProfile } = useProfile()
-  const username = profile?.username ?? null
+  const { user } = useSession()
+  const discussionOwner = user ? `firebase:${user.uid}` : profile?.username ?? null
   const [params] = useSearchParams()
 
   // Saved social handles
@@ -52,7 +55,7 @@ function SocialContent() {
   const [submitNotice, setSubmitNotice] = useState<{ kind: 'ok' | 'draft' | 'error'; text: string } | null>(null)
 
   // Local discussion records, newest first
-  const [records, setRecords] = useState(() => listDiscussions(username))
+  const [records, setRecords] = useState(() => listDiscussions(discussionOwner))
 
   // Preselect a bill when the reader arrives from a bill page's "your stance" link.
   const preselect = params.get('bill')
@@ -105,54 +108,49 @@ function SocialContent() {
       return
     }
     setSubmitting(true)
+    const review = {
+      stance: stance as (typeof STANCES)[number],
+      story: story.trim() || null,
+      action_taken: actionTaken.trim() || null,
+      consent_to_share: false,
+    }
+    let saved = false
+    let notice: NonNullable<typeof submitNotice> = { kind: 'draft', text: 'Draft saved in this browser.' }
     try {
-      await saveReview(selected.congress, selected.type, selected.number, {
-        stance: stance as (typeof STANCES)[number],
-        story: story.trim() || null,
-        action_taken: actionTaken.trim() || null,
-        consent_to_share: false,
-      })
-      recordDiscussion(username, {
-        bill: {
-          congress: selected.congress,
-          type: selected.type,
-          number: selected.number,
-          title: selected.title,
-        },
-        stance: stance as (typeof STANCES)[number],
-        story: story.trim() || null,
-        action_taken: actionTaken.trim() || null,
-        consent: false,
-        saved: true,
-        at: new Date().toISOString(),
-      })
-      setRecords(listDiscussions(username))
-      setStory('')
-      setActionTaken('')
-      setSubmitNotice({ kind: 'ok', text: 'Your review is saved. That is how your stance shows on the bill page.' })
+      if (user) {
+        const token = await user.getIdToken()
+        await saveReview(selected.congress, selected.type, selected.number, review, token)
+        saved = true
+        notice = { kind: 'ok', text: 'Your review is saved. You can see it on the bill page.' }
+        setStory('')
+        setActionTaken('')
+      }
     } catch (cause) {
       const isAuth = cause instanceof ApiError && cause.status === 401
-      recordDiscussion(username, {
-        bill: {
-          congress: selected.congress,
-          type: selected.type,
-          number: selected.number,
-          title: selected.title,
-        },
-        stance: stance as (typeof STANCES)[number],
-        story: story.trim() || null,
-        action_taken: actionTaken.trim() || null,
-        consent: false,
-        saved: false,
-        at: new Date().toISOString(),
-      })
-      setRecords(listDiscussions(username))
-      setSubmitNotice(
-        isAuth
-          ? { kind: 'draft', text: 'Draft saved in this browser.' }
-          : { kind: 'error', text: cause instanceof Error ? cause.message : 'The review could not be saved right now.' },
-      )
+      if (!isAuth) {
+        notice = { kind: 'error', text: cause instanceof ApiError ? cause.message : 'The review could not be saved right now.' }
+      }
     } finally {
+      try {
+        recordDiscussion(discussionOwner, {
+          bill: {
+            congress: selected.congress,
+            type: selected.type,
+            number: selected.number,
+            title: selected.title,
+          },
+          stance: review.stance,
+          story: review.story,
+          action_taken: review.action_taken,
+          consent: false,
+          saved,
+          at: new Date().toISOString(),
+        })
+        setRecords(listDiscussions(discussionOwner))
+      } catch {
+        if (!saved) notice = { kind: 'error', text: 'This browser could not save your draft.' }
+      }
+      setSubmitNotice(notice)
       setSubmitting(false)
     }
   }
@@ -264,6 +262,7 @@ function SocialContent() {
 
         <section className="panel" aria-label="Start a discussion">
           <h2>Start a discussion</h2>
+          {!user ? <p className="muted"><Link to="/sign-in">Sign in</Link> to save your review to your account.</p> : null}
 
           {selected ? (
             <div className="social-bill">

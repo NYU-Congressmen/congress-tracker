@@ -1,91 +1,72 @@
-import httpx
 import psycopg
 import pytest
 from fastapi.testclient import TestClient
 
-from app.ai.explainer import Explanation
+from app.ai.explainer import explain
 from app.config import settings
 from app.main import app
 from tests.conftest import TEST_DATABASE_URL
-from tests.test_explainer import BILL, PARTS, fake_client
+from tests.test_explainer import BILL, PARTS, add_summary, fake_client
 
 client = TestClient(app)
 URL = "/api/bills/119/s/3108/explanation"
 
 
 @pytest.fixture
-def configured(db, monkeypatch):
-    """Add the bill, set both keys, and answer model calls with a fixed explanation."""
-    monkeypatch.setattr(settings, "llm_model", "test-model")
-    monkeypatch.setattr(settings, "congress_api_key", "test-key")
-    monkeypatch.setattr("app.ai.service.llm_client", lambda: fake_client(PARTS))
+def stored_bill(db):
+    """Add a bill to the database for explanation requests."""
     with psycopg.connect(TEST_DATABASE_URL) as conn:
         conn.execute(
             "INSERT INTO bills (bill_id, congress, type, number, title) "
             "VALUES ('119-s-3108', 119, 's', 3108, 'Example Act')"
         )
-    return monkeypatch
 
 
-def fetch_returns(bill):
-    return lambda congress_client, congress, bill_type, number: bill
+def test_saved_explanation_is_available_without_service_credentials(stored_bill, monkeypatch):
+    monkeypatch.setattr(settings, "llm_model", "saved-model")
+    explain(BILL, fake_client(PARTS))
+    monkeypatch.setattr(settings, "llm_model", "")
+    monkeypatch.setattr(settings, "congress_api_key", "")
+    monkeypatch.setattr(settings, "llm_api_key", "")
 
+    response = client.get(URL)
 
-def fetch_fails(error: Exception):
-    def fail(congress_client, congress, bill_type, number):
-        raise error
-
-    return fail
-
-
-def test_a_bill_without_a_summary_is_explained_by_the_ai(configured) -> None:
-    configured.setattr("app.routes.explanations.fetch_bill", fetch_returns(BILL))
-
-    body = client.get(URL).json()
-
+    assert response.status_code == 200
+    body = response.json()
     assert body["does"] == PARTS.does
     assert body["does_source"] == "ai"
-    assert (body["cached"], body["from_stored"], body["missing"]) == (False, False, [])
+    assert body["model"] == "saved-model"
+    assert body["cached"] and body["from_stored"]
 
 
-def test_missing_lookups_reach_the_page(configured) -> None:
-    configured.setattr(
-        "app.routes.explanations.fetch_bill",
-        fetch_returns(BILL.__class__(**{**BILL.__dict__, "missing": ["committees"]})),
-    )
+def test_official_summary_is_available_without_a_saved_explanation(stored_bill):
+    add_summary()
 
-    assert client.get(URL).json()["missing"] == ["committees"]
+    response = client.get(URL)
 
-
-def test_the_saved_explanation_is_shown_when_congress_gov_fails(configured) -> None:
-    configured.setattr("app.routes.explanations.fetch_bill", fetch_returns(BILL))
-    client.get(URL)
-    configured.setattr(
-        "app.routes.explanations.fetch_bill", fetch_fails(httpx.ConnectError("down"))
-    )
-
-    body = client.get(URL).json()
-
-    assert body["from_stored"] is True
-    assert Explanation(**{k: body[k] for k in ("does", "does_not", "stands", "decides")}) == PARTS
+    assert response.status_code == 200
+    body = response.json()
+    assert body["does"] == "A summary."
+    assert body["does_source"] == "crs_summary"
+    assert all(body[field] is None for field in ("does_not", "stands", "decides", "model"))
 
 
-def test_an_unexplained_bill_is_502_when_congress_gov_fails(configured) -> None:
-    configured.setattr(
-        "app.routes.explanations.fetch_bill", fetch_fails(httpx.ConnectError("down"))
-    )
+def test_missing_explanation_uses_no_upstream_services(stored_bill, monkeypatch):
+    monkeypatch.setattr(settings, "congress_api_key", "test-key")
+    monkeypatch.setattr(settings, "llm_api_key", "test-key")
+    monkeypatch.setattr(settings, "llm_model", "test-model")
 
-    assert client.get(URL).status_code == 502
+    def unexpected_call(*args, **kwargs):
+        pytest.fail("A public explanation request called an upstream service.")
 
-
-def test_a_bill_with_no_text_yet_is_404(configured) -> None:
-    configured.setattr("app.routes.explanations.fetch_bill", fetch_fails(LookupError("no text")))
+    monkeypatch.setattr("app.sync.client.CongressClient.__init__", unexpected_call)
+    monkeypatch.setattr("app.ai.service.llm_client", unexpected_call)
 
     response = client.get(URL)
 
     assert response.status_code == 404
-    assert "no published text" in response.json()["detail"]
+    assert "official summary is unavailable" in response.json()["detail"]
 
 
-def test_an_unknown_bill_is_404(configured) -> None:
+def test_an_unknown_bill_is_404(stored_bill):
     assert client.get("/api/bills/119/s/99999/explanation").status_code == 404

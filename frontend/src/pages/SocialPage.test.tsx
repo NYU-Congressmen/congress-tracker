@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
+import type { User } from '@firebase/auth'
 import { afterEach, describe, expect, test, vi } from 'vitest'
+import { SessionContext } from '../auth/SessionContext'
 import SocialPage from './SocialPage'
 import { listDiscussions, recordDiscussion } from '../social/drafts'
 import { mockApi } from '../test/fetchMock'
@@ -45,16 +47,18 @@ const BILL = {
   cache: { complete: true, stale: false, refreshed_at: null, refresh_failed: false, retry_after: null },
 }
 
-function renderSocial(routes: { match: string; body: unknown; status?: number }[] = []) {
+function renderSocial(routes: { match: string; body: unknown; status?: number }[] = [], user: User | null = null) {
   const fetchMock = mockApi([
     ...routes,
     { match: '/api/bills/119/hr/7', body: BILL },
     { match: '/api/bills', body: BILL_PAGE },
   ])
   const result = render(
-    <MemoryRouter initialEntries={['/social']}>
-      <SocialPage />
-    </MemoryRouter>,
+    <SessionContext.Provider value={{ user, loading: false, error: null, retry: () => {} }}>
+      <MemoryRouter initialEntries={['/social']}>
+        <SocialPage />
+      </MemoryRouter>
+    </SessionContext.Provider>,
   )
   return { result, fetchMock }
 }
@@ -96,7 +100,7 @@ describe('SocialPage', () => {
     })
     fireEvent.click(await screen.findByRole('button', { name: 'Save my stance' }))
 
-    // The backend sign-in is not live, so the review lands as a local draft
+    // A signed-out visitor saves a browser draft.
     expect(
       await screen.findByText(/draft saved in this browser/i),
     ).toBeTruthy()
@@ -132,7 +136,8 @@ describe('SocialPage', () => {
       created_at: '2026-11-11T12:00:00Z',
       updated_at: '2026-11-11T12:00:00Z',
     }
-    renderSocial([{ match: '/api/bills/119/hr/7/review', body: review }])
+    const user = { uid: 'reviewer', getIdToken: vi.fn().mockResolvedValue('test-id-token') } as unknown as User
+    const { fetchMock } = renderSocial([{ match: '/api/bills/119/hr/7/review', body: review }], user)
 
     const search = screen.getByPlaceholderText(/search by keyword/i)
     fireEvent.change(search, { target: { value: 'hospital' } })
@@ -142,6 +147,9 @@ describe('SocialPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Save my stance' }))
 
     expect(await screen.findByText(/Your review is saved/i)).toBeTruthy()
+    expect(fetchMock).toHaveBeenCalledWith('/api/bills/119/hr/7/review', expect.objectContaining({
+      headers: expect.objectContaining({ Authorization: 'Bearer test-id-token' }),
+    }))
     await waitFor(() => {
       expect(screen.getByText('Saved')).toBeTruthy()
     })

@@ -7,12 +7,13 @@ interface PageBandProps {
   className?: string
 }
 
-// The top of every page: the dot field behind the page's title and main
-// controls, fading into the page below.
+// Set the page title and controls against the fading dot field.
 export function PageBand({ children, labelledBy, className }: PageBandProps) {
   return (
     <section className={`band${className ? ` ${className}` : ''}`} aria-labelledby={labelledBy}>
-      <DotMosaic />
+      <div className="band__mosaic">
+        <DotMosaic />
+      </div>
       <div className="container band__in">{children}</div>
     </section>
   )

@@ -33,7 +33,7 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
       - run: uv sync --locked
       - run: uv run ruff check .
@@ -43,8 +43,8 @@ jobs:
   frontend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -53,3 +53,65 @@ jobs:
       - run: npm run lint:fe
       - run: npm run test:fe
       - run: npm run build
+      - name: Save the release build
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: pull-frontend
+          path: frontend/dist
+          if-no-files-found: error
+          retention-days: 7
+
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    concurrency:
+      group: pull-production
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: pull-frontend
+          path: frontend/dist
+      - name: Check that the release is current
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          main_sha=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')
+          if [[ "$main_sha" == "$GITHUB_SHA" ]]; then
+            echo 'current=true' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Authenticate to Google Cloud
+        if: steps.release.outputs.current == 'true'
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          project_id: congress-pull
+          workload_identity_provider: ${{ vars.PULL_WIF_PROVIDER }}
+          service_account: pull-release@congress-pull.iam.gserviceaccount.com
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3
+        if: steps.release.outputs.current == 'true'
+      - name: Deploy and check the Cloud Run API
+        if: steps.release.outputs.current == 'true'
+        run: |
+          bash scripts/deploy-api.sh
+          api_url=$(gcloud run services describe pull-api --project=congress-pull \
+            --region=us-east1 --format='value(status.url)')
+          node scripts/check-deployment.mjs "$api_url" --api-only
+      - name: Publish Firebase Hosting
+        if: steps.release.outputs.current == 'true'
+        run: npx --yes firebase-tools@15.37.0 deploy --only hosting --project congress-pull --non-interactive
+      - name: Check the public site
+        if: steps.release.outputs.current == 'true'
+        run: node scripts/check-deployment.mjs https://congress-pull.web.app

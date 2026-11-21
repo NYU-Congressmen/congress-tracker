@@ -1,6 +1,6 @@
 # Pull
 
-Pull is a web app for following U.S. legislation, being built so people can search bills, follow members of Congress and get alerts when something changes. A Python sync job copies member and bill summaries from the [Congress.gov API](https://github.com/LibraryOfCongress/api.congress.gov) into Postgres, and a FastAPI backend serves stored data and fills detail caches on demand. A React frontend will display that data, with user accounts, tracking, notifications and voting records planned for later milestones.
+Pull is a web app for understanding and following U.S. legislation. We treat bills like pull requests, with legislative timelines, side-by-side text comparisons and space to record a stance. Readers can search 119th Congress bills, explore the topic feed and find their representatives. [Open Pull](https://congress-pull.web.app/)
 
 ## Development
 
@@ -8,9 +8,17 @@ Pull is a web app for following U.S. legislation, being built so people can sear
 
 ## Status
 
-The backend uses a shared PostgreSQL database on Supabase. `npm run sync` saves every current member of Congress, a summary record of every bill in the 119th Congress and the CRS summaries of those bills. The API provides typed member and bill responses, search with stable bill pagination, and detail endpoints with cache freshness metadata and bounded upstream refreshes. The frontend is still the single page that reports the API's health, and frontend work starts in Week 5. Pending migrations are applied only after their pull request merges, following [CONTRIBUTING.md](CONTRIBUTING.md#database-migrations).
+Onboarding saves a profile, a manually selected congressional district and chosen topics in the browser. The dashboard uses those topics to show matching bills, and the My representatives view uses the selected district. Bill pages show legislative actions and offer text comparisons when multiple versions are available. Member profiles show sponsored bills and display office contact details when the data is available.
 
-The initial roadmap follows the bootcamp's weekly structure. Two additions bring integration checks forward: a deployment smoke test in Week 5 and one complete login, bill-tracking and in-app update flow in Week 6. These planned additions expose hosting and authentication issues before the final deployment in Week 8, while keeping the checkpoint and final presentation dates unchanged.
+The Social page saves stance drafts in the browser. Firebase phone sign-in creates an account that can save one review per bill. The Explanation panel shows saved explanations with Summary, Limits, Status and Next steps, or the official summary by itself when available. The public deployment serves stored legislative data from Supabase.
+
+Pull follows the device theme until a visitor chooses Day or Night. The arrow beside the theme button restores the device setting.
+
+Firebase Hosting serves the React app over HTTPS and forwards `/api` requests to a pinned FastAPI revision on Cloud Run. App pages send a Content Security Policy and block framing. The release workflow checks the API before publishing the tested frontend build and checks the public feed afterward. The live site was deployed manually, and the first automated release awaits a merge to `main` that includes the workflow. [Release workflow](CONTRIBUTING.md#releases)
+
+## Initial roadmap
+
+The initial roadmap follows the bootcamp's weekly structure. It brings integration checks forward by including a deployment smoke test in Week 5 and one complete login, bill-tracking and in-app update flow in Week 6.
 
 | Week | Starts | Focus |
 |---|---|---|
@@ -31,23 +39,24 @@ The initial roadmap follows the bootcamp's weekly structure. Two additions bring
 
 ## Data flow
 
-Congress.gov allows [5,000 requests an hour per key](https://github.com/LibraryOfCongress/api.congress.gov#rate-limit), so search reads stored summaries. A full list sync takes roughly 115 requests at the current dataset size. A bill's sponsor, full action history and list of text versions are fetched on its first view and refreshed when the list sync records an upstream version newer than the cached detail version. A member's current-Congress sponsored bills are fetched on profile view and kept for a day.
+A Python sync job copies member and bill records and Congressional Research Service summaries into Postgres. Search reads stored data, and the topic feed matches keywords against bill titles and summaries. With a Congress.gov key configured, the API fetches a bill's sponsor, full action history and list of text versions on its first view and refreshes them when the list sync records a newer upstream version. A member's current-Congress sponsored bills are fetched on profile view and kept for a day. The member sync also fetches office contact details for new or changed members. [Congress.gov API](https://github.com/LibraryOfCongress/api.congress.gov)
 
 Cold and stale detail requests can call Congress.gov. Their upstream work shares a five-second budget across all pages and any missing-sponsor request. A failed refresh leaves cached data intact and postpones retries for that cached resource for one minute, and a bill Congress.gov reports as missing is remembered for ten minutes so repeated requests for it spend no quota. Responses distinguish missing details from complete cached results and report staleness, the last fetch time and a failed refresh. Pagination and missing sponsors mean a new bill view can need more than two upstream requests, so caching reduces quota pressure without eliminating it.
 
-Bill status is a simplified interpretation of observed action text, using the full cached history when available and the latest action otherwise. House and Senate passage are independent flags, and the stage distinguishes passage in one chamber from observed passage in both. Passing both chambers does not establish agreement on identical text, and the model does not fully represent vetoes or resolution-specific procedures. Syncs retain observed milestones, so a false-positive inference may require a correction. Scheduling and tracked-bill refresh remain planned work.
+Bill text downloads when a comparison needs it and is then cached. The explanation command uses the latest stored CRS summary or the bill's earliest published text alongside status, committee and related-bill context. The model writes three sections when the official summary supplies the first, and otherwise writes all four. The AI cache key includes the feature, prompt version, model and exact messages, so changed input produces a new key. The public explanation endpoint reads saved results and official summaries from Supabase.
+
+Bill status is a simplified interpretation of observed action text, using the full cached history when available and the latest action otherwise. House and Senate passage are independent flags, and the stage distinguishes passage in one chamber from observed passage in both. Passing both chambers does not establish agreement on identical text, and the status rules do not fully represent vetoes or resolution-specific procedures. Syncs retain observed milestones, so a false-positive inference may require a correction. Scheduling and tracked-bill refresh remain planned work.
 
 ## Stack
 
-The table shows the planned stack and how much of each part exists today.
-
 | Part | Technology | State |
 |---|---|---|
-| Frontend | React 19, TypeScript, Vite | One page that reports the API's health |
-| Backend API | FastAPI on Python 3.13 | Typed member and bill search and detail responses, cache metadata, health |
-| Sync job | Python, sharing code with the API | List sync through `npm run sync` and on-demand caching, not yet scheduled |
-| Database | PostgreSQL on Supabase, with migrations managed by Alembic | Members, bills and bill actions |
-| Login | Firebase Auth, with tokens verified by the API | Planned |
+| Frontend | React 19, TypeScript, Vite | Dashboard, search, detail pages, browser profiles, phone sign-in and stance drafts |
+| Backend API | FastAPI on Python 3.13 | Bills, members, text comparisons, topics, feed, explanations, accounts and reviews |
+| Sync job | Python, sharing code with the API | Manual list sync through `npm run sync` and on-demand caching |
+| Database | PostgreSQL on Supabase, Alembic, pgvector | Legislative data, user and review tables, tracking and brief tables, AI cache and call log |
+| AI | OpenAI SDK with a configurable OpenAI-compatible endpoint | Structured explanations, result caching and call logging |
+| Deployment | Firebase Hosting, Cloud Run, GitHub Actions | Live app and API, with a release workflow for `main` |
 
 ## Project layout
 
@@ -60,17 +69,24 @@ congress-tracker/
 │   │   ├── migrate.py       Runs Alembic, or skips without a database
 │   │   ├── db.py            Database connection and query helpers
 │   │   ├── models.py        Public API response models
-│   │   ├── routes/          Health, member, bill, feed and review endpoints
+│   │   ├── auth.py          Firebase token verification and account identity
+│   │   ├── ai/              Explanation prompts, model calls, caching and logging
+│   │   ├── routes/          Health, member, bill, feed, explanation, account and review endpoints
 │   │   └── sync/            Congress.gov client, list sync, cache and status rules
 │   ├── alembic/versions/    Database migrations, written as SQL
 │   └── tests/               Unit tests, plus database tests that need PostgreSQL
 ├── frontend/
 │   └── src/
 │       ├── api/             Functions that call the backend
-│       └── App.tsx
-├── scripts/                 The setup, get-latest and git hook installer scripts
+│       ├── auth/            Firebase client and verified account session
+│       ├── components/      Layout, bill, member and shared UI components
+│       ├── pages/           Dashboard, onboarding, sign-in, bill, member and social pages
+│       ├── profile/         Browser profiles and district and topic selections
+│       └── App.tsx          Browser routes and shared layout
+├── scripts/                 Setup, branch updates, deployment and smoke checks
 ├── .githooks/               Blocks direct pushes to main and develop
-├── .github/workflows/ci.yml Lint, tests and build on every pull request
+├── .github/workflows/ci.yml  Pull request checks and releases from main
+├── firebase.json            Hosting routes and browser security headers
 ├── .env.example             Template for your local .env
 ├── SETUP.md                 Preparing a laptop and running the app
 └── CONTRIBUTING.md          Workflow, commands, pull requests and merging

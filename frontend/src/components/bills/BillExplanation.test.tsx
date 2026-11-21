@@ -44,6 +44,15 @@ describe('BillExplanation', () => {
     expect(screen.getAllByText('AI-generated')).toHaveLength(4)
   })
 
+  test('shows an official summary by itself when generation has not run', async () => {
+    renderPart({ ...BASE, does: 'The bill revises the agreement.', does_source: 'crs_summary', does_not: null, stands: null, decides: null, model: null })
+
+    expect(await screen.findByText('The bill revises the agreement.')).toBeTruthy()
+    expect(screen.getByText(/Official summary/)).toBeTruthy()
+    expect(screen.queryByText('AI-generated')).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'Limits' })).toBeNull()
+  })
+
   test('shortens a long summary until the reader asks for the rest', async () => {
     renderPart({ ...BASE, does: LONG_SUMMARY, does_source: 'crs_summary', source: 'Explained from the CRS summary' })
 
