@@ -49,8 +49,8 @@ Each teammate keeps their own `.env` at the repo root, and `.env.example` is the
 | `CONGRESS_API_KEY` | Now | Authenticates requests to Congress.gov |
 | `DATABASE_URL` | To see real data | Connection string for the team's Supabase database. Ask the teammate who manages it to send it privately, and never paste it into the repo or a group chat |
 | `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL` | Once the AI service is added | Your own free Gemini key from <https://aistudio.google.com/apikey>, with the endpoint and model from `.env.example`. The AI service calls the model through OpenAI's SDK, so another provider needs only different values here |
-| `FIREBASE_PROJECT_ID` | Once login is added | Lets the API verify Firebase login tokens |
-| `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID` | Once login is added | Firebase web configuration for the React app, which identifies the project and is not secret |
+| `FIREBASE_PROJECT_ID` | For phone sign-in | Identifies the Firebase project whose tokens the API accepts |
+| `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID` | For local Firebase configuration | Identifies the Firebase project to the browser SDK. Firebase Hosting supplies these values in production |
 
 ## Database tests
 
@@ -80,6 +80,8 @@ The migrations enable the pgvector extension, so the test database needs pgvecto
 ## Deployment setup
 
 The release workflow uses the `congress-pull` Firebase and Google Cloud project, the default Hosting site and the `pull-api` Cloud Run service in `us-east1`. Cloud Run reads `DATABASE_URL` from a pinned version of the `pull-database-url` Secret Manager secret. The runtime service account needs Secret Manager Secret Accessor on that secret. The Supabase session pooler supplies the IPv4 connection string for Cloud Run. [Cloud Run secrets](https://docs.cloud.google.com/run/docs/configuring/services/secrets) [Supabase connection modes](https://supabase.com/docs/guides/database/connecting-to-postgres)
+
+Phone sign-in uses the Firebase Hosting configuration endpoint in the browser and the Cloud Run service identity through Application Default Credentials in the API. The hosted account page is `/sign-in`. A hosted sign-in check uses a domain authorized in Firebase Auth and a configured fictional number, which sends no SMS. The check covers code verification, saving and reopening a review, and signing out. [Firebase phone sign-in](https://firebase.google.com/docs/auth/web/phone-auth)
 
 GitHub Actions uses Workload Identity Federation to impersonate `pull-release@congress-pull.iam.gserviceaccount.com`. The repository variable `PULL_WIF_PROVIDER` holds the full provider resource name. The provider accepts push tokens for this repository's numeric ID on `refs/heads/main` from `.github/workflows/ci.yml`. The release service account uses Cloud Run Source Developer, Service Usage Consumer, Firebase Hosting Admin and API Keys Viewer, with Service Account User on the Cloud Run runtime identity. The Cloud Build identity uses Cloud Run Builder. [Google Cloud federation setup](https://docs.cloud.google.com/iam/docs/workload-identity-federation-with-deployment-pipelines) [Firebase deployment roles](https://firebase.google.com/docs/projects/iam/roles-predefined-product)
 

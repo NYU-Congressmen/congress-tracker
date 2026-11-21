@@ -13,6 +13,7 @@ gcloud run deploy pull-api \
   --region=us-east1 \
   --source="$source_dir" \
   --port=8080 \
+  --update-env-vars=FIREBASE_PROJECT_ID=congress-pull \
   --set-build-env-vars='GOOGLE_ENTRYPOINT=uvicorn app.main:app --host 0.0.0.0 --port 8080' \
   --quiet \
   "$@"

@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from app.routes import bills, explanations, feed, health, members, reviews
+from app.routes import account, bills, explanations, feed, health, members, reviews
 
 app = FastAPI(title="Pull API", version="0.1.0")
 
@@ -11,3 +11,4 @@ app.include_router(bills.router, prefix="/api")
 app.include_router(explanations.router, prefix="/api")
 app.include_router(feed.router, prefix="/api")
 app.include_router(reviews.router, prefix="/api")
+app.include_router(account.router, prefix="/api")

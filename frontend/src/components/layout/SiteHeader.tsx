@@ -1,15 +1,16 @@
 import { Link, NavLink } from 'react-router-dom'
 import { NAV_ITEMS } from '../../lib/constants'
-import { CapitolIcon } from '../icons'
+import { CapitolIcon, ChevronRightIcon, PeopleIcon } from '../icons'
 import { ThemeToggle } from '../ui/ThemeToggle'
 import { useProfile } from '../../profile/ProfileContext'
 import { initialsOf } from '../../lib/format'
 import { districtHeading } from '../../lib/districts'
+import { useSession } from '../../auth/SessionContext'
 
-// The floating glass bar: wordmark, primary navigation and the theme toggle.
-// On phones the links move to the tab bar at the bottom of the screen.
+// Render the wordmark, primary links, account controls and theme switch.
 export function SiteHeader() {
   const { profile } = useProfile()
+  const { user } = useSession()
   return (
     <header className="site-header">
       <div className="container">
@@ -45,10 +46,23 @@ export function SiteHeader() {
                 </span>
               </Link>
             ) : (
-              <Link to="/onboarding" className="btn btn--ink btn--sm site-user-cta">
-                Get started
+              <Link to="/onboarding" className="site-user" aria-label="Get started">
+                <span className="site-user__avatar" aria-hidden="true"><ChevronRightIcon /></span>
+                <span className="site-user__text">
+                  <span className="site-user__name">Get started</span>
+                </span>
               </Link>
             )}
+            <NavLink
+              to="/sign-in"
+              aria-label={user ? 'Account' : 'Sign in'}
+              className="site-user"
+            >
+              <span className="site-user__avatar" aria-hidden="true"><PeopleIcon size={17} /></span>
+              <span className="site-user__text">
+                <span className="site-user__name">{user ? 'Account' : 'Sign in'}</span>
+              </span>
+            </NavLink>
             <ThemeToggle />
           </div>
         </div>

@@ -10,7 +10,9 @@ Pull is a web app for understanding and following U.S. legislation. We treat bil
 
 Onboarding saves a profile, a manually selected congressional district and chosen topics in the browser. The dashboard uses those topics to show matching bills, and the My representatives view uses the selected district. Bill pages show legislative actions and offer text comparisons when multiple versions are available. Member profiles show sponsored bills and display office contact details when the data is available.
 
-The Social page saves stance drafts in the browser. The reviews API can store one review per signed-in user per bill, and its current sign-in placeholder rejects requests until Firebase token verification is in place. The Explanation panel shows saved explanations with Summary, Limits, Status and Next steps, or the official summary by itself when available. The public deployment serves stored legislative data from Supabase.
+The Social page saves stance drafts in the browser. Firebase phone sign-in creates an account that can save one review per bill. The Explanation panel shows saved explanations with Summary, Limits, Status and Next steps, or the official summary by itself when available. The public deployment serves stored legislative data from Supabase.
+
+Pull follows the device theme until a visitor chooses Day or Night. The arrow beside the theme button restores the device setting.
 
 Firebase Hosting serves the React app over HTTPS and forwards `/api` requests to a pinned FastAPI revision on Cloud Run. App pages send a Content Security Policy and block framing. The release workflow checks the API before publishing the tested frontend build and checks the public feed afterward. The live site was deployed manually, and the first automated release awaits a merge to `main` that includes the workflow. [Release workflow](CONTRIBUTING.md#releases)
 
@@ -49,8 +51,8 @@ Bill status is a simplified interpretation of observed action text, using the fu
 
 | Part | Technology | State |
 |---|---|---|
-| Frontend | React 19, TypeScript, Vite | Dashboard, search, detail pages, browser profiles and stance drafts |
-| Backend API | FastAPI on Python 3.13 | Bills, members, text comparisons, topics, feed, explanations and reviews |
+| Frontend | React 19, TypeScript, Vite | Dashboard, search, detail pages, browser profiles, phone sign-in and stance drafts |
+| Backend API | FastAPI on Python 3.13 | Bills, members, text comparisons, topics, feed, explanations, accounts and reviews |
 | Sync job | Python, sharing code with the API | Manual list sync through `npm run sync` and on-demand caching |
 | Database | PostgreSQL on Supabase, Alembic, pgvector | Legislative data, user and review tables, tracking and brief tables, AI cache and call log |
 | AI | OpenAI SDK with a configurable OpenAI-compatible endpoint | Structured explanations, result caching and call logging |
@@ -67,17 +69,18 @@ congress-tracker/
 │   │   ├── migrate.py       Runs Alembic, or skips without a database
 │   │   ├── db.py            Database connection and query helpers
 │   │   ├── models.py        Public API response models
-│   │   ├── auth.py          Sign-in dependency, currently a placeholder
+│   │   ├── auth.py          Firebase token verification and account identity
 │   │   ├── ai/              Explanation prompts, model calls, caching and logging
-│   │   ├── routes/          Health, member, bill, feed, explanation and review endpoints
+│   │   ├── routes/          Health, member, bill, feed, explanation, account and review endpoints
 │   │   └── sync/            Congress.gov client, list sync, cache and status rules
 │   ├── alembic/versions/    Database migrations, written as SQL
 │   └── tests/               Unit tests, plus database tests that need PostgreSQL
 ├── frontend/
 │   └── src/
 │       ├── api/             Functions that call the backend
+│       ├── auth/            Firebase client and verified account session
 │       ├── components/      Layout, bill, member and shared UI components
-│       ├── pages/           Dashboard, onboarding, bill, member and social pages
+│       ├── pages/           Dashboard, onboarding, sign-in, bill, member and social pages
 │       ├── profile/         Browser profiles and district and topic selections
 │       └── App.tsx          Browser routes and shared layout
 ├── scripts/                 Setup, branch updates, deployment and smoke checks

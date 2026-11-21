@@ -54,7 +54,6 @@
   --d5: #9c8a6c;
   --d6: var(--hl);
   --d6-ring: rgba(15, 23, 42, 0.35);
-  --band-mask: linear-gradient(to bottom, #000 66%, transparent 100%);
 
   /* Party colors always travel with a letter, never alone. */
   --r: #d1453b;
