@@ -29,8 +29,10 @@ export interface Review extends ReviewIn {
 }
 
 // Return the signed-in user's review of a bill.
-export function getReview(congress: number, type: BillType, number: number): Promise<Review> {
-  return request<Review>(`/api/bills/${congress}/${type}/${number}/review`)
+export function getReview(congress: number, type: BillType, number: number, token: string): Promise<Review> {
+  return request<Review>(`/api/bills/${congress}/${type}/${number}/review`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
 }
 
 // Create or replace the signed-in user's review of a bill and return it.
@@ -39,10 +41,11 @@ export function saveReview(
   type: BillType,
   number: number,
   review: ReviewIn,
+  token: string,
 ): Promise<Review> {
   return request<Review>(`/api/bills/${congress}/${type}/${number}/review`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(review),
   })
 }

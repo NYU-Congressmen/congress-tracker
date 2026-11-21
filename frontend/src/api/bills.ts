@@ -118,18 +118,18 @@ export function getBill(congress: number, type: BillType, number: number): Promi
 export interface BillExplanation {
   bill_id: string
   does: string
-  does_not: string
-  stands: string
-  decides: string
+  does_not: string | null
+  stands: string | null
+  decides: string | null
   does_source: 'crs_summary' | 'ai'
   source: string
-  model: string
+  model: string | null
   cached: boolean
   missing: string[]
   from_stored: boolean
 }
 
-// Return a bill's plain-language explanation, which the backend writes on the first request.
+// Return a bill's saved explanation or official summary.
 export function getExplanation(
   congress: number,
   type: BillType,
