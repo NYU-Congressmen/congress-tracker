@@ -146,9 +146,44 @@ def test_backfill_ranks_the_feed_and_refreshes_a_changed_summary(saved_embedding
             """
         )
     stale = client.get("/api/feed", params=params)
-    assert stale.json()["total"] == 1
+    stale_next = client.get("/api/feed", params={**params, "page": 2})
+    # The changed bill stays in the feed by keyword until its vector is refreshed
+    assert stale.json()["total"] == 2
     assert titles(stale) == ["Affordable Housing Act"]
+    assert titles(stale_next) == ["Rural Roads Act"]
 
     assert backfill(model) == (0, 1)
     assert calls[-1] == ["Rural Roads Act\n\nNewer summary of housing assistance near roads."]
     assert titles(client.get("/api/feed", params=params)) == ["Rural Roads Act"]
+
+
+def test_bills_without_a_vector_follow_the_ranked_ones(saved_embeddings):
+    def create(**request):
+        rows = [
+            SimpleNamespace(
+                index=index,
+                embedding=([1.0, 0.0] if "housing" in text.lower() else [0.0, 1.0])
+                + [0.0] * (DIMENSIONS - 2),
+            )
+            for index, text in enumerate(request["input"])
+        ]
+        return SimpleNamespace(data=rows, usage=SimpleNamespace(prompt_tokens=10))
+
+    model = SimpleNamespace(embeddings=SimpleNamespace(create=create))
+    params = {"issue_id": saved_embeddings["Housing"]}
+
+    # Topic vectors alone rank nothing, so every keyword match is listed
+    backfill(model, limit_bills=0)
+    assert titles(client.get("/api/feed", params=params)) == [
+        "Affordable Housing Act",
+        "Rural Roads Act",
+    ]
+
+    # A sample run embeds hr-1 and hr-2 only, and a later sync adds hr-5 with no vector
+    backfill(model, limit_bills=2)
+    with psycopg.connect(TEST_DATABASE_URL) as conn:
+        add_bill(conn, 5, "Housing Vouchers Act", "2026-10-01")
+
+    response = client.get("/api/feed", params=params)
+    assert response.json()["total"] == 3
+    assert titles(response) == ["Rural Roads Act", "Housing Vouchers Act", "Affordable Housing Act"]

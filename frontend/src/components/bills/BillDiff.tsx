@@ -1,9 +1,8 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { diffTextVersions, listTextVersions } from '../../api/texts'
 import type { BillDiff as DiffResult, TextVersion } from '../../api/texts'
 import type { BillType } from '../../api/bills'
-import { ApiError } from '../../api/client'
 import { useSession } from '../../auth/SessionContext'
 import { getAccountToken } from '../../auth/accountToken'
 import { useApi } from '../../hooks/useApi'
@@ -104,8 +103,11 @@ export function BillDiff({ congress, type, number }: BillDiffProps) {
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [comparing, setComparing] = useState(false)
+  const [summarizing, setSummarizing] = useState(false)
   const [compareError, setCompareError] = useState<string | null>(null)
   const [result, setResult] = useState<DiffResult | null>(null)
+  // Counts comparisons so a late answer never replaces a newer one.
+  const latestRequest = useRef(0)
 
   const list: TextVersion[] = versions ?? []
   const options = list.map(({ version_type }) => ({ value: version_type, label: version_type }))
@@ -120,21 +122,39 @@ export function BillDiff({ congress, type, number }: BillDiffProps) {
       setCompareError('Choose two different versions to compare.')
       return
     }
+    const request = ++latestRequest.current
     setComparing(true)
+    setSummarizing(false)
     setCompareError(null)
     setResult(null)
+    let diff: DiffResult
     try {
-      const token = user ? await getAccountToken(user).catch(() => undefined) : undefined
-      const loadDiff = (idToken?: string) => diffTextVersions(congress, type, number, fromValue, toValue, idToken)
-      const diff = await loadDiff(token).catch((cause: unknown) => {
-        if (token && cause instanceof ApiError && [401, 403, 503].includes(cause.status ?? 0)) return loadDiff()
-        throw cause
-      })
-      setResult(diff)
+      // The public comparison is quick, so show it before any summary is written.
+      diff = await diffTextVersions(congress, type, number, fromValue, toValue)
     } catch (cause) {
-      setCompareError(cause instanceof Error ? cause.message : 'The comparison could not be made.')
+      if (request === latestRequest.current) {
+        setCompareError(cause instanceof Error ? cause.message : 'The comparison could not be made.')
+        setComparing(false)
+      }
+      return
+    }
+    if (request !== latestRequest.current) return
+    setResult(diff)
+    setComparing(false)
+    if (!user || diff.summary || diff.changes.length === 0) return
+
+    // A signed-in reader can have a missing summary written, which can take a while.
+    setSummarizing(true)
+    try {
+      const token = await getAccountToken(user)
+      const { summary } = await diffTextVersions(congress, type, number, fromValue, toValue, token)
+      if (request === latestRequest.current && summary) {
+        setResult((current) => (current ? { ...current, summary } : current))
+      }
+    } catch {
+      // The summary is optional and the comparison is already on screen.
     } finally {
-      setComparing(false)
+      if (request === latestRequest.current) setSummarizing(false)
     }
   }
 
@@ -201,6 +221,8 @@ export function BillDiff({ congress, type, number }: BillDiffProps) {
               </div>
               <p>{result.summary}</p>
             </div>
+          ) : summarizing ? (
+            <p className="muted" role="status">Summarizing the changes…</p>
           ) : null}
 
           {result ? <ComparisonText result={result} /> : null}

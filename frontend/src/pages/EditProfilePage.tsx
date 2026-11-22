@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { Navigate, useSearchParams } from 'react-router-dom'
-import { saveAccountDistrict } from '../api/account'
+import { clearAccountDistrict, replacesAccountDistrict, saveAccountDistrict } from '../api/account'
 import { useSession } from '../auth/SessionContext'
 import { PageBand } from '../components/layout/PageBand'
 import { AccountStep } from '../components/onboarding/AccountStep'
@@ -38,6 +38,7 @@ export default function EditProfilePage() {
       const district: DistrictSelection | null | undefined = address
         ? { ...await saveAccountDistrict(user, address), method: 'address' }
         : changes.district
+      if (replacesAccountDistrict(district)) await clearAccountDistrict(user)
       updateProfile({ ...changes, district, firebase_uid: user.uid })
       setParams({ section: 'saved' }, { replace: true })
     } catch (cause) {

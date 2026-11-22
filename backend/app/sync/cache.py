@@ -83,10 +83,11 @@ def retry_allowed(retry_after: datetime | None) -> bool:
 
 
 def record_failure(resource: str, identifier: str) -> None:
-    """Delay another refresh of a cached bill or member for one minute."""
+    """Delay another refresh of a cached bill, bill graph or member for one minute."""
     # Only these fixed queries are accepted so identifiers never become SQL syntax.
     queries = {
         "bill": "UPDATE bills SET details_retry_after = %s WHERE bill_id = %s",
+        "graph": "UPDATE bills SET graph_retry_after = %s WHERE bill_id = %s",
         "member": "UPDATE members SET sponsored_retry_after = %s WHERE bioguide_id = %s",
     }
     with connect() as conn:

@@ -11,31 +11,48 @@ router = APIRouter(tags=["feed"])
 # A minimum similarity of 0.28 filled ten results on all five topics in the bill pilot.
 MAX_COSINE_DISTANCE = 0.72
 
-SEMANTIC_FEED = """
+# Bills ranked by meaning come first. Bills with no current vector (new since the last
+# embedding run, or changed since) are matched by keyword after them, so the feed never
+# drops a bill for lack of a vector. With no ranked bills, every keyword match is listed.
+FEED = """
     WITH selected AS MATERIALIZED (
         SELECT i.embedding
         FROM issue_embeddings i JOIN issue_embedding_inputs src USING (issue_id)
         WHERE i.issue_id = ANY(%(ids)s) AND i.source_key = src.source_key
-    ), ranked AS (
-        SELECT b.bill_id, b.congress, b.type, b.number, b.title, b.status, b.passed_house,
-               b.passed_senate, b.introduced_date, b.latest_action_date, b.latest_action_text,
-               nearest.distance
+    ), current_vectors AS MATERIALIZED (
+        SELECT e.bill_id
         FROM bill_embeddings e JOIN bill_embedding_inputs src USING (bill_id)
-        JOIN bills b USING (bill_id)
+        WHERE e.source_key = src.source_key
+    ), ranked AS (
+        SELECT e.bill_id, 0 AS tier, nearest.distance
+        FROM bill_embeddings e JOIN current_vectors USING (bill_id)
         CROSS JOIN LATERAL (
             SELECT min(e.embedding <=> s.embedding) AS distance FROM selected s
         ) nearest
         WHERE (SELECT count(*) FROM selected) = %(issue_count)s
-          AND e.source_key = src.source_key
           AND nearest.distance <= %(max_distance)s
+    ), matched AS (
+        SELECT b.bill_id, 1 AS tier, NULL::double precision AS distance
+        FROM bills b
+        WHERE (b.title ~* %(pattern)s::text OR EXISTS (
+                   SELECT 1 FROM bill_summaries s
+                   WHERE s.bill_id = b.bill_id AND s.text ~* %(pattern)s::text
+               ))
+          AND (NOT EXISTS (SELECT 1 FROM ranked)
+               OR NOT EXISTS (SELECT 1 FROM current_vectors c WHERE c.bill_id = b.bill_id))
+    ), combined AS (
+        SELECT * FROM ranked UNION ALL SELECT * FROM matched
     ), page AS (
-        SELECT * FROM ranked
-        ORDER BY distance, latest_action_date DESC NULLS LAST, bill_id
+        SELECT b.bill_id, b.congress, b.type, b.number, b.title, b.status, b.passed_house,
+               b.passed_senate, b.introduced_date, b.latest_action_date, b.latest_action_text,
+               c.tier, c.distance
+        FROM combined c JOIN bills b USING (bill_id)
+        ORDER BY c.tier, c.distance, b.latest_action_date DESC NULLS LAST, b.bill_id
         LIMIT %(limit)s OFFSET %(offset)s
     )
-    SELECT (SELECT count(*) FROM ranked) AS total,
-           coalesce(jsonb_agg(to_jsonb(page) - 'distance'
-                              ORDER BY distance, latest_action_date DESC NULLS LAST, bill_id),
+    SELECT (SELECT count(*) FROM combined) AS total,
+           coalesce(jsonb_agg(to_jsonb(page) - 'tier' - 'distance'
+                              ORDER BY tier, distance, latest_action_date DESC NULLS LAST, bill_id),
                     '[]'::jsonb) AS data
     FROM page
 """
@@ -59,7 +76,7 @@ def get_feed(
     page: Annotated[int, Query(ge=1)] = 1,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
 ) -> dict[str, Any]:
-    """Return bills closest to any selected issue, falling back to keyword matching."""
+    """Return bills closest to any selected issue, then keyword matches lacking a vector."""
     ids = sorted(set(issue_id))
     issues = fetch_all(
         "SELECT issue_id, keywords FROM issues WHERE issue_id = ANY(%(ids)s)", {"ids": ids}
@@ -68,33 +85,17 @@ def get_feed(
     if missing:
         raise HTTPException(status_code=404, detail=f"Unknown issues: {sorted(missing)}")
 
-    pagination = {"limit": limit, "offset": (page - 1) * limit}
-    result = fetch_one(
-        SEMANTIC_FEED,
-        {**pagination, "ids": ids, "issue_count": len(ids), "max_distance": MAX_COSINE_DISTANCE},
-    )
-    if result["total"]:
-        return {"page": page, "limit": limit, **result}
-
     keywords = [keyword for issue in issues for keyword in issue["keywords"]]
-    if not keywords:
-        return {"total": 0, "page": page, "limit": limit, "data": []}
-    where = """
-        WHERE title ~* %(pattern)s OR EXISTS (
-            SELECT 1 FROM bill_summaries s
-            WHERE s.bill_id = bills.bill_id AND s.text ~* %(pattern)s
-        )
-    """
-    params: dict[str, Any] = {"pattern": keyword_pattern(keywords)}
-    total = fetch_one(f"SELECT count(*) AS n FROM bills {where}", params)["n"]
-    bills = fetch_all(
-        f"""
-        SELECT bill_id, congress, type, number, title, status, passed_house, passed_senate,
-               introduced_date, latest_action_date, latest_action_text
-        FROM bills {where}
-        ORDER BY latest_action_date DESC NULLS LAST, bill_id
-        LIMIT %(limit)s OFFSET %(offset)s
-        """,
-        {**params, **pagination},
+    result = fetch_one(
+        FEED,
+        {
+            "ids": ids,
+            "issue_count": len(ids),
+            "max_distance": MAX_COSINE_DISTANCE,
+            # No keywords leaves the pattern NULL, which matches no bill
+            "pattern": keyword_pattern(keywords) if keywords else None,
+            "limit": limit,
+            "offset": (page - 1) * limit,
+        },
     )
-    return {"total": total, "page": page, "limit": limit, "data": bills}
+    return {"page": page, "limit": limit, **result}

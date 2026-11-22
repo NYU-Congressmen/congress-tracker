@@ -10,7 +10,7 @@ from pydantic import BaseModel, ValidationError
 
 from app.ai.service import AiAnswer, ask, cache_key
 from app.config import settings
-from app.db import fetch_all
+from app.db import connect, fetch_all
 from app.models import BillType
 from app.sync.bills import make_bill_id
 from app.sync.texts import compare_versions
@@ -18,7 +18,23 @@ from app.sync.texts import compare_versions
 FEATURE = "diff-summary"
 PROMPT_VERSION = "diff-summary-v1"
 MAX_DIFF_CHARS = 32_000
+# New summaries readers can cause in any 24 hours, each and all together. A call costs well
+# under a tenth of a cent, so the shared limit keeps a day's spend under about 50 cents.
+READER_DAILY_LIMIT = 20
+TOTAL_DAILY_LIMIT = 500
 logger = logging.getLogger(__name__)
+
+RECENT_CALLS = """
+    SELECT count(*) AS total, count(*) FILTER (WHERE uid = %(uid)s) AS reader
+    FROM ai_calls
+    WHERE feature = %(feature)s AND uid IS NOT NULL AND created_at > now() - interval '1 day'
+"""
+
+RESERVE_CALL = """
+    INSERT INTO ai_calls (feature, bill_id, model, uid, seconds, succeeded, error)
+    VALUES (%(feature)s, %(bill_id)s, %(model)s, %(uid)s, 0, false, 'Pending')
+    RETURNING call_id
+"""
 
 SYSTEM_PROMPT = (
     "Explain what changed from the first version of this U.S. bill to the second. "
@@ -61,8 +77,20 @@ def summarize_diff(
     return ask(FEATURE, bill_id, PROMPT_VERSION, messages, DiffSummary, client)
 
 
-def summary_for_diff(bill_id: str, changes: list[str], *, generate: bool) -> str | None:
-    """Return an exact cached summary or try the configured model when generation is requested."""
+def reserve_summary_call(uid: str, bill_id: str, model: str) -> int | None:
+    """Reserve one daily summary call and return its log ID when quota is available."""
+    params = {"uid": uid, "feature": FEATURE, "bill_id": bill_id, "model": model}
+    with connect() as conn:
+        # Serialize quota reservations across processes and release the lock before inference.
+        conn.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", (FEATURE,))
+        recent = conn.execute(RECENT_CALLS, params).fetchone()
+        if recent["reader"] >= READER_DAILY_LIMIT or recent["total"] >= TOTAL_DAILY_LIMIT:
+            return None
+        return conn.execute(RESERVE_CALL, params).fetchone()["call_id"]
+
+
+def summary_for_diff(bill_id: str, changes: list[str], *, uid: str | None = None) -> str | None:
+    """Return an exact cached summary, or try the model for a signed-in reader within limits."""
     messages = diff_messages(bill_id, changes)
     if messages is None:
         return None
@@ -84,11 +112,20 @@ def summary_for_diff(bill_id: str, changes: list[str], *, generate: bool) -> str
         if row["cache_key"] == keys[row["model"]]:
             return DiffSummary.model_validate(row["result"]).summary
 
-    if generate and settings.llm_model and settings.llm_api_key:
-        try:
-            return ask(FEATURE, bill_id, PROMPT_VERSION, messages, DiffSummary).value.summary
-        except (OpenAIError, ValidationError) as error:
-            logger.warning("Diff summary unavailable for %s (%s)", bill_id, type(error).__name__)
+    model = settings.llm_model
+    if uid is None or not (model and settings.llm_api_key):
+        return None
+    reservation_id = reserve_summary_call(uid, bill_id, model)
+    if reservation_id is None:
+        logger.warning("Diff summary limit reached for %s", bill_id)
+        return None
+    try:
+        answer = ask(
+            FEATURE, bill_id, PROMPT_VERSION, messages, DiffSummary, reservation_id=reservation_id
+        )
+        return answer.value.summary
+    except (OpenAIError, ValidationError) as error:
+        logger.warning("Diff summary unavailable for %s (%s)", bill_id, type(error).__name__)
     return None
 
 

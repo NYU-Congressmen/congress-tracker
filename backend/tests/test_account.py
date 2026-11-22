@@ -5,10 +5,61 @@ from fastapi.testclient import TestClient
 from firebase_admin import auth
 
 from app.config import settings
+from app.geocoding import LookupLimiter
 from app.main import app
 from tests.conftest import TEST_DATABASE_URL
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def fresh_limiter(monkeypatch):
+    """Give each test its own lookup limits, so earlier tests never spend them."""
+    limiter = LookupLimiter()
+    monkeypatch.setattr("app.geocoding.limiter", limiter)
+    return limiter
+
+
+def census_match(url, *, params, timeout):
+    """Answer every lookup with one New York district."""
+    match = {
+        "addressComponents": {"state": "NY"},
+        "geographies": {"119th Congressional Districts": [{"GEOID": "3612"}]},
+    }
+    body = {"result": {"addressMatches": [match]}}
+    return httpx.Response(200, json=body, request=httpx.Request("GET", url))
+
+
+def test_district_lookups_stop_at_the_per_minute_limit(monkeypatch, fresh_limiter):
+    fresh_limiter.max_per_minute = 2
+    monkeypatch.setattr("app.geocoding.httpx.get", census_match)
+    address = {"address": "100 Example Street, Example City"}
+
+    assert client.post("/api/district-lookup", json=address).status_code == 200
+    assert client.post("/api/district-lookup", json=address).status_code == 200
+    limited = client.post("/api/district-lookup", json=address)
+    assert limited.status_code == 429
+    assert limited.headers["Retry-After"] == "60"
+
+    # A minute later the oldest lookups no longer count
+    fresh_limiter.started = type(fresh_limiter.started)(t - 61 for t in fresh_limiter.started)
+    assert client.post("/api/district-lookup", json=address).status_code == 200
+
+
+def test_district_lookups_wait_for_a_free_slot(monkeypatch, fresh_limiter):
+    fresh_limiter.max_in_flight = 1
+    address = {"address": "100 Example Street, Example City"}
+    statuses = []
+
+    def slow_census(url, *, params, timeout):
+        # A second lookup while this one is still in flight finds no free slot
+        statuses.append(client.post("/api/district-lookup", json=address).status_code)
+        return census_match(url, params=params, timeout=timeout)
+
+    monkeypatch.setattr("app.geocoding.httpx.get", slow_census)
+    assert client.post("/api/district-lookup", json=address).status_code == 200
+    assert statuses == [429]
+    assert fresh_limiter.in_flight == 0
 
 
 @pytest.fixture
@@ -131,3 +182,8 @@ def test_verified_account_saves_the_119th_congress_district(
     matches.clear()
     assert client.put(path, json=address, headers=headers).status_code == 422
     assert client.get(path, headers=headers).json() == expected
+
+    # Choosing a district on the map later forgets the address match
+    assert client.delete(path).status_code == 401
+    assert client.delete(path, headers=headers).status_code == 204
+    assert client.get(path, headers=headers).json() is None

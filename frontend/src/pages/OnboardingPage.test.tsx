@@ -151,7 +151,10 @@ describe('OnboardingPage', () => {
   })
 
   test('saves a local profile with a district, topic and social handle', async () => {
-    mockApi([{ match: '/api/issues', body: ISSUES }])
+    const fetchMock = mockApi([
+      { match: '/api/issues', body: ISSUES },
+      { match: '/api/account/district', body: null },
+    ])
     renderOnboarding(VERIFIED_USER)
     completeAccount()
 
@@ -192,6 +195,8 @@ describe('OnboardingPage', () => {
       socials: [{ platform: 'bluesky', handle: 'maya.bsky.social' }],
     })
     expect(localStorage.getItem('pull:session')).toBe('civics-maya')
+    // A district picked by number replaces any address match saved on the account
+    expect(fetchMock).toHaveBeenCalledWith('/api/account/district', expect.objectContaining({ method: 'DELETE' }))
   })
 
   test('requires a district after choosing a numbered state', async () => {

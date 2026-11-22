@@ -13,3 +13,16 @@ export async function saveAccountDistrict(
     body: JSON.stringify({ address }),
   })
 }
+
+// Forget the account's address-matched district once the reader picks one on the map or by number.
+export async function clearAccountDistrict(user: User): Promise<void> {
+  await request('/api/account/district', {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${await getAccountToken(user)}` },
+  })
+}
+
+// Return whether a district choice should replace the account's address match.
+export function replacesAccountDistrict(district: DistrictSelection | null | undefined): boolean {
+  return district != null && district.method !== 'address'
+}

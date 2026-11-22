@@ -29,7 +29,13 @@ def signed_in(db):
 
 def test_a_second_review_replaces_the_first(signed_in):
     first = signed_in.put(
-        URL, json={"stance": "support", "story": "My clinic closed.", "consent_to_share": True}
+        URL,
+        json={
+            "stance": "support",
+            "story": "My clinic closed.",
+            "consent_to_share": True,
+            "share_publicly": True,
+        },
     ).json()
     second = signed_in.put(URL, json={"stance": "oppose", "action_taken": "Called my senator"})
     assert second.status_code == 200
@@ -39,6 +45,7 @@ def test_a_second_review_replaces_the_first(signed_in):
     # PUT replaces the whole review, so fields left out go back to their defaults
     assert body["story"] is None
     assert body["consent_to_share"] is False
+    assert body["share_publicly"] is False
     assert body["created_at"] == first["created_at"]
     assert datetime.fromisoformat(body["updated_at"]) > datetime.fromisoformat(first["updated_at"])
     with psycopg.connect(TEST_DATABASE_URL) as conn:
