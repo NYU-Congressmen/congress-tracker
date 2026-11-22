@@ -14,6 +14,9 @@ export default defineConfig({
     // (for example a backend running on a different port).
     proxy: {
       '/api': process.env.API_PROXY_TARGET ?? 'http://127.0.0.1:8000',
+      // Share links (/s/code) are served by FastAPI too. The trailing slash keeps /social
+      // and /sign-in in the React app.
+      '/s/': process.env.API_PROXY_TARGET ?? 'http://127.0.0.1:8000',
     },
   },
   test: {

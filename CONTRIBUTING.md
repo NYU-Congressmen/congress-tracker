@@ -74,21 +74,9 @@ Public response models live in `backend/app/models.py` and appear in FastAPI's `
 
 To add a package, run `uv add --directory backend package-name` for Python or `npm install -w frontend package-name` for the frontend. Commit the updated lock file (`backend/uv.lock` or `package-lock.json`) with the change, so everyone installs the same versions.
 
-## API responses
+## Pull endpoints
 
-Bill lists return `total`, `page`, `limit` and `data`, ordered by latest action date descending and then bill ID ascending. The secondary order resolves date ties, although a sync that changes records between requests can still move records between pages. Member profiles include sponsored bills from the configured current Congress only. Bill detail actions retain Congress.gov's supplied sequence, including actions sharing a date. `GET /api/feed` returns the same shape for the bills matching one or more `issue_id` values from `GET /api/issues`, by keyword over titles and CRS summaries.
-
-`PUT /api/bills/{congress}/{type}/{number}/review` replaces the signed-in user's whole review, so a client sends every field, and anything left out returns to its default. `GET` on the same path returns that review.
-
-Opening a bill stores its list of text versions, and the texts and diff endpoints fetch that list themselves when none is stored yet. `GET /api/bills/{congress}/{type}/{number}/texts` lists them, oldest first, and `.../diff?from=&to=` compares two by version name, downloading and caching each text the first time it is needed.
-
-Both detail endpoints include a `cache` object. `complete` means the bill's details and actions, or the member's entire sponsored-bill list, were fetched successfully. It does not guarantee that the upstream source itself is complete. `stale` means that the detail version is behind the latest recorded bill version or that sponsored bills are older than a day, and is also true for a missing cache. `refreshed_at` is the last successful local fetch time. `refresh_failed` records an unsuccessful refresh, and `retry_after` gives the earliest retry time. Successful refreshes clear the failure state.
-
-An HTTP 200 response can contain an incomplete bill summary or a partial set of known sponsored bills when refresh is unavailable. Use `cache.complete` to distinguish that result from a successfully fetched empty history or sponsored list. A complete stale result can still be displayed with its fetch time. Without a configured key, endpoints serve stored data and leave incomplete caches marked as such without calling Congress.gov. An uncached bill returns 404 when it cannot be found and 502 when an upstream error prevents fetching it.
-
-Interactive refreshes pass a five-second budget to `CongressClient`, shared across every upstream request in that refresh. Each request may wait only for the time left in that budget, so a stalled connection ends at the deadline, and database writes begin only after upstream fetching succeeds. The budget covers upstream work rather than the database or the entire endpoint. Failed refreshes of stored resources write a one-minute retry deadline to Postgres, so cooldowns survive process restarts and are shared by workers. Simultaneous first requests can still duplicate upstream fetching. A bill that Congress.gov reports as missing has no stored row, so each server process remembers it in memory for ten minutes instead. The list sync uses the client's ordinary per-request timeout without an overall five-second budget.
-
-Bill stages are `introduced`, `committee`, `passed_one_chamber`, `passed_both_chambers`, `to_president` and `became_law`. The `passed_house` and `passed_senate` flags accumulate independently in every upsert, so Senate-originated bills follow the same rules as House-originated bills. These flags describe observed passage and do not prove that both chambers approved identical text. Text-derived stages remain approximate even with full action history, and retaining milestones also retains false-positive inferences until they are corrected explicitly.
+These endpoints serve Pull's own features on top of the legislative data.
 
 ### Who decides a bill
 
@@ -107,6 +95,30 @@ Anyone can `POST /api/reviews/{review_id}/reports` with a `reason` (`spam`, `har
 ### House votes
 
 `GET /api/bills/{congress}/{type}/{number}/house-votes` lists a bill's House roll-call votes, oldest first. Each has its question, result, `totals` counting every member's position exactly as the Clerk recorded it (`Yea`, `Nay`, `Aye`, `No`, `Present` or `Not Voting`), and `positions` naming each member with their district when Pull has them stored. `?bioguide_id=` narrows `positions` to one member, so a page can put a representative's vote beside what Pull users said, while `totals` still counts everyone. The sync reads a followed bill's actions again only after the bill changes and fetches each vote's positions once, since a recorded vote never changes. Until then `positions_complete` is false. Congress.gov's House vote data covers the 118th and 119th Congresses.
+
+### Share links
+
+`PUT /api/bills/{congress}/{type}/{number}/review/shares/{platform}` returns the signed-in author's link for sharing their review on one platform (`bluesky`, `x`, `mastodon`, `threads`, `instagram`, `tiktok`, `facebook`, `linkedin` or `other`), such as `https://congress-pull.web.app/s/k3Xa9QpL`. Asking again for the same platform returns the same link, so its visits keep adding up. Sharing needs a saved review. `GET .../review/shares` returns `shared_to`, each link with its `visits`, and `posted_to`, the live posts found carrying one of the links. Shared reviews list their `posted_to` platforms too.
+
+A link at `/s/{code}` serves a page with the bill's title and the start of its CRS summary, or its latest action, as Open Graph tags, which apps read to draw a preview card. People's browsers follow the page's refresh to the bill. Only people count as visits, so preview robots such as Twitterbot, facebookexternalhit and Bluesky's Cardyb are left out by their user agent. Firebase Hosting forwards `/s/**` to the API, and so does the Vite dev server. `PUBLIC_SITE_URL` sets the address links point to, `https://congress-pull.web.app` by default.
+
+The sync signs in as Pull's own Bluesky account with `BLUESKY_HANDLE` and an app password in `BLUESKY_APP_PASSWORD`, because Bluesky's post search needs an account. It searches for posts linking to each share link made in the last 30 days, records each post once in `post_cards` and skips the search when the account is not set up.
+
+## API responses
+
+Bill lists return `total`, `page`, `limit` and `data`, ordered by latest action date descending and then bill ID ascending. The secondary order resolves date ties, although a sync that changes records between requests can still move records between pages. Member profiles include sponsored bills from the configured current Congress only. Bill detail actions retain Congress.gov's supplied sequence, including actions sharing a date. `GET /api/feed` returns the same shape for the bills matching one or more `issue_id` values from `GET /api/issues`, by keyword over titles and CRS summaries.
+
+`PUT /api/bills/{congress}/{type}/{number}/review` replaces the signed-in user's whole review, so a client sends every field, and anything left out returns to its default. `GET` on the same path returns that review.
+
+Opening a bill stores its list of text versions, and the texts and diff endpoints fetch that list themselves when none is stored yet. `GET /api/bills/{congress}/{type}/{number}/texts` lists them, oldest first, and `.../diff?from=&to=` compares two by version name, downloading and caching each text the first time it is needed.
+
+Both detail endpoints include a `cache` object. `complete` means the bill's details and actions, or the member's entire sponsored-bill list, were fetched successfully. It does not guarantee that the upstream source itself is complete. `stale` means that the detail version is behind the latest recorded bill version or that sponsored bills are older than a day, and is also true for a missing cache. `refreshed_at` is the last successful local fetch time. `refresh_failed` records an unsuccessful refresh, and `retry_after` gives the earliest retry time. Successful refreshes clear the failure state.
+
+An HTTP 200 response can contain an incomplete bill summary or a partial set of known sponsored bills when refresh is unavailable. Use `cache.complete` to distinguish that result from a successfully fetched empty history or sponsored list. A complete stale result can still be displayed with its fetch time. Without a configured key, endpoints serve stored data and leave incomplete caches marked as such without calling Congress.gov. An uncached bill returns 404 when it cannot be found and 502 when an upstream error prevents fetching it.
+
+Interactive refreshes pass a five-second budget to `CongressClient`, shared across every upstream request in that refresh. Each request may wait only for the time left in that budget, so a stalled connection ends at the deadline, and database writes begin only after upstream fetching succeeds. The budget covers upstream work rather than the database or the entire endpoint. Failed refreshes of stored resources write a one-minute retry deadline to Postgres, so cooldowns survive process restarts and are shared by workers. Simultaneous first requests can still duplicate upstream fetching. A bill that Congress.gov reports as missing has no stored row, so each server process remembers it in memory for ten minutes instead. The list sync uses the client's ordinary per-request timeout without an overall five-second budget.
+
+Bill stages are `introduced`, `committee`, `passed_one_chamber`, `passed_both_chambers`, `to_president` and `became_law`. The `passed_house` and `passed_senate` flags accumulate independently in every upsert, so Senate-originated bills follow the same rules as House-originated bills. These flags describe observed passage and do not prove that both chambers approved identical text. Text-derived stages remain approximate even with full action history, and retaining milestones also retains false-positive inferences until they are corrected explicitly.
 
 ## Merge strategy
 

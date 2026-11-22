@@ -35,6 +35,14 @@
         }
       },
       {
+        "source": "/s/**",
+        "run": {
+          "serviceId": "pull-api",
+          "region": "us-east1",
+          "pinTag": true
+        }
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

@@ -124,7 +124,10 @@ def list_shared_reviews(
     reviews = fetch_all(
         f"""
         SELECT r.review_id, r.bill_id, r.stance, r.story, r.action_taken, u.state, u.district,
-               r.created_at, r.updated_at
+               r.created_at, r.updated_at,
+               ARRAY(SELECT DISTINCT p.platform FROM post_cards p
+                     WHERE p.review_id = r.review_id AND NOT p.hidden_on_pull
+                     ORDER BY p.platform) AS posted_to
         FROM reviews r JOIN users u ON u.uid = r.uid
         WHERE {where}
         ORDER BY r.updated_at DESC, r.review_id DESC

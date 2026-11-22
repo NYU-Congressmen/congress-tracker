@@ -2,6 +2,7 @@ import sys
 
 from app.config import settings
 from app.sync.bills import sync_bills
+from app.sync.bluesky import sync_bluesky_posts
 from app.sync.client import CongressClient
 from app.sync.graph import sync_followed_graphs
 from app.sync.members import sync_contacts, sync_members
@@ -35,6 +36,11 @@ def main() -> int:
         print(f"Fetched cosponsors, committees and related bills for {saved} followed bills.")
         saved = sync_followed_votes(client)
         print(f"Fetched member positions for {saved} House votes on followed bills.")
+    found = sync_bluesky_posts()
+    if found is None:
+        print("BLUESKY_HANDLE and BLUESKY_APP_PASSWORD are not set, so no posts were searched.")
+    else:
+        print(f"Found {found} new Bluesky posts carrying share links.")
     return 0
 
 

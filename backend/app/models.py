@@ -261,6 +261,8 @@ class PublicReview(BaseModel):
     district: int | None
     created_at: datetime
     updated_at: datetime
+    # Platforms where a live post carrying one of the review's share links was found
+    posted_to: list[str] = Field(default_factory=list)
 
 
 class ReviewPage(BaseModel):
@@ -318,3 +320,36 @@ class HouseVote(BaseModel):
     # Every member's position counted by how it was recorded, such as {"Yea": 220, "Nay": 210}
     totals: dict[str, int]
     positions: list[VotePosition]
+
+
+SharePlatform = Literal[
+    "bluesky", "x", "mastodon", "threads", "instagram", "tiktok", "facebook", "linkedin", "other"
+]
+
+
+class ShareLink(BaseModel):
+    """Describe the signed-in user's share link for one platform and how many people it brought."""
+
+    platform: SharePlatform
+    code: str
+    url: str
+    # People who opened the link, leaving out link-preview robots
+    visits: int
+    last_visited_at: datetime | None
+    created_at: datetime
+
+
+class PostedTo(BaseModel):
+    """Describe a live post found carrying one of the user's share links."""
+
+    platform: str
+    post_url: str
+    posted_at: datetime | None
+    found_at: datetime
+
+
+class ShareSummary(BaseModel):
+    """Describe where the user shared their review and where posts with its links were found."""
+
+    shared_to: list[ShareLink]
+    posted_to: list[PostedTo]
