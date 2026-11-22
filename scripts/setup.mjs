@@ -1,20 +1,23 @@
 // Prepare a fresh clone for development. Only Node's built-in modules are used, because
 // this runs before npm install has created node_modules.
 import { spawnSync } from 'node:child_process'
-import { chmodSync, copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { homedir, platform } from 'node:os'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline/promises'
+import { checkKey, ensureEnvFile, hasApiKey } from './setup-config.mjs'
 
 const root = join(import.meta.dirname, '..')
 const isWindows = platform() === 'win32'
 const teammates = ['adam', 'akbar', 'abdrahman']
 const interactive = process.stdin.isTTY && !process.env.CI
 
+// Print the next setup step.
 function step(message) {
   console.log(`\n==> ${message}`)
 }
 
+// Run a command in the repo and throw if it fails.
 function run(command, args) {
   const result = spawnSync(command, args, { cwd: root, stdio: 'inherit' })
   if (result.status !== 0) {
@@ -22,11 +25,13 @@ function run(command, args) {
   }
 }
 
+// Return a command's output or null if it fails.
 function output(command, args) {
   const result = spawnSync(command, args, { cwd: root, encoding: 'utf8' })
   return result.status === 0 ? result.stdout.trim() : null
 }
 
+// Ask a visible question and return the normalized answer.
 async function ask(question) {
   const rl = createInterface({ input: process.stdin, output: process.stdout })
   const answer = await rl.question(question)
@@ -34,7 +39,7 @@ async function ask(question) {
   return answer.trim().toLowerCase()
 }
 
-// Read a line without echoing it, so a secret never appears on screen or in scrollback
+// Read a line without echoing it, so a secret never appears on screen or in scrollback.
 function askHidden(question) {
   return new Promise((resolve) => {
     const stdin = process.stdin
@@ -68,6 +73,7 @@ function askHidden(question) {
   })
 }
 
+// Report whether Node matches the project's version.
 function checkNode() {
   step('Checking Node')
   const wanted = readFileSync(join(root, '.nvmrc'), 'utf8').trim()
@@ -80,7 +86,7 @@ function checkNode() {
   }
 }
 
-// Return the uv command to use, installing uv first if the teammate agrees
+// Return the uv command to use, installing uv first if the teammate agrees.
 async function findUv() {
   step('Checking uv')
   // The official installer puts uv here, which may not be on PATH until a new terminal opens
@@ -110,6 +116,7 @@ async function findUv() {
   return installed
 }
 
+// Install the frontend and backend dependencies.
 function installDependencies(uv) {
   step('Installing frontend packages')
   // npm_execpath points at the npm that launched this script, which avoids Windows .cmd issues
@@ -118,33 +125,19 @@ function installDependencies(uv) {
   run(uv, ['sync', '--directory', 'backend'])
 }
 
-// Create .env from the template if it is missing, and return whether it already holds an API key
+// Create .env from the template if it is missing and return whether it already holds an API key.
 function createEnvFile() {
   step('Checking .env')
   const envFile = join(root, '.env')
-  if (!existsSync(envFile)) {
-    copyFileSync(join(root, '.env.example'), envFile)
+  if (ensureEnvFile(envFile, join(root, '.env.example'))) {
     console.log('Created .env from .env.example.')
   } else {
-    console.log('.env already exists, so it was left unchanged.')
+    console.log('.env already exists, so its contents were preserved.')
   }
-  return /^CONGRESS_API_KEY=\S+/m.test(readFileSync(envFile, 'utf8'))
+  return hasApiKey(readFileSync(envFile, 'utf8'))
 }
 
-// Return 'ok' if Congress.gov accepts the key, 'rejected' if it refuses it, or 'unknown'
-async function checkKey(key) {
-  try {
-    const response = await fetch('https://api.congress.gov/v3/bill?limit=1&format=json', {
-      headers: { 'X-Api-Key': key },
-    })
-    if (response.ok) return 'ok'
-    return response.status === 401 || response.status === 403 ? 'rejected' : 'unknown'
-  } catch {
-    return 'unknown'
-  }
-}
-
-// Ask for the API key until a valid one is saved or the teammate skips, and return whether one was saved
+// Ask for the API key until one is saved or the teammate skips and return whether one was saved.
 async function promptForKey() {
   step('Adding your Congress.gov API key')
   console.log('Get a free key at https://api.congress.gov/sign-up/ if you do not have one.')
@@ -173,15 +166,13 @@ async function promptForKey() {
       ? text.replace(/^CONGRESS_API_KEY=.*$/m, line)
       : `${text.trimEnd()}\n${line}\n`
     writeFileSync(envFile, updated)
-    if (!isWindows) {
-      chmodSync(envFile, 0o600)
-    }
     console.log(result === 'ok' ? 'Key accepted and saved to .env.' : 'Key saved to .env.')
     return true
   }
   return false
 }
 
+// Switch a clean checkout to the selected teammate's branch.
 async function switchBranch() {
   step('Checking your branch')
   const current = output('git', ['branch', '--show-current'])

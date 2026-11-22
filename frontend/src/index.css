@@ -1,14 +1,14 @@
-:root {
-  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
-  color-scheme: light dark;
-}
+/* Pull design system: Paper Pop.
+   Light glass over paper, Figtree throughout, and a field of dots (one per bill)
+   at the top of every page. Each file below holds one layer; page files are
+   added next to the page they style. */
 
-body {
-  margin: 0;
-}
-
-main {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 2rem 1rem;
-}
+@import './styles/tokens.css';
+@import './styles/base.css';
+@import './styles/shell.css';
+@import './styles/components.css';
+@import './styles/home.css';
+@import './styles/bill.css';
+@import './styles/members.css';
+@import './styles/pages.css';
+@import './styles/features.css';

@@ -14,6 +14,15 @@ class Settings(BaseSettings):
     congress_api_key: str | None = None
     database_url: str | None = None
     firebase_project_id: str | None = None
+    llm_api_key: str | None = None
+    llm_base_url: str | None = None
+    llm_model: str | None = None
+    # The public address share links point to
+    public_site_url: str = "https://congress-pull.web.app"
+    # Pull's own Bluesky account, which searches for posts carrying share links
+    bluesky_handle: str | None = None
+    bluesky_app_password: str | None = None
+    bluesky_service: str = "https://bsky.social"
 
 
 settings = Settings()

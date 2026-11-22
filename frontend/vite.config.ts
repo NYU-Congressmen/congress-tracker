@@ -9,12 +9,18 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
-    // Forward API calls to FastAPI so the browser only ever talks to one origin
+    // Forward API calls to FastAPI so the browser only ever talks to one origin.
+    // Defaults to the local dev backend; API_PROXY_TARGET points it elsewhere
+    // (for example a backend running on a different port).
     proxy: {
-      '/api': 'http://127.0.0.1:8000',
+      '/api': process.env.API_PROXY_TARGET ?? 'http://127.0.0.1:8000',
+      // Share links (/s/code) are served by FastAPI too. The trailing slash keeps /social
+      // and /sign-in in the React app.
+      '/s/': process.env.API_PROXY_TARGET ?? 'http://127.0.0.1:8000',
     },
   },
   test: {
     environment: 'jsdom',
+    setupFiles: ['src/test/setup.ts'],
   },
 })

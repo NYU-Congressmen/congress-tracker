@@ -1,0 +1,387 @@
+/* Bill page: the printed bill's cover sheet and the stage card on the band,
+   then the explanation and sponsor beside the action history as a chat. */
+
+.bill-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 24px;
+  align-items: start;
+}
+
+.cover {
+  padding: 36px 40px;
+  border-radius: 24px;
+  color: var(--ink);
+}
+
+.cover__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.cover__congress {
+  line-height: 1.6;
+}
+
+.cover__num {
+  font-weight: 900;
+  font-size: 34px;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  color: var(--num);
+}
+
+.cover__title {
+  font-size: clamp(24px, 3vw, 36px);
+  line-height: 1.14;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  margin: 20px 0 0;
+}
+
+.cover__house {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-block: 18px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.cover__house::before,
+.cover__house::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--line);
+}
+
+.cover__date {
+  text-align: center;
+  margin-bottom: 14px;
+}
+
+.cover__intro {
+  font-size: 16px;
+  max-width: 70ch;
+}
+
+.cover__intro a {
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.stage-box {
+  padding: 22px;
+  border-radius: 24px;
+  color: var(--ink);
+  display: grid;
+  gap: 16px;
+}
+
+.stage-box__now {
+  background: var(--stage-bg);
+  color: var(--stage-ink);
+  border-radius: 16px;
+  padding: 16px 18px;
+}
+
+.stage-box__now b {
+  display: block;
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.stage-box__now p {
+  margin-top: 6px;
+  font-size: 13.5px;
+  color: var(--stage-ink-2);
+}
+
+.stage-box__now--law {
+  background: var(--hl);
+  color: var(--hl-ink);
+}
+
+.stage-box__now--law p {
+  color: var(--hl-ink);
+}
+
+.ladder {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.ladder li {
+  display: grid;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-3);
+  text-align: center;
+}
+
+.ladder li::before {
+  content: '';
+  height: 10px;
+  border-radius: 3px;
+  background: var(--line);
+}
+
+.ladder li.on {
+  color: var(--ink);
+}
+
+.ladder li.on::before {
+  background: var(--fill);
+}
+
+.ladder li.cur {
+  font-weight: 900;
+}
+
+.ladder li.cur::before {
+  background: var(--hl);
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.25);
+}
+
+.stage-box__acts {
+  display: grid;
+  gap: 8px;
+}
+
+.facts {
+  margin: 0;
+  display: grid;
+}
+
+.facts div {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 10px;
+  padding: 9px 0;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+  align-items: center;
+}
+
+.facts dt {
+  color: var(--ink-3);
+  font-weight: 600;
+}
+
+.facts dd {
+  margin: 0;
+}
+
+.bill-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+
+.bill-grid__main {
+  display: grid;
+  gap: 28px;
+  min-width: 0;
+}
+
+.card__title {
+  margin-bottom: 14px;
+}
+
+/* explanation: each part in its own row, its source tagged beside the name */
+.explain-note {
+  font-size: 13.5px;
+  color: var(--ink-3);
+  margin-bottom: 8px;
+}
+
+.explain-grid {
+  display: grid;
+}
+
+.explain-part {
+  display: grid;
+  gap: 6px;
+  padding: 18px 0;
+  border-top: 1px solid var(--line);
+}
+
+.explain-part:first-child {
+  border-top: 0;
+  padding-top: 2px;
+}
+
+.explain-part__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.explain-part h3 {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.explain-part p {
+  color: var(--ink-2);
+  font-size: 15.5px;
+  max-width: 66ch;
+}
+
+.explain-tag {
+  font-size: 12px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px dashed var(--ink-3);
+  color: var(--ink-2);
+}
+
+.explain-tag--official {
+  border: 1px solid transparent;
+  background: var(--btn);
+  color: var(--btn-ink);
+}
+
+.explain-more {
+  justify-self: start;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font: 700 14.5px var(--font);
+}
+
+/* action history as a chat */
+.chat {
+  padding: 0;
+  overflow: hidden;
+}
+
+.chat__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--line);
+}
+
+.chat__head h2 {
+  font-size: 16px;
+}
+
+.chat__head small {
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+.chat__avatar {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--fill);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 900;
+  flex: none;
+}
+
+.chat__empty {
+  padding: 18px 22px;
+}
+
+.chat__foot {
+  padding: 12px 22px 16px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+.thread {
+  list-style: none;
+  margin: 0;
+  padding: 18px 22px;
+  display: grid;
+  gap: 8px;
+}
+
+.thread__stamp {
+  justify-self: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-3);
+  margin: 8px 0 2px;
+}
+
+.thread__msg {
+  max-width: 88%;
+  display: grid;
+  gap: 2px;
+}
+
+.thread__who {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-3);
+  margin-left: 12px;
+}
+
+.thread__bubble {
+  padding: 9px 13px;
+  border-radius: 18px 18px 18px 6px;
+  background: var(--bubble);
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.thread__event {
+  justify-self: center;
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 92%;
+  padding: 8px 14px;
+  border-radius: 16px;
+  font-size: 13.5px;
+  font-weight: 700;
+  background: var(--stage-bg);
+  color: var(--stage-ink);
+  margin: 6px 0;
+}
+
+.thread__event svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+@media (max-width: 960px) {
+  .bill-top,
+  .bill-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .cover {
+    padding: 24px 20px;
+  }
+  .cover__num {
+    font-size: 24px;
+  }
+  .cover__house {
+    white-space: normal;
+  }
+}

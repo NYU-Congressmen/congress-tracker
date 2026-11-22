@@ -11,7 +11,7 @@ ALEMBIC_INI = Path(__file__).resolve().parents[1] / "alembic.ini"
 
 def main() -> int:
     """Apply all pending migrations and return the process exit code."""
-    # npm run dev calls this first, so a missing database must not stop the dev servers
+    # Allow the command to run before a teammate has configured the database.
     if settings.database_url is None:
         print("DATABASE_URL not set, skipping migrations")
         return 0
