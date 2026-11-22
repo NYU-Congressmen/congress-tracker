@@ -184,3 +184,18 @@ class Review(ReviewIn):
     bill_id: str
     created_at: datetime
     updated_at: datetime
+
+
+class CallIn(BaseModel):
+    """Describe the congressional office a person called."""
+
+    bioguide_id: str = Field(min_length=1, max_length=32)
+    note: Annotated[str, StringConstraints(strip_whitespace=True, max_length=2_000)] | None = None
+
+
+class CallEntry(CallIn):
+    """Describe a call recorded by the signed-in user."""
+
+    action_id: int
+    member_name: str
+    created_at: datetime

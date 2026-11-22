@@ -109,12 +109,23 @@ a.chip:hover {
   font-weight: 800;
 }
 
-.panel h2:not(.panel__heading-row h2) {
+.panel:not(.panel--stack) h2:not(.panel__heading-row h2) {
   margin-bottom: 12px;
 }
 
-.panel p + p {
+.panel:not(.panel--stack) p + p {
   margin-top: 10px;
+}
+
+.panel--stack {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 16px;
+}
+
+.panel--stack > :is(.panel__heading-row, .card__head, .card__title, .cache-notice, .form-error) {
+  margin-block: 0;
 }
 
 .panel__count,
@@ -343,7 +354,7 @@ a.chip:hover {
 
 .field {
   display: grid;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -370,17 +381,17 @@ a.chip:hover {
   color: var(--ink-3);
 }
 
-:is(.filters, .diff-compare, .onboard, .social-add) .field:has(> select.field__control) {
+.field:has(> select.field__control) {
   position: relative;
 }
 
-:is(.filters, .diff-compare, .onboard, .social-add) select.field__control {
+select.field__control {
   appearance: none;
   height: 44px;
   padding-inline-end: 32px;
 }
 
-:is(.filters, .diff-compare, .onboard, .social-add) .field:has(> select.field__control)::after {
+.field:has(> select.field__control)::after {
   content: '';
   position: absolute;
   inset-inline-end: 14px;
