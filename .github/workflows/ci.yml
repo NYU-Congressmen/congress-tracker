@@ -11,6 +11,8 @@ permissions:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    outputs:
+      schema_head: ${{ steps.schema.outputs.head }}
     # The database tests run against this throwaway PostgreSQL and fail rather than skip
     services:
       postgres:
@@ -39,6 +41,21 @@ jobs:
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run pytest
+      - name: Read the release schema revision
+        id: schema
+        run: |
+          head=$(uv run --locked python - <<'PY'
+          from alembic.config import Config
+          from alembic.script import ScriptDirectory
+
+          print(ScriptDirectory.from_config(Config("alembic.ini")).get_current_head() or "")
+          PY
+          )
+          if [[ ! "$head" =~ ^[A-Za-z0-9_-]+$ ]]; then
+            echo "::error::The release needs exactly one Alembic head."
+            exit 1
+          fi
+          echo "head=$head" >> "$GITHUB_OUTPUT"
 
   frontend:
     runs-on: ubuntu-latest
@@ -102,6 +119,11 @@ jobs:
           service_account: pull-release@congress-pull.iam.gserviceaccount.com
       - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3
         if: steps.release.outputs.current == 'true'
+      - name: Check the Supabase schema
+        if: steps.release.outputs.current == 'true'
+        env:
+          RELEASE_SCHEMA_HEAD: ${{ needs.backend.outputs.schema_head }}
+        run: bash scripts/check-release-schema.sh "$RELEASE_SCHEMA_HEAD"
       - name: Deploy and check the Cloud Run API
         if: steps.release.outputs.current == 'true'
         run: |

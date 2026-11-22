@@ -155,7 +155,7 @@ If a conflict is confusing, cancel the merge with `git get-latest --abort` and a
 
 Before each milestone, a pull request from `develop` into `main` carries the demo release. GitHub requires one approving review and passing backend and frontend checks on both branches.
 
-The merge runs CI on the exact release commit. After the backend and frontend checks pass, the release job deploys the Cloud Run API and checks its database-backed feed before publishing the frontend build from CI. Firebase Hosting pins the site to that API revision. The final check fetches the public frontend and feed through the Hosting URL. [SETUP.md](SETUP.md#deployment-setup) describes the one-time cloud configuration.
+The merge runs CI on the exact release commit. After the backend and frontend checks pass, a private Cloud Run job compares the release's Alembic head with the shared Supabase database. A mismatch or failed database connection stops the release before either service changes. Once the migrations are applied separately, rerunning the failed release repeats the check. A successful check allows the Cloud Run API deploy and smoke test, followed by publication of the tested frontend to Firebase Hosting. Hosting pins the site to that API revision, and the final check fetches the public frontend and feed. [SETUP.md](SETUP.md#deployment-setup) describes the one-time cloud configuration.
 
 ```bash
 gh pr create --base main --head develop --title "Release for milestone name"
