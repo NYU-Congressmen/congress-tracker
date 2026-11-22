@@ -12,6 +12,7 @@ import { useApi } from '../hooks/useApi'
 import { CHAMBER_OPTIONS, PARTY_OPTIONS, STATE_OPTIONS, CONGRESS_NUMBER } from '../lib/constants'
 import { districtHeading, representativesForDistrict, stateName } from '../lib/districts'
 import { useProfile } from '../profile/ProfileContext'
+import { useSession } from '../auth/SessionContext'
 
 interface FilterValues {
   state: string
@@ -84,6 +85,7 @@ function MembersFiltersForm({ initial, hasFilters, onApply }: MembersFiltersForm
 // district and the state's senators, each with their role labeled.
 function MyRepresentativesView() {
   const { profile } = useProfile()
+  const { user } = useSession()
   const district = profile?.district ?? null
 
   const { data, loading, error, refetch } = useApi(
@@ -98,7 +100,7 @@ function MyRepresentativesView() {
           title="No district on your profile yet"
           hint="Pick your congressional district and this view lists the House member and senators who represent you."
         />
-        <Link to="/onboarding" className="btn btn--primary">
+        <Link to={user && profile ? '/profile?section=district' : '/onboarding'} className="btn btn--primary">
           Set up my district
         </Link>
       </div>

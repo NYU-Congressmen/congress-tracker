@@ -7,14 +7,20 @@ import { districtHeading, isAtLargeState, stateName } from '../../lib/districts'
 import { useApi } from '../../hooks/useApi'
 import type { DistrictSelection } from '../../profile/types'
 import { DistrictMap } from './DistrictMap'
+import { AddressDistrict } from './AddressDistrict'
 import { SelectField } from '../ui/Fields'
 import { LoadingState } from '../ui/LoadingState'
+import { StepActions } from './StepActions'
 
-type Method = 'map' | 'number'
+type Method = DistrictSelection['method']
 
 interface DistrictStepProps {
   initial: DistrictSelection | null
-  onDone: (selection: DistrictSelection) => void
+  preferAddress: boolean
+  deferAddressSave?: boolean
+  nextLabel: string
+  onBack?: () => void
+  onDone: (selection: DistrictSelection, addressToSave?: string) => void
 }
 
 // The state's district boundaries, simplified once and kept in memory, so
@@ -28,10 +34,10 @@ const geometryCache = new Map<string, FeatureCollection>()
 // little higher for states with many hard angles.
 const DIST_MAP_POINTS = 4000
 
-// Choose a congressional district with the map or the district list.
-export function DistrictStep({ initial, onDone }: DistrictStepProps) {
-  const [method, setMethod] = useState<Method>('number')
-  const [choice, setChoice] = useState<DistrictSelection | null>(initial)
+// Choose a congressional district by address, map or district number.
+export function DistrictStep({ initial, preferAddress, deferAddressSave, nextLabel, onBack, onDone }: DistrictStepProps) {
+  const [method, setMethod] = useState<Method>(preferAddress ? 'address' : initial?.method ?? 'address')
+  const [choice, setChoice] = useState<DistrictSelection | null>(initial?.method === 'address' ? null : initial)
 
   const [mapState, setMapState] = useState(initial?.state ?? '')
   const [numState, setNumState] = useState(initial?.state ?? '')
@@ -41,7 +47,7 @@ export function DistrictStep({ initial, onDone }: DistrictStepProps) {
     if (method !== 'map' || !mapState || isAtLargeState(mapState)) return null
     const cached = geometryCache.get(mapState)
     if (cached) return cached
-    const geometry = simplifyFeatureCollection(await stateDistrictGeometry(mapState), DIST_MAP_POINTS)
+    const geometry = simplifyFeatureCollection(await stateDistrictGeometry(mapState), DIST_MAP_POINTS, mapState === 'AK')
     geometryCache.set(mapState, geometry)
     return geometry
   }, [method, mapState])
@@ -59,13 +65,15 @@ export function DistrictStep({ initial, onDone }: DistrictStepProps) {
   }
 
   const methodTabs: { id: Method; label: string }[] = [
+    { id: 'address', label: 'Find by address' },
     { id: 'map', label: 'Pick it on the map' },
     { id: 'number', label: 'Pick the number' },
   ]
 
   return (
-    <div className="onboard-step">
-      <div className="onboard-step__modes" role="tablist" aria-label="How to choose your district">
+    <div className="onboard-step onboard-district">
+      <h2>Congressional district</h2>
+      <div className="onboard-step__modes" role="tablist" aria-label="District lookup methods">
         {methodTabs.map((tab) => (
           <button
             key={tab.id}
@@ -79,6 +87,16 @@ export function DistrictStep({ initial, onDone }: DistrictStepProps) {
           </button>
         ))}
       </div>
+
+      {method === 'address' ? (
+        <AddressDistrict
+          initial={initial?.method === 'address' ? initial : null}
+          deferSave={deferAddressSave}
+          nextLabel={nextLabel}
+          onBack={onBack}
+          onDone={onDone}
+        />
+      ) : null}
 
       {method === 'map' ? (
         <div className="onboard-map">
@@ -192,18 +210,20 @@ export function DistrictStep({ initial, onDone }: DistrictStepProps) {
         </div>
       ) : null}
 
-      {choice ? (
+      {method !== 'address' && choice ? (
         <div className="onboard-choice" role="status">
           <span className="onboard-choice__label">Your district:</span>{' '}
           <strong>{districtHeading(choice.state, choice.district)}</strong>
         </div>
       ) : null}
 
-      <div className="onboard-step__actions">
-        <button type="button" className="btn btn--primary btn--lg" disabled={!choice} onClick={() => choice && onDone(choice)}>
-          Continue to topics
-        </button>
-      </div>
+      {method !== 'address' ? (
+        <StepActions onBack={onBack}>
+          <button type="button" className="btn btn--primary" disabled={!choice} onClick={() => choice && onDone(choice)}>
+            {nextLabel}
+          </button>
+        </StepActions>
+      ) : null}
     </div>
   )
 }

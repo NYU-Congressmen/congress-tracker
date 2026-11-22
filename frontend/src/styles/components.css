@@ -370,17 +370,17 @@ a.chip:hover {
   color: var(--ink-3);
 }
 
-:is(.filters, .diff-compare) .field:has(> select.field__control) {
+:is(.filters, .diff-compare, .onboard, .social-add) .field:has(> select.field__control) {
   position: relative;
 }
 
-:is(.filters, .diff-compare) select.field__control {
+:is(.filters, .diff-compare, .onboard, .social-add) select.field__control {
   appearance: none;
   height: 44px;
   padding-inline-end: 32px;
 }
 
-:is(.filters, .diff-compare) .field:has(> select.field__control)::after {
+:is(.filters, .diff-compare, .onboard, .social-add) .field:has(> select.field__control)::after {
   content: '';
   position: absolute;
   inset-inline-end: 14px;

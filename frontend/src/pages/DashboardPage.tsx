@@ -16,6 +16,7 @@ import { billNumber, billTypeShort, formatShortDate } from '../lib/format'
 import { loadStageCounts, totalOf } from '../lib/stageCounts'
 import { countByChamber } from '../lib/stats'
 import { useProfile } from '../profile/ProfileContext'
+import { useSession } from '../auth/SessionContext'
 
 // Keyword shortcuts under the search box. They run an ordinary title search.
 const TOPICS: { label: string; q: string }[] = [
@@ -103,6 +104,7 @@ export default function DashboardPage() {
   // The signed-in person's district and topics drive the personalized
   // panels, which sit between "At a glance" and "Latest activity".
   const { profile } = useProfile()
+  const { user } = useSession()
   const district = profile?.district ?? null
   const topics = profile?.topics ?? []
 
@@ -253,8 +255,8 @@ export default function DashboardPage() {
                   Start with the bills your representatives have sponsored. Add topics to follow legislation across Congress.
                 </p>
               </div>
-              <Link to="/onboarding" className="btn btn--ink">
-                Set up my profile
+              <Link to={user && profile ? '/profile?section=district' : '/onboarding'} className="btn btn--ink">
+                {user && profile ? 'Set up my district' : 'Set up my profile'}
               </Link>
             </section>
           )}

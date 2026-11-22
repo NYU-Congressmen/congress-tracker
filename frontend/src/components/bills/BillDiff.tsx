@@ -5,6 +5,7 @@ import type { BillDiff as DiffResult, TextVersion } from '../../api/texts'
 import type { BillType } from '../../api/bills'
 import { ApiError } from '../../api/client'
 import { useSession } from '../../auth/SessionContext'
+import { getAccountToken } from '../../auth/accountToken'
 import { useApi } from '../../hooks/useApi'
 import { formatDate } from '../../lib/format'
 import { EmptyState } from '../ui/EmptyState'
@@ -123,7 +124,7 @@ export function BillDiff({ congress, type, number }: BillDiffProps) {
     setCompareError(null)
     setResult(null)
     try {
-      const token = await user?.getIdToken().catch(() => undefined)
+      const token = user ? await getAccountToken(user).catch(() => undefined) : undefined
       const loadDiff = (idToken?: string) => diffTextVersions(congress, type, number, fromValue, toValue, idToken)
       const diff = await loadDiff(token).catch((cause: unknown) => {
         if (token && cause instanceof ApiError && [401, 403, 503].includes(cause.status ?? 0)) return loadDiff()

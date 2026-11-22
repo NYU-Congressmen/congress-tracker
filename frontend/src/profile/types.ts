@@ -1,5 +1,8 @@
 // Define the profile data stored in the browser.
 
+export const PROFILE_SECTIONS = { name: 'Profile', district: 'District', topics: 'Topics', social: 'Social' }
+export type ProfileSection = keyof typeof PROFILE_SECTIONS
+
 // A connected social media account, e.g. { platform: 'bluesky', handle: 'maya.bsky.social' }
 export interface SocialProfile {
   platform: string
@@ -17,6 +20,7 @@ export interface DistrictSelection {
 
 export interface Profile {
   username: string
+  firebase_uid?: string
   district: DistrictSelection | null
   // The issue ids (from /api/issues) the person follows, chosen in
   // onboarding. The dashboard lists the newest bills on those topics.

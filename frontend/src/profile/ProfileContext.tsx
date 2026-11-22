@@ -1,8 +1,9 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { ProfileError, currentProfile, selectProfile as storeSelectProfile, leaveProfile as storeLeaveProfile, createProfile as storeCreateProfile, updateProfile as storeUpdateProfile } from './store'
-import type { NewProfile } from './store'
+import type { NewProfile, ProfileChanges } from './store'
 import type { Profile } from './types'
+import { useSession } from '../auth/SessionContext'
 
 interface ProfileContextValue {
   profile: Profile | null
@@ -10,7 +11,7 @@ interface ProfileContextValue {
   createProfile: (username: string, base: NewProfile) => Profile
   selectProfile: (username: string) => Profile
   leaveProfile: () => void
-  updateProfile: (patch: Partial<Pick<Profile, 'district' | 'topics' | 'socials'>>) => Profile
+  updateProfile: (patch: ProfileChanges) => Profile
 }
 
 const ProfileContext = createContext<ProfileContextValue | null>(null)
@@ -32,7 +33,10 @@ const FALLBACK: ProfileContextValue = {
 
 // Provide the active local profile and actions for changing it.
 export function ProfileProvider({ children }: { children: ReactNode }) {
-  const [profile, setProfile] = useState<Profile | null>(() => currentProfile())
+  const { user } = useSession()
+  const [selected, setProfile] = useState<Profile | null>(() => currentProfile())
+  const uid = user?.uid
+  const profile = selected?.firebase_uid && selected.firebase_uid !== uid ? null : selected
 
   const createProfile = useCallback((username: string, base: NewProfile) => {
     const nextProfile = storeCreateProfile(username, base)
@@ -41,21 +45,22 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const selectProfile = useCallback((username: string) => {
-    const nextProfile = storeSelectProfile(username)
+    const nextProfile = storeSelectProfile(username, uid)
     setProfile(nextProfile)
     return nextProfile
-  }, [])
+  }, [uid])
 
   const leaveProfile = useCallback(() => {
     storeLeaveProfile()
     setProfile(null)
   }, [])
 
-  const updateProfile = useCallback((patch: Partial<Pick<Profile, 'district' | 'topics' | 'socials'>>) => {
-    const nextProfile = storeUpdateProfile(patch)
+  const updateProfile = useCallback((patch: ProfileChanges) => {
+    if (!profile) throw new ProfileError('Select a profile before editing it.')
+    const nextProfile = storeUpdateProfile(patch, profile.username)
     setProfile(nextProfile)
     return nextProfile
-  }, [])
+  }, [profile])
 
   const value = useMemo(
     () => ({ profile, createProfile, selectProfile, leaveProfile, updateProfile }),

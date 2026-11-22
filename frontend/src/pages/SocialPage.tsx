@@ -6,6 +6,7 @@ import { getBill, searchBills } from '../api/bills'
 import type { BillSummary } from '../api/bills'
 import { saveReview, STANCES, STANCE_LABELS } from '../api/reviews'
 import { useSession } from '../auth/SessionContext'
+import { getAccountToken } from '../auth/accountToken'
 import { PLATFORMS, platformName } from '../profile/platforms'
 import type { SocialProfile } from '../profile/types'
 import { useProfile } from '../profile/ProfileContext'
@@ -118,7 +119,7 @@ function SocialContent() {
     let notice: NonNullable<typeof submitNotice> = { kind: 'draft', text: 'Draft saved in this browser.' }
     try {
       if (user) {
-        const token = await user.getIdToken()
+        const token = await getAccountToken(user)
         await saveReview(selected.congress, selected.type, selected.number, review, token)
         saved = true
         notice = { kind: 'ok', text: 'Your review is saved. You can see it on the bill page.' }

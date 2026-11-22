@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import type { BillType } from '../../api/bills'
 import { getReview, STANCE_LABELS } from '../../api/reviews'
 import { useSession } from '../../auth/SessionContext'
+import { getAccountToken } from '../../auth/accountToken'
 import { useApi } from '../../hooks/useApi'
 import { timeAgo } from '../../lib/format'
 
@@ -29,7 +30,7 @@ export function ReviewPanel(props: ReviewPanelProps) {
 
 function AccountReview({ congress, type, number, user }: ReviewPanelProps & { user: User }) {
   const { data, loading, error } = useApi(
-    async () => getReview(congress, type, number, await user.getIdToken()),
+    async () => getReview(congress, type, number, await getAccountToken(user)),
     [congress, type, number, user],
   )
   const discussionPath = `/social?bill=${congress}-${type}-${number}`
