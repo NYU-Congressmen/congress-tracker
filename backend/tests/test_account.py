@@ -131,3 +131,8 @@ def test_verified_account_saves_the_119th_congress_district(
     matches.clear()
     assert client.put(path, json=address, headers=headers).status_code == 422
     assert client.get(path, headers=headers).json() == expected
+
+    # Choosing a district on the map later forgets the address match
+    assert client.delete(path).status_code == 401
+    assert client.delete(path, headers=headers).status_code == 204
+    assert client.get(path, headers=headers).json() is None

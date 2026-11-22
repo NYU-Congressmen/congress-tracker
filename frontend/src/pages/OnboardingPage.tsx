@@ -6,7 +6,7 @@ import { SocialStep } from '../components/onboarding/SocialStep'
 import { TopicsStep } from '../components/onboarding/TopicsStep'
 import { PageBand } from '../components/layout/PageBand'
 import { StepActions } from '../components/onboarding/StepActions'
-import { saveAccountDistrict } from '../api/account'
+import { clearAccountDistrict, replacesAccountDistrict, saveAccountDistrict } from '../api/account'
 import { useSession } from '../auth/SessionContext'
 import { useProfile } from '../profile/ProfileContext'
 import type { DistrictSelection, SocialProfile } from '../profile/types'
@@ -57,6 +57,7 @@ export default function OnboardingPage() {
         setDistrict(verifiedDistrict)
         setAddressToSave(undefined)
       }
+      if (replacesAccountDistrict(verifiedDistrict)) await clearAccountDistrict(user)
       const details = { firebase_uid: user.uid, district: verifiedDistrict, topics, socials }
       if (profile?.username === username) updateProfile(details)
       else createProfile(username, details)

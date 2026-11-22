@@ -87,7 +87,7 @@ These endpoints serve Pull's own features on top of the legislative data.
 
 ### What people on Pull think
 
-`GET /api/bills/{congress}/{type}/{number}/responses` counts stances on a bill as `counts.support`, `counts.oppose` and `counts.unsure`, with their `total` and a `label` for the page to show. Every account is phone-verified, so these are people who chose to respond, not a sample of the public. `?state=NY` limits the counts to users whose saved district is in that state, and `&district=12` to one district. An at-large seat has no district number, so its constituents are counted with the state alone. Reviews their authors hid are left out.
+`GET /api/bills/{congress}/{type}/{number}/responses` counts stances on a bill as `counts.support`, `counts.oppose` and `counts.unsure`, with their `total` and a `label` for the page to show. Every account is phone-verified, so these are people who chose to respond, not a sample of the public. `?state=NY` limits the counts to users whose saved district is in that state, and `&district=12` to one district. Only a Census address match saves a district on the account (`PUT /api/account/district`); picking one on the map or by number calls `DELETE /api/account/district`, so such users are counted only without a state filter. An at-large seat has no district number, so its constituents are counted with the state alone. Reviews their authors hid are left out.
 
 ### Shared reviews and reports
 

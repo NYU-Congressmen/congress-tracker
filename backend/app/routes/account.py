@@ -60,3 +60,13 @@ def save_district(
     if saved is None:
         raise HTTPException(403, "Finish signing up before saving your district.")
     return district
+
+
+@router.delete("/account/district", status_code=204)
+def clear_district(uid: Annotated[str, Depends(current_uid)]) -> Response:
+    """Forget the caller's address-matched district after they choose one another way."""
+    # Response counts and shared reviews read this district, so it must not outlive the
+    # profile's choice. Map and number choices stay in the browser profile only.
+    with connect() as conn:
+        conn.execute("UPDATE users SET state = NULL, district = NULL WHERE uid = %s", (uid,))
+    return Response(status_code=204)

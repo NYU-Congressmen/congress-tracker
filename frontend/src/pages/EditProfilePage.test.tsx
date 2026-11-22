@@ -104,3 +104,26 @@ test('saves a district on request and uses it for My representatives', async () 
   expect(screen.getByText('Example Senator')).toBeTruthy()
   expect(screen.queryByText('Neighboring House Member')).toBeNull()
 })
+
+test('forgets the account district when the reader picks one by number', async () => {
+  createProfile('maya', {
+    firebase_uid: user.uid,
+    district: { state: 'NY', district: 12, method: 'address' },
+    topics: [],
+    socials: [],
+  })
+  const fetchMock = mockApi([
+    { match: '/api/account/district', body: null },
+    { match: 'tigerWMS', body: { features: [] } },
+  ])
+  renderEditor()
+
+  fireEvent.click(await screen.findByRole('tab', { name: 'Pick the number' }))
+  fireEvent.change(screen.getByLabelText('State or territory'), { target: { value: 'DC' } })
+  fireEvent.click(await screen.findByRole('button', { name: 'Use my at-large seat' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Save district' }))
+
+  expect(await screen.findByRole('heading', { name: 'Profile saved' })).toBeTruthy()
+  expect(fetchMock).toHaveBeenCalledWith('/api/account/district', expect.objectContaining({ method: 'DELETE' }))
+  expect(currentProfile()?.district).toEqual({ state: 'DC', district: null, method: 'number' })
+})
