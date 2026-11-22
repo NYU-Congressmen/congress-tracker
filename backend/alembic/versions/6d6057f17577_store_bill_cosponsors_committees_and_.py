@@ -1,7 +1,7 @@
 """store bill cosponsors committees and related bills
 
 Revision ID: 6d6057f17577
-Revises: 46b919d6d069
+Revises: 2aa5b64a1f0d
 Create Date: 2026-11-22 08:34:29.317379
 
 """
@@ -13,7 +13,7 @@ from alembic import op  # noqa: F401
 
 # revision identifiers, used by Alembic.
 revision: str = "6d6057f17577"
-down_revision: str | Sequence[str] | None = "46b919d6d069"
+down_revision: str | Sequence[str] | None = "2aa5b64a1f0d"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
