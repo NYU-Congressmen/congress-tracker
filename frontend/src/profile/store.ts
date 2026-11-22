@@ -7,10 +7,13 @@ const SESSION_KEY = 'pull:session'
 
 // What the onboarding flow hands over; the store supplies the timestamps.
 export interface NewProfile {
+  firebase_uid?: string
   district: DistrictSelection | null
   topics: number[]
   socials: SocialProfile[]
 }
+
+export type ProfileChanges = Partial<NewProfile & Pick<Profile, 'username'>>
 
 export class ProfileError extends Error {
   constructor(message: string) {
@@ -43,6 +46,14 @@ export function listUsernames(): string[] {
   return Object.keys(readAccounts()).sort()
 }
 
+// List legacy profiles and profiles owned by the signed-in account.
+export function listSelectableUsernames(uid?: string): string[] {
+  return Object.values(readAccounts())
+    .filter((profile) => !profile.firebase_uid || profile.firebase_uid === uid)
+    .map((profile) => profile.username)
+    .sort()
+}
+
 // Validate a profile name during onboarding and again when saving it.
 export function usernameError(username: string): string | null {
   const name = username.trim()
@@ -69,6 +80,7 @@ export function createProfile(username: string, base: NewProfile): Profile {
   const now = new Date().toISOString()
   const account: Profile = {
     username: name,
+    firebase_uid: base.firebase_uid,
     district: base.district,
     topics: base.topics,
     socials: base.socials,
@@ -80,10 +92,12 @@ export function createProfile(username: string, base: NewProfile): Profile {
   return account
 }
 
-export function selectProfile(username: string): Profile {
+export function selectProfile(username: string, uid?: string): Profile {
   const accounts = readAccounts()
   const match = Object.keys(accounts).find((name) => name.toLowerCase() === username.trim().toLowerCase())
-  if (!match) throw new ProfileError('That profile could not be found on this device.')
+  if (!match || (accounts[match].firebase_uid && accounts[match].firebase_uid !== uid)) {
+    throw new ProfileError('That profile could not be found for this account.')
+  }
   localStorage.setItem(SESSION_KEY, match)
   return accounts[match]
 }
@@ -100,26 +114,46 @@ export function currentProfile(): Profile | null {
 }
 
 // Save changes to the active local profile and return it.
-export function updateProfile(patch: Partial<Pick<Profile, 'district' | 'topics' | 'socials'>>): Profile {
+export function updateProfile(patch: ProfileChanges, expectedName?: string): Profile {
   const name = localStorage.getItem(SESSION_KEY)
   const accounts = readAccounts()
   const account = name && Object.hasOwn(accounts, name) ? accounts[name] : undefined
-  if (!account) throw new ProfileError('Select a profile before editing it.')
+  if (!account || (expectedName !== undefined && name !== expectedName)) {
+    throw new ProfileError('Select a profile before editing it.')
+  }
+  const username = patch.username?.trim() ?? account.username
+  if (username !== account.username) {
+    const problem = usernameError(username)
+    if (problem) throw new ProfileError(problem)
+    if (Object.keys(accounts).some((key) => key !== name && key.toLowerCase() === username.toLowerCase())) {
+      throw new ProfileError('That name is already used by a profile on this device.')
+    }
+  }
   const next: Profile = {
     ...account,
+    username,
+    firebase_uid: account.firebase_uid ?? patch.firebase_uid,
     district: patch.district !== undefined ? patch.district : account.district,
     topics: patch.topics !== undefined ? patch.topics : account.topics ?? [],
     socials: patch.socials !== undefined ? patch.socials : account.socials,
     updated_at: new Date().toISOString(),
   }
-  accounts[account.username] = next
-  writeAccounts(accounts)
+  delete accounts[account.username]
+  const renamed = username !== account.username
+  if (renamed) localStorage.setItem(SESSION_KEY, username)
+  try {
+    writeAccounts({ ...accounts, [username]: next })
+  } catch (cause) {
+    if (renamed) localStorage.setItem(SESSION_KEY, account.username)
+    throw cause
+  }
   return toProfile(next)
 }
 
 function toProfile(account: Profile): Profile {
   return {
     username: account.username,
+    firebase_uid: account.firebase_uid,
     district: account.district,
     topics: account.topics ?? [],
     socials: account.socials,

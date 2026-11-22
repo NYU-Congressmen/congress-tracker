@@ -46,11 +46,11 @@ function BillsFiltersForm({ initial, hasFilters, onApply }: BillsFiltersFormProp
     >
       <TextField
         id="bill-q"
-        label="Keyword"
+        label="Bill title or number"
         type="search"
         value={formQ}
         onChange={setFormQ}
-        placeholder="e.g. clean water"
+        placeholder="Clean water or H.R. 10159"
         className="filters__keyword"
       />
       <SelectField
@@ -131,7 +131,7 @@ export default function BillsPage() {
           Bills
         </h1>
         <p className="page-lede">
-          Search legislation from the 119th Congress by keyword, stage, or the date it was introduced.
+          Find bills from the 119th Congress by title or number. Filter by stage or introduction date.
         </p>
 
         <BillsFiltersForm

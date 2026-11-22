@@ -6,6 +6,7 @@ import { getBill, searchBills } from '../api/bills'
 import type { BillSummary } from '../api/bills'
 import { saveReview, STANCES, STANCE_LABELS } from '../api/reviews'
 import { useSession } from '../auth/SessionContext'
+import { getAccountToken } from '../auth/accountToken'
 import { PLATFORMS, platformName } from '../profile/platforms'
 import type { SocialProfile } from '../profile/types'
 import { useProfile } from '../profile/ProfileContext'
@@ -118,7 +119,7 @@ function SocialContent() {
     let notice: NonNullable<typeof submitNotice> = { kind: 'draft', text: 'Draft saved in this browser.' }
     try {
       if (user) {
-        const token = await user.getIdToken()
+        const token = await getAccountToken(user)
         await saveReview(selected.congress, selected.type, selected.number, review, token)
         saved = true
         notice = { kind: 'ok', text: 'Your review is saved. You can see it on the bill page.' }
@@ -186,8 +187,7 @@ function SocialContent() {
           Social
         </h1>
         <p className="page-lede">
-          Where the discussion about current policy happens: say where you stand on a bill, tell the story behind it,
-          and follow what is moving.
+          Save your stance on a bill and the experience behind it.
         </p>
       </PageBand>
 
@@ -195,7 +195,7 @@ function SocialContent() {
 
         {!profile ? (
           <div className="social__prompt panel">
-            <h2>Join the discussion</h2>
+            <h2>Browser profile</h2>
             <p className="muted">
               Save your discussion drafts with a profile in this browser.
             </p>
@@ -260,8 +260,8 @@ function SocialContent() {
           ) : null}
         </section>
 
-        <section className="panel" aria-label="Start a discussion">
-          <h2>Start a discussion</h2>
+        <section className="panel" aria-label="Bill review">
+          <h2>Bill review</h2>
           {!user ? <p className="muted"><Link to="/sign-in">Sign in</Link> to save your review to your account.</p> : null}
 
           {selected ? (
@@ -319,7 +319,7 @@ function SocialContent() {
 
           <form className="social-composer" onSubmit={submitDiscussion}>
             <fieldset className="social-stance">
-              <legend>Where do you stand?</legend>
+              <legend>Your stance</legend>
               {STANCES.map((option) => (
                 <label key={option} className={`social-stance__option${stance === option ? ' is-selected' : ''}`}>
                   <input
@@ -340,18 +340,16 @@ function SocialContent() {
                 className="field__control social-composer__textarea"
                 value={story}
                 maxLength={20000}
-                placeholder="What does this bill mean to you?"
                 onChange={(event) => setStory(event.target.value)}
               />
             </label>
 
             <label className="field">
-              <span className="field__label">What have you done about it? (optional)</span>
+              <span className="field__label">Action taken (optional)</span>
               <textarea
                 className="field__control social-composer__textarea"
                 value={actionTaken}
                 maxLength={20000}
-                placeholder="Called your representative, attended a hearing, organized a neighbor…"
                 onChange={(event) => setActionTaken(event.target.value)}
               />
             </label>
@@ -394,13 +392,13 @@ function SocialContent() {
               ))}
             </ul>
           ) : (
-            <p className="muted">No discussions yet. Pick a bill above and say where you stand.</p>
+            <p className="muted">No saved reviews or drafts.</p>
           )}
         </section>
 
-        <section className="panel" aria-label="Bills moving now">
+        <section className="panel" aria-label="Recent bill activity">
           <div className="panel__heading-row">
-            <h2>What is moving</h2>
+            <h2>Recent bill activity</h2>
             <Link to="/bills" className="link-more">
               All bills
             </Link>

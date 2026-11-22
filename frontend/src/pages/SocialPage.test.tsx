@@ -95,7 +95,7 @@ describe('SocialPage', () => {
 
     // Weigh in
     fireEvent.click(screen.getByRole('radio', { name: 'Support' }))
-    fireEvent.change(screen.getByPlaceholderText(/what does this bill mean/i), {
+    fireEvent.change(screen.getByLabelText(/your story/i), {
       target: { value: 'My family used this service.' },
     })
     fireEvent.click(await screen.findByRole('button', { name: 'Save my stance' }))

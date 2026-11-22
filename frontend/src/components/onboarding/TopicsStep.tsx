@@ -3,16 +3,17 @@ import { listIssues } from '../../api/feed'
 import { useApi } from '../../hooks/useApi'
 import { ErrorState } from '../ui/ErrorState'
 import { LoadingState } from '../ui/LoadingState'
+import { StepActions } from './StepActions'
 
 interface TopicsStepProps {
   initial: number[]
+  nextLabel?: string
+  onBack?: () => void
   onDone: (topics: number[]) => void
 }
 
-// Step three: pick the topics the person wants Pull to follow. Issues come
-// from the backend, so a new tracking category is a database row, not a code
-// change. The dashboard then lists the newest bills on the chosen topics.
-export function TopicsStep({ initial, onDone }: TopicsStepProps) {
+// Choose which topics appear on the dashboard.
+export function TopicsStep({ initial, nextLabel = 'Continue to social profiles', onBack, onDone }: TopicsStepProps) {
   const [chosen, setChosen] = useState<number[]>(initial)
   const { data: issues, loading, error, refetch } = useApi(() => listIssues(), [])
 
@@ -24,6 +25,7 @@ export function TopicsStep({ initial, onDone }: TopicsStepProps) {
     return (
       <div className="onboard-step">
         <LoadingState message="Loading the topics you can follow…" />
+        <StepActions onBack={onBack} />
       </div>
     )
   }
@@ -32,16 +34,17 @@ export function TopicsStep({ initial, onDone }: TopicsStepProps) {
     return (
       <div className="onboard-step">
         <ErrorState title="Topics could not be loaded" message={error?.message} onRetry={refetch} />
+        <StepActions onBack={onBack} />
       </div>
     )
   }
 
   return (
-    <div className="onboard-step">
-      <p className="muted">
-        Pick the topics you want Pull to follow. Your dashboard lists the newest bills working on them, and the
-        Social page groups discussion around them. This step is optional.
-      </p>
+    <div className="onboard-step onboard-step--spaced">
+      <div className="onboard-step__intro">
+        <h2>Topics to follow</h2>
+        <p className="muted">Choose topics to see related bills on your dashboard.</p>
+      </div>
 
       <div className="topics__chips" role="group" aria-label="Topics to follow">
         {issues.map((issue) => (
@@ -57,13 +60,11 @@ export function TopicsStep({ initial, onDone }: TopicsStepProps) {
         ))}
       </div>
 
-      {chosen.length === 0 ? <p className="muted onboard-social__empty">No topics chosen yet.</p> : null}
-
-      <div className="onboard-step__actions">
-        <button type="button" className="btn btn--primary btn--lg" onClick={() => onDone(chosen)}>
-          Continue to social profiles
+      <StepActions onBack={onBack}>
+        <button type="button" className="btn btn--primary" onClick={() => onDone(chosen)}>
+          {nextLabel}
         </button>
-      </div>
+      </StepActions>
     </div>
   )
 }

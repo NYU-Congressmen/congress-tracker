@@ -238,7 +238,6 @@
   font-weight: 600;
   color: var(--ink-2);
   max-width: 52ch;
-  text-shadow: 0 1px 10px var(--bg), 0 0 2px var(--bg);
 }
 
 /* footer */

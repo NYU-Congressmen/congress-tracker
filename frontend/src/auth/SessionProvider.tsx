@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { User } from '@firebase/auth'
 import { request } from '../api/client'
+import { getAccountToken } from './accountToken'
 import { loadFirebaseAuth } from './firebase'
 import { SessionContext } from './SessionContext'
 
@@ -27,15 +28,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
         // A restored Firebase session can retry account creation after an API outage.
         try {
-          const token = await signedIn.getIdToken()
+          const token = await getAccountToken(signedIn)
           await request('/api/account', {
             method: 'PUT',
             headers: { Authorization: `Bearer ${token}` },
           })
           if (active && current === revision) setUser(signedIn)
-        } catch (cause) {
+        } catch {
           if (active && current === revision) {
-            setError(cause instanceof Error ? cause.message : 'The account could not be loaded.')
+            setError('Your account could not be set up. Try again.')
           }
         } finally {
           if (active && current === revision) setLoading(false)

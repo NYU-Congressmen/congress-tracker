@@ -8,6 +8,7 @@ import AboutPage from './pages/AboutPage'
 import BillDetailPage from './pages/BillDetailPage'
 import BillsPage from './pages/BillsPage'
 import DashboardPage from './pages/DashboardPage'
+import EditProfilePage from './pages/EditProfilePage'
 import MemberDetailPage from './pages/MemberDetailPage'
 import MembersPage from './pages/MembersPage'
 import NotFoundPage from './pages/NotFoundPage'
@@ -31,6 +32,7 @@ export default function App() {
               <Route path="members/:bioguideId" element={<MemberDetailPage />} />
               <Route path="social" element={<SocialPage />} />
               <Route path="onboarding" element={<OnboardingPage />} />
+              <Route path="profile" element={<EditProfilePage />} />
               <Route path="sign-in" element={
                 <Suspense fallback={<LoadingState message="Loading sign-in…" />}>
                   <SignInPage />
