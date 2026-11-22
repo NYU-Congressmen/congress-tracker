@@ -155,7 +155,9 @@ function simplifyChain(points: Position[], budget: number, closed: boolean): Pos
 // proportion to each run's length, so every boundary renders at the same
 // smoothness. Shared borders (runs walked by two districts) are simplified
 // once and reused, so they stay exactly coincident.
-export function simplifyFeatureCollection(fc: FeatureCollection, targetPoints: number): FeatureCollection {
+export function simplifyFeatureCollection(
+  fc: FeatureCollection, targetPoints: number, crossesAntimeridian = false,
+): FeatureCollection {
   // 1. De-duplicate exact vertices and capture every ring as a vertex sequence.
   const vertexIndex = new Map<string, number>()
   const vertexId = (p: Position): number => {
@@ -178,7 +180,9 @@ export function simplifyFeatureCollection(fc: FeatureCollection, targetPoints: n
       const ring = value as Position[]
       const ids: number[] = []
       const points: Position[] = []
-      for (const p of ring) {
+      for (const [lng, lat] of ring) {
+        // Keep Alaska's Aleutian Islands next to each other at the date line.
+        const p: Position = [crossesAntimeridian && lng > 0 ? lng - 360 : lng, lat]
         const last = points[points.length - 1]
         if (last && last[0] === p[0] && last[1] === p[1]) continue
         points.push(p)

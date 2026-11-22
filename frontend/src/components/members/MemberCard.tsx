@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import type { Member } from '../../api/members'
-import { initialsOf, seatLabel } from '../../lib/format'
+import { seatLabel } from '../../lib/format'
+import { MemberAvatar } from './MemberAvatar'
 
 interface MemberCardProps {
   member: Member
@@ -23,18 +24,7 @@ export function MemberCard({ member, role }: MemberCardProps) {
   return (
     <li className={`member-card${partyClass ? ` ${partyClass}` : ''}`}>
       <Link to={`/members/${member.bioguide_id}`} className="member-card__link glass">
-        <span className="avatar">
-          {member.image_url ? (
-            <img src={member.image_url} alt="" loading="lazy" />
-          ) : (
-            <span aria-hidden="true">{initialsOf(member.name)}</span>
-          )}
-          {member.party ? (
-            <i className={`pb pb--${member.party.toLowerCase()}`} aria-hidden="true">
-              {member.party}
-            </i>
-          ) : null}
-        </span>
+        <MemberAvatar member={member} />
         <span className="member-card__body">
           <span className="member-card__name">{member.name}</span>
           {role ? <span className="member-card__role">{role}</span> : null}

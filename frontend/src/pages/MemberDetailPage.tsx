@@ -2,13 +2,14 @@ import { Link, useParams } from 'react-router-dom'
 import { getMember } from '../api/members'
 import { PageBand } from '../components/layout/PageBand'
 import { BillListItem } from '../components/bills/BillListItem'
+import { MemberAvatar } from '../components/members/MemberAvatar'
 import { ChevronLeftIcon, ExternalLinkIcon } from '../components/icons'
 import { CacheNotice } from '../components/ui/CacheNotice'
 import { EmptyState } from '../components/ui/EmptyState'
 import { ErrorState } from '../components/ui/ErrorState'
 import { LoadingState } from '../components/ui/LoadingState'
 import { useApi } from '../hooks/useApi'
-import { initialsOf, memberUrl, stateName } from '../lib/format'
+import { memberUrl, stateName } from '../lib/format'
 import { CONGRESS_NUMBER, PARTY_LABELS } from '../lib/constants'
 import { useProfile } from '../profile/ProfileContext'
 
@@ -83,18 +84,7 @@ export default function MemberDetailPage() {
       <PageBand labelledBy="member-name">
         <BackLink />
         <section className="profile glass" aria-labelledby="member-name">
-          <span className="avatar avatar--lg">
-            {member.image_url ? (
-              <img src={member.image_url} alt={`Official photo of ${member.name}`} />
-            ) : (
-              <span aria-hidden="true">{initialsOf(member.name)}</span>
-            )}
-            {member.party ? (
-              <i className={`pb pb--${member.party.toLowerCase()}`} aria-hidden="true">
-                {member.party}
-              </i>
-            ) : null}
-          </span>
+          <MemberAvatar key={member.bioguide_id} member={member} size="lg" describePhoto />
           <div className="profile__info">
             {isMine ? <p className="profile__mine">Your representative</p> : null}
             <h1 id="member-name" className="profile__name">

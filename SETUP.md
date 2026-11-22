@@ -52,6 +52,10 @@ Each teammate keeps their own `.env` at the repo root, and `.env.example` is the
 | `FIREBASE_PROJECT_ID` | For phone sign-in | Identifies the Firebase project whose tokens the API accepts |
 | `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID` | For local Firebase configuration | Identifies the Firebase project to the browser SDK. Firebase Hosting supplies these values in production |
 
+## Local phone verification
+
+Use an authorized Firebase project with a fictional phone number configured in Authentication. The number's country must be on the Firebase SMS allowlist. Starting Vite with `VITE_FIREBASE_PHONE_TEST_MODE=true` enables Firebase's fictional-number test mode on localhost. The code configured in Firebase completes verification without an SMS. The API verifies the resulting Firebase token, and the production build uses standard reCAPTCHA. [Firebase phone sign-in tests](https://firebase.google.com/docs/auth/web/phone-auth#test-with-fictional-phone-numbers)
+
 ## Database tests
 
 The database tests check migration upgrades and downgrades, cache versions, retry cooldowns, atomic writes, chamber-passage milestones and search pagination against a real PostgreSQL. They skip themselves when none is available, so `npm test` passes without one. CI always runs them against its own PostgreSQL, so installing it locally is optional and only needed to run those tests before pushing. The tests empty their database every run, so they only use a database whose name contains "test" and refuse anything else. Set `REQUIRE_TEST_DATABASE=1` to make an unavailable test database fail locally as it does in CI.
@@ -84,6 +88,10 @@ The release workflow uses the `congress-pull` Firebase and Google Cloud project,
 Phone sign-in uses the Firebase Hosting configuration endpoint in the browser and the Cloud Run service identity through Application Default Credentials in the API. The hosted account page is `/sign-in`. A hosted sign-in check uses a domain authorized in Firebase Auth and a configured fictional number, which sends no SMS. The check covers code verification, saving and reopening a review, and signing out. [Firebase phone sign-in](https://firebase.google.com/docs/auth/web/phone-auth)
 
 GitHub Actions uses Workload Identity Federation to impersonate `pull-release@congress-pull.iam.gserviceaccount.com`. The repository variable `PULL_WIF_PROVIDER` holds the full provider resource name. The provider accepts push tokens for this repository's numeric ID on `refs/heads/main` from `.github/workflows/ci.yml`. The release service account uses Cloud Run Source Developer, Service Usage Consumer, Firebase Hosting Admin and API Keys Viewer, with Service Account User on the Cloud Run runtime identity. The Cloud Build identity uses Cloud Run Builder. [Google Cloud federation setup](https://docs.cloud.google.com/iam/docs/workload-identity-federation-with-deployment-pipelines) [Firebase deployment roles](https://firebase.google.com/docs/projects/iam/roles-predefined-product)
+
+## MCP clients
+
+Connect a client using Streamable HTTP. The local FastAPI server exposes `http://127.0.0.1:8000/mcp`, and Firebase Hosting exposes `https://congress-pull.web.app/mcp` once the release containing the endpoint is deployed. Pull's tools read public data from PostgreSQL without extra credentials. [FastMCP clients](https://gofastmcp.com/clients/transports)
 
 ## Troubleshooting
 

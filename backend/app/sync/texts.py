@@ -1,3 +1,4 @@
+import difflib
 import html
 import re
 from typing import Any
@@ -76,3 +77,20 @@ def load_text(bill_id: str, version_type: str) -> str | None:
             (text, bill_id, version_type),
         )
     return text
+
+
+def compare_versions(bill_id: str, from_version: str, to_version: str) -> list[str]:
+    """Return the unified diff for two formatted versions of a bill."""
+    old = load_text(bill_id, from_version)
+    new = load_text(bill_id, to_version)
+    if old is None or new is None:
+        raise LookupError("One of these versions has no formatted text to compare")
+    return list(
+        difflib.unified_diff(
+            old.splitlines(),
+            new.splitlines(),
+            fromfile=from_version,
+            tofile=to_version,
+            lineterm="",
+        )
+    )

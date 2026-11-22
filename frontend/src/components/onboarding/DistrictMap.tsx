@@ -119,11 +119,12 @@ export function DistrictMap({ features, state, selected, onSelect }: DistrictMap
   }, [bounds, kx])
 
   const initial = useMemo<View>(() => {
-    const [bx, by, bw, bh] = fullBounds
+    // Open on the main Hawaiian islands. Zooming out still shows the full district.
+    const [bx, by, bw, bh] = state === 'HI' ? [-161 * kx, -22.7, 6.5 * kx, 4.2] : fullBounds
     const padX = bw * 0.06
     const padY = bh * 0.06
     return [bx - padX, by - padY, bw + padX * 2, bh + padY * 2]
-  }, [fullBounds])
+  }, [fullBounds, kx, state])
 
   const [view, setView] = useState<View>(initial)
   const dragging = useRef<{ startX: number; startY: number; origin: [number, number]; moved: boolean } | null>(null)
@@ -134,7 +135,7 @@ export function DistrictMap({ features, state, selected, onSelect }: DistrictMap
   const surface = useRef<SVGSVGElement | null>(null)
 
   const MIN_ZOOM = 0.02
-  const MAX_ZOOM = fullBounds[2] * 1.05
+  const MAX_ZOOM = Math.max(initial[2], fullBounds[2] * 1.12)
 
   const zoomAt = useCallback(
     (factor: number, point: [number, number] | null) => {
@@ -190,7 +191,9 @@ export function DistrictMap({ features, state, selected, onSelect }: DistrictMap
     if (!svg) return
     const onWheel = (event: WheelEvent) => {
       event.preventDefault()
-      zoomAt(event.deltaY > 0 ? 1.25 : 0.8, pointFromEvent(event))
+      const units = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? svg.clientHeight : 1
+      const delta = Math.max(-80, Math.min(80, event.deltaY * units))
+      if (delta) zoomAt(Math.exp(delta * 0.002), pointFromEvent(event))
     }
     svg.addEventListener('wheel', onWheel, { passive: false })
     return () => svg.removeEventListener('wheel', onWheel)
@@ -214,13 +217,13 @@ export function DistrictMap({ features, state, selected, onSelect }: DistrictMap
     const svg = surface.current
     if (!svg) return
     const rect = svg.getBoundingClientRect()
-    if (rect.width === 0) return
-    const dx = ((event.clientX - drag.startX) / rect.width) * view[2]
-    const dy = ((event.clientY - drag.startY) / rect.height) * view[3]
-    if (Math.abs(event.clientX - drag.startX) + Math.abs(event.clientY - drag.startY) > 5) {
-      drag.moved = true
-    }
-    setView([drag.origin[0] - dx, drag.origin[1] - dy, view[2], view[3]])
+    if (rect.width === 0 || rect.height === 0) return
+    const dx = event.clientX - drag.startX
+    const dy = event.clientY - drag.startY
+    if (!drag.moved && Math.hypot(dx, dy) <= 5) return
+    drag.moved = true
+    const unitsPerPixel = Math.max(view[2] / rect.width, view[3] / rect.height)
+    setView([drag.origin[0] - dx * unitsPerPixel, drag.origin[1] - dy * unitsPerPixel, view[2], view[3]])
   }
 
   const onPointerUp = (event: React.PointerEvent<SVGSVGElement>) => {
@@ -259,7 +262,7 @@ export function DistrictMap({ features, state, selected, onSelect }: DistrictMap
           onPointerCancel={onPointerUp}
           onDoubleClick={(event) => {
             event.preventDefault()
-            zoomAt(0.6, pointFromEvent(event))
+            zoomAt(0.85, pointFromEvent(event))
           }}
         >
           {features.features.map((feature, index) => {

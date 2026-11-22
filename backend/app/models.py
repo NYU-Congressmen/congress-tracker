@@ -1,7 +1,7 @@
 from datetime import date, datetime
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, StringConstraints, field_validator
 
 BillType = Literal["hr", "s", "hjres", "sjres", "hconres", "sconres", "hres", "sres"]
 Status = Literal[
@@ -13,6 +13,20 @@ Status = Literal[
     "became_law",
 ]
 Stance = Literal["support", "oppose", "unsure"]
+
+
+class DistrictAddress(BaseModel):
+    """Describe a street address submitted for district lookup."""
+
+    address: Annotated[str, StringConstraints(strip_whitespace=True, min_length=5, max_length=300)]
+
+
+class AccountDistrict(BaseModel):
+    """Describe a Census district by state and district number."""
+
+    state: str
+    district: int | None
+
 
 # Far beyond any real post, while keeping huge pastes out of the database and the AI brief
 MAX_REVIEW_TEXT = 20_000
@@ -119,11 +133,12 @@ class TextVersion(BaseModel):
 
 
 class BillDiff(BaseModel):
-    """Describe the line-by-line changes between two versions of a bill's text."""
+    """Describe the line-by-line changes and any saved summary for a pair of bill versions."""
 
     from_version: str
     to_version: str
     changes: list[str]
+    summary: str | None = None
 
 
 class BillExplanation(BaseModel):

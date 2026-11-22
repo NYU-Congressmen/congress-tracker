@@ -1,7 +1,10 @@
+from types import SimpleNamespace
+
 import psycopg
 import pytest
 from fastapi.testclient import TestClient
 
+from app.ai.embeddings import DIMENSIONS, backfill
 from app.main import app
 from app.routes.feed import keyword_pattern
 from tests.conftest import TEST_DATABASE_URL
@@ -91,3 +94,61 @@ def test_feed_requires_an_issue(issues):
 
 def test_keyword_pattern_escapes_special_characters():
     assert keyword_pattern(["a.b", "c"]) == r"\y(a\.b|c)\y"
+
+
+@pytest.fixture
+def saved_embeddings(issues):
+    """Provide topic IDs and clear the saved topic vectors after the test."""
+    yield issues
+    with psycopg.connect(TEST_DATABASE_URL) as conn:
+        conn.execute("DELETE FROM issue_embeddings")
+
+
+def test_backfill_ranks_the_feed_and_refreshes_a_changed_summary(saved_embeddings):
+    calls = []
+
+    def create(**request):
+        calls.append(request["input"])
+        rows = []
+        for index, text in enumerate(request["input"]):
+            if text.startswith("Housing policy") or "Rural Roads" in text:
+                values = [1.0, 0.0]
+            elif text.startswith("Affordable Housing"):
+                values = [0.8, 0.6]
+            else:
+                values = [0.0, 1.0]
+            rows.append(SimpleNamespace(index=index, embedding=values + [0.0] * (DIMENSIONS - 2)))
+        return SimpleNamespace(data=rows[::-1], usage=SimpleNamespace(prompt_tokens=100))
+
+    model = SimpleNamespace(embeddings=SimpleNamespace(create=create))
+    housing = saved_embeddings["Housing"]
+    params = {"issue_id": [housing, housing], "limit": 1}
+
+    assert backfill(model, limit_bills=2) == (len(saved_embeddings), 2)
+    assert backfill(model) == (0, 2)
+    assert len(calls) == 3
+    assert backfill(model) == (0, 0)
+    assert len(calls) == 3
+
+    first = client.get("/api/feed", params=params)
+    second = client.get("/api/feed", params={**params, "page": 2})
+    empty = client.get("/api/feed", params={**params, "page": 3})
+    assert first.json()["total"] == second.json()["total"] == empty.json()["total"] == 2
+    assert titles(first) == ["Rural Roads Act"]
+    assert titles(second) == ["Affordable Housing Act"]
+    assert titles(empty) == []
+
+    with psycopg.connect(TEST_DATABASE_URL) as conn:
+        conn.execute(
+            """
+            INSERT INTO bill_summaries (bill_id, version_code, text)
+            VALUES ('119-hr-2', '01', 'Newer summary of housing assistance near roads.')
+            """
+        )
+    stale = client.get("/api/feed", params=params)
+    assert stale.json()["total"] == 1
+    assert titles(stale) == ["Affordable Housing Act"]
+
+    assert backfill(model) == (0, 1)
+    assert calls[-1] == ["Rural Roads Act\n\nNewer summary of housing assistance near roads."]
+    assert titles(client.get("/api/feed", params=params)) == ["Rural Roads Act"]

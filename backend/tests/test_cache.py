@@ -401,6 +401,34 @@ def test_bill_search_pagination_has_a_stable_tie_breaker(api):
     assert all(page["total"] == 3 for page in pages)
 
 
+def test_bill_search_matches_references_and_titles(api):
+    client, _ = api
+    execute_many(
+        SAVE_BILL_SQL,
+        [
+            clean_bill({**BILL_DETAIL, "number": 10159, "title": "Clean Water Act"}),
+            clean_bill({**BILL_DETAIL, "number": 10159, "type": "S"}),
+            clean_bill({**BILL_DETAIL, "number": 10159, "congress": 118}),
+        ],
+    )
+    for query, expected in [
+        ("10159", {"118-hr-10159", "119-hr-10159", "119-s-10159"}),
+        ("H.R. 10159", {"118-hr-10159", "119-hr-10159"}),
+        ("hr10159", {"118-hr-10159", "119-hr-10159"}),
+        ("119-hr-10159", {"119-hr-10159"}),
+        ("clean water", {"119-hr-10159"}),
+        ("9999999999", set()),
+    ]:
+        response = client.get("/api/bills", params={"q": query})
+        assert response.status_code == 200
+        body = response.json()
+        assert body["total"] == len(expected)
+        assert {bill["bill_id"] for bill in body["data"]} == expected
+
+    filtered = client.get("/api/bills", params={"q": "10159", "from": "2026-11-21"})
+    assert filtered.json()["total"] == 0
+
+
 def test_status_migration_preserves_records_and_converts_legacy_milestones(db):
     command.downgrade(db, "803cfe036e6c")
     sql(

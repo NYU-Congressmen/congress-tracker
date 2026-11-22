@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { DistrictMap } from './DistrictMap'
-import type { FeatureCollection } from '../../geo/simplify'
+import { simplifyFeatureCollection, type FeatureCollection } from '../../geo/simplify'
 
 // Two adjacent square districts sharing the edge x=1, like the map of a tiny
 // state. District numbers come from the CD119 property.
@@ -94,5 +94,36 @@ describe('DistrictMap selection', () => {
     render(<DistrictMap features={FEATURES} state="CA" selected={1} onSelect={() => {}} />)
     expect(screen.getByRole('button', { name: 'District 1' }).getAttribute('aria-pressed')).toBe('true')
     expect(screen.getByRole('button', { name: 'District 2' }).getAttribute('aria-pressed')).toBe('false')
+  })
+
+  test('keeps Alaska geometry near the date line together', () => {
+    const alaska = simplifyFeatureCollection({
+      type: 'FeatureCollection',
+      features: [{
+        type: 'Feature',
+        properties: { CD119: '00' },
+        geometry: {
+          type: 'Polygon',
+          coordinates: [[[179, 52], [-179, 52], [-179, 54], [179, 54], [179, 52]]],
+        },
+      }],
+    }, 100, true)
+    render(<DistrictMap features={alaska} state="AK" selected={null} onSelect={() => {}} />)
+    const width = Number(svgSurface().getAttribute('viewBox')?.split(' ')[2])
+    expect(width).toBeGreaterThan(1)
+    expect(width).toBeLessThan(3)
+  })
+
+  test('applies small trackpad deltas as small, reversible zoom changes', () => {
+    renderMap()
+    const svg = svgSurface()
+    const width = () => Number(svg.getAttribute('viewBox')?.split(' ')[2])
+    const initialWidth = width()
+
+    fireEvent.wheel(svg, { deltaY: -4, clientX: 200, clientY: 150 })
+    expect(width()).toBeLessThan(initialWidth)
+    expect(width()).toBeGreaterThan(initialWidth * 0.98)
+    fireEvent.wheel(svg, { deltaY: 4, clientX: 200, clientY: 150 })
+    expect(width()).toBeCloseTo(initialWidth)
   })
 })

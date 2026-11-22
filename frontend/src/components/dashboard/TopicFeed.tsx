@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useSession } from '../../auth/SessionContext'
 import { getFeed, listIssues } from '../../api/feed'
 import type { BillSummary } from '../../api/bills'
 import { useApi } from '../../hooks/useApi'
@@ -14,10 +15,9 @@ interface TopicFeedProps {
   topicIds: number[]
 }
 
-// The newest bills on the topics the person follows, listed in the same
-// format as "Latest activity". The topics themselves are chosen in
-// onboarding, so this panel only shows and links back.
+// Show bills on followed topics and link to the profile settings.
 export function TopicFeed({ topicIds }: TopicFeedProps) {
+  const { user } = useSession()
   const { data: issues, loading: issuesLoading } = useApi(
     () => (topicIds.length > 0 ? listIssues() : Promise.resolve(null)),
     [topicIds.join(',')],
@@ -37,7 +37,7 @@ export function TopicFeed({ topicIds }: TopicFeedProps) {
     <>
       <div className="panel__heading-row">
         <h2>Topics you follow</h2>
-        <Link to="/onboarding" className="link-more">
+        <Link to={user ? '/profile?section=topics' : '/onboarding'} className="link-more">
           {topicIds.length > 0 ? 'Change topics' : 'Choose topics'}
         </Link>
       </div>
@@ -45,7 +45,7 @@ export function TopicFeed({ topicIds }: TopicFeedProps) {
       {topicIds.length === 0 ? (
         <EmptyState
           title="No topics chosen yet"
-          hint="Add the topics you care about in onboarding and Pull lists the newest bills working on them."
+          hint="Choose topics to see related bills."
         />
       ) : issuesLoading || feed.loading ? (
         <LoadingState message="Loading the bills on your topics…" />
