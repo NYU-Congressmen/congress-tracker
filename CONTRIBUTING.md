@@ -90,6 +90,10 @@ Interactive refreshes pass a five-second budget to `CongressClient`, shared acro
 
 Bill stages are `introduced`, `committee`, `passed_one_chamber`, `passed_both_chambers`, `to_president` and `became_law`. The `passed_house` and `passed_senate` flags accumulate independently in every upsert, so Senate-originated bills follow the same rules as House-originated bills. These flags describe observed passage and do not prove that both chambers approved identical text. Text-derived stages remain approximate even with full action history, and retaining milestones also retains false-positive inferences until they are corrected explicitly.
 
+### Who decides a bill
+
+`GET /api/bills/{congress}/{type}/{number}/graph` returns a bill's cosponsors, the committees and subcommittees holding it with each one's latest activity, and its related bills. Withdrawn cosponsors come last and carry a `withdrawn_date`. Each related bill has `stored`, which says whether Pull has that bill to link to. The first request fetches all three from Congress.gov within the five-second budget, and later requests read the stored copy until the bill's update date changes. The daily sync refreshes them for every bill someone tracks or reviews. The response carries the same `cache` object as the detail endpoints.
+
 ## Merge strategy
 
 Squash merging turns a pull request into one new commit on `develop`, which leaves your dev branch holding the original commits that `develop` does not recognise. Because the dev branches last the whole project, the next merge of `develop` into your branch would conflict with your own earlier work. A merge commit keeps the shared history, so the merge from `develop` that `git get-latest` makes stays clean.

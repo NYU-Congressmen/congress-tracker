@@ -3,6 +3,7 @@ import sys
 from app.config import settings
 from app.sync.bills import sync_bills
 from app.sync.client import CongressClient
+from app.sync.graph import sync_followed_graphs
 from app.sync.members import sync_contacts, sync_members
 from app.sync.summaries import sync_summaries
 
@@ -29,6 +30,8 @@ def main() -> int:
         print(f"Saved {saved} summaries.")
         saved = sync_contacts(client)
         print(f"Fetched contact details for {saved} members.")
+        saved = sync_followed_graphs(client)
+        print(f"Fetched cosponsors, committees and related bills for {saved} followed bills.")
     return 0
 
 

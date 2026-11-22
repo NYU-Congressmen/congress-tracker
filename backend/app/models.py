@@ -169,3 +169,53 @@ class Review(ReviewIn):
     bill_id: str
     created_at: datetime
     updated_at: datetime
+
+
+class Cosponsor(BaseModel):
+    """Describe a member who cosponsored a bill, including one who later withdrew."""
+
+    bioguide_id: str
+    name: str
+    party: str | None
+    state: str | None
+    district: int | None
+    sponsorship_date: date | None
+    is_original: bool
+    withdrawn_date: date | None
+
+
+class BillCommittee(BaseModel):
+    """Describe a committee or subcommittee holding a bill and its latest step on it."""
+
+    system_code: str
+    name: str
+    chamber: str | None
+    type: str | None
+    parent_code: str | None
+    latest_activity: str | None
+    latest_activity_date: datetime | None
+
+
+class RelatedBill(BaseModel):
+    """Describe a bill Congress.gov links to another, and whether Pull has it stored."""
+
+    bill_id: str
+    congress: int
+    type: str
+    number: int
+    title: str | None
+    relationship: str
+    identified_by: str | None
+    latest_action_date: date | None
+    latest_action_text: str | None
+    stored: bool
+
+
+class BillGraph(BaseModel):
+    """Describe who decides a bill and which bills link to it, with the cache's freshness."""
+
+    bill_id: str
+    cosponsors: list[Cosponsor]
+    committees: list[BillCommittee]
+    related_bills: list[RelatedBill]
+    cache: CacheInfo
