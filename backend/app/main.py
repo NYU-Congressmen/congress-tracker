@@ -10,6 +10,7 @@ from app.routes import (
     members,
     responses,
     reviews,
+    votes,
 )
 
 app = FastAPI(title="Pull API", version="0.1.0")
@@ -24,3 +25,4 @@ app.include_router(reviews.router, prefix="/api")
 app.include_router(account.router, prefix="/api")
 app.include_router(graph.router, prefix="/api")
 app.include_router(responses.router, prefix="/api")
+app.include_router(votes.router, prefix="/api")

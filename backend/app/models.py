@@ -289,3 +289,32 @@ class ReportIn(BaseModel):
     def clean_details(cls, value: str | None) -> str | None:
         """Return the details as written, or None when blank, and refuse a null character."""
         return ReviewIn.clean_text(value)
+
+
+class VotePosition(BaseModel):
+    """Describe how one House member voted, exactly as the Clerk recorded it."""
+
+    bioguide_id: str
+    name: str | None
+    party: str | None
+    state: str | None
+    district: int | None
+    position: str
+
+
+class HouseVote(BaseModel):
+    """Describe a House roll-call vote on a bill, its totals and members' positions."""
+
+    congress: int
+    session: int
+    roll_number: int
+    vote_date: datetime | None
+    question: str | None
+    result: str | None
+    vote_type: str | None
+    source_url: str | None
+    # False until the sync fetches the positions; totals and positions are empty until then
+    positions_complete: bool
+    # Every member's position counted by how it was recorded, such as {"Yea": 220, "Nay": 210}
+    totals: dict[str, int]
+    positions: list[VotePosition]

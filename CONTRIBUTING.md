@@ -104,6 +104,10 @@ Bill stages are `introduced`, `committee`, `passed_one_chamber`, `passed_both_ch
 
 Anyone can `POST /api/reviews/{review_id}/reports` with a `reason` (`spam`, `harassment`, `misinformation`, `personal_info` or `other`) and optional `details`, signed in or not. A signed-in person's report counts once per review, and reports from three different signed-in people withhold the review from the shared list until the team clears them in `review_reports`. Visitors' reports are recorded but never withhold a review on their own, because one visitor could send any number of them. Authors cannot report their own review.
 
+### House votes
+
+`GET /api/bills/{congress}/{type}/{number}/house-votes` lists a bill's House roll-call votes, oldest first. Each has its question, result, `totals` counting every member's position exactly as the Clerk recorded it (`Yea`, `Nay`, `Aye`, `No`, `Present` or `Not Voting`), and `positions` naming each member with their district when Pull has them stored. `?bioguide_id=` narrows `positions` to one member, so a page can put a representative's vote beside what Pull users said, while `totals` still counts everyone. The sync reads a followed bill's actions again only after the bill changes and fetches each vote's positions once, since a recorded vote never changes. Until then `positions_complete` is false. Congress.gov's House vote data covers the 118th and 119th Congresses.
+
 ## Merge strategy
 
 Squash merging turns a pull request into one new commit on `develop`, which leaves your dev branch holding the original commits that `develop` does not recognise. Because the dev branches last the whole project, the next merge of `develop` into your branch would conflict with your own earlier work. A merge commit keeps the shared history, so the merge from `develop` that `git get-latest` makes stays clean.
