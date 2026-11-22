@@ -370,6 +370,29 @@ a.chip:hover {
   color: var(--ink-3);
 }
 
+:is(.filters, .diff-compare) .field:has(> select.field__control) {
+  position: relative;
+}
+
+:is(.filters, .diff-compare) select.field__control {
+  appearance: none;
+  height: 44px;
+  padding-inline-end: 32px;
+}
+
+:is(.filters, .diff-compare) .field:has(> select.field__control)::after {
+  content: '';
+  position: absolute;
+  inset-inline-end: 14px;
+  bottom: 20px;
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid var(--ink-2);
+  border-bottom: 2px solid var(--ink-2);
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+
 .filters__keyword {
   flex: 1 1 260px;
 }

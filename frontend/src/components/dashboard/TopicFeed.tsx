@@ -45,7 +45,7 @@ export function TopicFeed({ topicIds }: TopicFeedProps) {
       {topicIds.length === 0 ? (
         <EmptyState
           title="No topics chosen yet"
-          hint="Add the topics you care about in onboarding and Pull lists the newest bills working on them."
+          hint="Choose topics to see related bills."
         />
       ) : issuesLoading || feed.loading ? (
         <LoadingState message="Loading the bills on your topics…" />

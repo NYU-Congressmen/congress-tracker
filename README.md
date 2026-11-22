@@ -1,6 +1,6 @@
 # Pull
 
-Pull is a web app for understanding and following U.S. legislation. We treat bills like pull requests, with legislative timelines, side-by-side text comparisons and space to record a stance. Readers can search 119th Congress bills, explore the topic feed and find their representatives. [Open Pull](https://congress-pull.web.app/)
+Pull is a web app for understanding and following U.S. legislation. We treat bills like pull requests, with legislative timelines, side-by-side text comparisons and space to record a stance. Readers can search 119th Congress bills by title or bill number, explore the topic feed and find their representatives. [Open Pull](https://congress-pull.web.app/)
 
 ## Development
 
@@ -8,7 +8,7 @@ Pull is a web app for understanding and following U.S. legislation. We treat bil
 
 ## Status
 
-Onboarding saves a profile, a manually selected congressional district and chosen topics in the browser. The dashboard uses those topics to show matching bills, and the My representatives view uses the selected district. Bill pages show legislative actions and offer text comparisons when multiple versions are available. Compare versions shows a saved summary above the diff. Signed-in readers can generate a missing summary when a model is configured. Member profiles show sponsored bills and display office contact details when the data is available.
+Onboarding saves a profile, a manually selected congressional district and chosen topics in the browser. The dashboard uses those topics to show matching bills, and the My representatives view uses the selected district. Bill pages show legislative actions and offer text comparisons when multiple versions are available. Compare versions shows a saved summary above passages labeled Added and Removed. Readers can show the surrounding text for context. Signed-in readers can generate a missing summary when a model is configured. Member profiles show sponsored bills and display office contact details when the data is available.
 
 The Social page saves stance drafts in the browser. Firebase phone sign-in creates an account that can save one review per bill. The Explanation panel shows saved explanations with Summary, Limits, Status and Next steps, or the official summary by itself when available. The public deployment serves stored legislative data from Supabase.
 

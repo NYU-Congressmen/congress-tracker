@@ -194,11 +194,10 @@ export default function MembersPage() {
     <div className="members-page">
       <PageBand labelledBy="members-title">
         <h1 id="members-title" className="page-title">
-          Who's in Congress
+          Members of Congress
         </h1>
         <p className="page-lede">
-          Every current member of the {CONGRESS_NUMBER}th Congress. Find yours, see what they've sponsored, and how to
-          reach their office.
+          Find your representatives in the {CONGRESS_NUMBER}th Congress, browse their sponsored bills, and get in touch with their offices.
         </p>
         <div className="page-views" role="group" aria-label="Choose a view">
           <button

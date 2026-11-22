@@ -392,6 +392,10 @@
   margin-bottom: 18px;
 }
 
+.diff-compare .field {
+  flex: 0 1 12rem;
+}
+
 .diff-summary {
   margin-bottom: 16px;
   padding: 14px;
@@ -401,55 +405,105 @@
 }
 
 .diff-summary p {
-  max-width: 70ch;
   color: var(--ink-2);
+  margin-top: 6px;
+  overflow-wrap: anywhere;
 }
 
 .diff-viewer {
-  max-height: 32rem;
-  overflow: auto;
+  border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--bg);
-  box-shadow: inset 0 0 0 1px var(--line);
 }
 
 .diff-viewer__head {
-  padding: 10px 14px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0 16px;
+  padding: 8px 14px;
   border-bottom: 1px solid var(--line);
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 800;
   color: var(--ink-2);
 }
 
-.diff-viewer pre {
+.diff-viewer__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.diff-viewer__toggle input {
   margin: 0;
-  padding: 10px 14px;
-  font: 13px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  overflow-x: auto;
+  accent-color: var(--focus);
 }
 
-.diff-line {
-  display: block;
-  white-space: pre-wrap;
+.diff-viewer__body {
+  display: grid;
+  gap: 10px;
+  max-height: 32rem;
+  overflow: auto;
+  padding: 12px 14px;
 }
 
-.diff-line__file {
-  color: var(--ink-3);
+.diff-viewer__empty {
+  padding: 12px 14px;
+  color: var(--ink-2);
 }
 
-.diff-line__hunk {
+.diff-passage {
+  min-width: 0;
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}
+
+.diff-passage__text {
+  font-size: 15px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.diff-passage__text + .diff-passage__text {
+  margin-top: 0.75em;
+}
+
+.diff-passage__label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.diff-passage__mark {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid currentColor;
+  border-radius: 8px;
+  box-shadow: 1px 1px currentColor;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.diff-passage--added {
   color: var(--stage-ink);
   background: var(--note-bg);
 }
 
-.diff-line__add {
-  color: var(--ok-ink);
-  background: var(--ok-bg);
-}
-
-.diff-line__del {
+.diff-passage--removed {
   color: var(--error-ink);
   background: var(--error-bg);
+}
+
+.diff-passage--context {
+  color: var(--ink-2);
 }
 
 /* the reader's stance on a bill */

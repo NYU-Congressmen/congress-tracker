@@ -54,7 +54,7 @@ function AccountReview({ congress, type, number, user }: ReviewPanelProps & { us
         <div className="review">
           <span className={`review__stance review__stance--${data.stance}`}>{STANCE_LABELS[data.stance]}</span>
           {data.story ? <p className="review__story">{data.story}</p> : null}
-          {data.action_taken ? <p className="review__action">What they did: {data.action_taken}</p> : null}
+          {data.action_taken ? <p className="review__action"><strong>Action taken</strong>{' '}{data.action_taken}</p> : null}
           <p className="muted review__meta">Saved {timeAgo(data.updated_at) || 'recently'}</p>
         </div>
       ) : null}

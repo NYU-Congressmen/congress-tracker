@@ -27,10 +27,10 @@ def search_bills(
     page: Annotated[int, Field(ge=1, le=1000)] = 1,
     limit: Annotated[int, Field(ge=1, le=25)] = 10,
 ) -> BillPage:
-    """Search stored bill titles by keyword and optional status, newest action first."""
+    """Search stored bills by title or number and optional status, newest action first."""
     query = query.strip()
     if not query:
-        raise ToolError("Enter a bill title keyword.")
+        raise ToolError("Enter a bill title or number.")
     results = search_public_bills(q=query, status=status, page=page, limit=limit)
     return BillPage.model_validate(results)
 
