@@ -169,6 +169,8 @@ class Review(ReviewIn):
     bill_id: str
     created_at: datetime
     updated_at: datetime
+    # A hidden review stays the author's own, out of shared lists and response counts
+    hidden: bool = False
 
 
 class Cosponsor(BaseModel):
@@ -239,3 +241,51 @@ class BillResponses(BaseModel):
     district: int | None
     total: int
     counts: StanceCounts
+
+
+class ReviewVisibility(BaseModel):
+    """Describe whether the author wants their review hidden."""
+
+    hidden: bool
+
+
+class PublicReview(BaseModel):
+    """Describe a review its author agreed to share, with the state and district they saved."""
+
+    review_id: int
+    bill_id: str
+    stance: Stance
+    story: str | None
+    action_taken: str | None
+    state: str | None
+    district: int | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class ReviewPage(BaseModel):
+    """Describe a page of shared reviews of a bill and how many there are."""
+
+    total: int
+    page: int
+    limit: int
+    data: list[PublicReview]
+
+
+ReportReason = Literal["spam", "harassment", "misinformation", "personal_info", "other"]
+
+# Room to explain a report without letting it become a second review
+MAX_REPORT_DETAILS = 1_000
+
+
+class ReportIn(BaseModel):
+    """Describe why someone reports a shared review."""
+
+    reason: ReportReason
+    details: str | None = Field(default=None, max_length=MAX_REPORT_DETAILS)
+
+    @field_validator("details")
+    @classmethod
+    def clean_details(cls, value: str | None) -> str | None:
+        """Return the details as written, or None when blank, and refuse a null character."""
+        return ReviewIn.clean_text(value)

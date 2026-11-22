@@ -62,3 +62,14 @@ def current_phone_identity(
 def current_uid(identity: Annotated[PhoneIdentity, Depends(current_phone_identity)]) -> str:
     """Return the verified Firebase UID for routes scoped to a single account."""
     return identity.uid
+
+
+def optional_uid(authorization: Annotated[str | None, Header()] = None) -> str | None:
+    """Return the verified UID when a token is sent, or None for a visitor who sent none.
+
+    A token that fails verification is still refused, so a broken session is never quietly
+    treated as a visitor.
+    """
+    if authorization is None:
+        return None
+    return current_phone_identity(authorization).uid

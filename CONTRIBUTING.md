@@ -98,6 +98,12 @@ Bill stages are `introduced`, `committee`, `passed_one_chamber`, `passed_both_ch
 
 `GET /api/bills/{congress}/{type}/{number}/responses` counts stances on a bill as `counts.support`, `counts.oppose` and `counts.unsure`, with their `total` and a `label` for the page to show. Every account is phone-verified, so these are people who chose to respond, not a sample of the public. `?state=NY` limits the counts to users whose saved district is in that state, and `&district=12` to one district. An at-large seat has no district number, so its constituents are counted with the state alone. Reviews their authors hid are left out.
 
+### Shared reviews and reports
+
+`GET /api/bills/{congress}/{type}/{number}/reviews` pages through the reviews whose authors set `consent_to_share`, most recently edited first. Each carries a `review_id` and the state and district its author saved, never a name or phone number. `PUT .../review/visibility` with `{"hidden": true}` lets the author hide their own review from that list and from response counts, and `{"hidden": false}` shows it again. Editing a hidden review keeps it hidden, and `GET .../review` reports `hidden`.
+
+Anyone can `POST /api/reviews/{review_id}/reports` with a `reason` (`spam`, `harassment`, `misinformation`, `personal_info` or `other`) and optional `details`, signed in or not. A signed-in person's report counts once per review, and reports from three different signed-in people withhold the review from the shared list until the team clears them in `review_reports`. Visitors' reports are recorded but never withhold a review on their own, because one visitor could send any number of them. Authors cannot report their own review.
+
 ## Merge strategy
 
 Squash merging turns a pull request into one new commit on `develop`, which leaves your dev branch holding the original commits that `develop` does not recognise. Because the dev branches last the whole project, the next merge of `develop` into your branch would conflict with your own earlier work. A merge commit keeps the shared history, so the merge from `develop` that `git get-latest` makes stays clean.
