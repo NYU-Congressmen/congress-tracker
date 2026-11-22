@@ -1,10 +1,13 @@
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
+
 import httpx
 import psycopg
 import pytest
 from fastapi.testclient import TestClient
 from openai import OpenAIError
 
-from app.ai.diff_summary import DiffSummary, main, summarize_diff
+from app.ai.diff_summary import DiffSummary, main, reserve_summary_call, summarize_diff
 from app.auth import current_uid
 from app.config import settings
 from app.main import app
@@ -234,6 +237,32 @@ def test_readers_cause_new_summaries_only_within_daily_limits(db, monkeypatch):
     with psycopg.connect(TEST_DATABASE_URL) as conn:
         readers = conn.execute("SELECT uid FROM ai_calls ORDER BY call_id").fetchall()
     assert readers == [("reader-a",), ("reader-b",)]
+
+
+def test_pending_summary_reservations_enforce_both_limits(db, monkeypatch):
+    bill_id = "119-hr-1"
+    with psycopg.connect(TEST_DATABASE_URL) as conn:
+        conn.execute(
+            "INSERT INTO bills (bill_id, congress, type, number, title) "
+            "VALUES (%s, 119, 'hr', 1, 'Example Act')",
+            (bill_id,),
+        )
+
+    monkeypatch.setattr("app.ai.diff_summary.READER_DAILY_LIMIT", 1)
+    monkeypatch.setattr("app.ai.diff_summary.TOTAL_DAILY_LIMIT", 2)
+    readers = ["reader-a", "reader-a", "reader-a", "reader-b", "reader-b", "reader-c"]
+    start = Barrier(len(readers))
+
+    def reserve(reader):
+        start.wait(timeout=5)
+        return reader, reserve_summary_call(reader, bill_id, "test-model")
+
+    with ThreadPoolExecutor(max_workers=len(readers)) as pool:
+        admitted = [reader for reader, reservation in pool.map(reserve, readers) if reservation]
+    assert len(admitted) == len(set(admitted)) == 2
+    with psycopg.connect(TEST_DATABASE_URL) as conn:
+        pending = conn.execute("SELECT count(*) FROM ai_calls WHERE error = 'Pending'").fetchone()
+    assert pending == (2,)
 
 
 def test_a_new_link_clears_the_cached_text(db):

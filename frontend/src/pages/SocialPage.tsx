@@ -55,6 +55,7 @@ function SocialContent({ linkedBill }: { linkedBill: string | null }) {
   const [story, setStory] = useState('')
   const [actionTaken, setActionTaken] = useState('')
   const [consentToShare, setConsentToShare] = useState(false)
+  const [sharePublicly, setSharePublicly] = useState(false)
   const [loadingReview, setLoadingReview] = useState(false)
   const [reviewError, setReviewError] = useState(false)
   const reviewLoad = useRef(0)
@@ -90,6 +91,7 @@ function SocialContent({ linkedBill }: { linkedBill: string | null }) {
       setStory(review.story ?? '')
       setActionTaken(review.action_taken ?? '')
       setConsentToShare(review.consent_to_share)
+      setSharePublicly(review.share_publicly ?? false)
     } catch (error) {
       if (load === reviewLoad.current && !(error instanceof ApiError && error.status === 404)) {
         setReviewError(true)
@@ -100,15 +102,19 @@ function SocialContent({ linkedBill }: { linkedBill: string | null }) {
   }, [user])
 
   const pickBill = useCallback((bill: BillSummary) => {
+    // Keep text drafted before the first bill choice. A saved review can replace it.
+    if (billPicked.current) {
+      setStance('')
+      setStory('')
+      setActionTaken('')
+      setConsentToShare(false)
+      setSharePublicly(false)
+    }
     billPicked.current = true
     setSelected(bill)
     setBillResults(null)
     setBillQuery('')
     setSubmitNotice(null)
-    setStance('')
-    setStory('')
-    setActionTaken('')
-    setConsentToShare(false)
     void loadReview(bill)
   }, [loadReview])
 
@@ -164,6 +170,7 @@ function SocialContent({ linkedBill }: { linkedBill: string | null }) {
       story: story.trim() ? story : null,
       action_taken: actionTaken.trim() ? actionTaken : null,
       consent_to_share: Boolean(user && consentToShare),
+      share_publicly: Boolean(user && sharePublicly),
     }
     let saved = false
     let notice: NonNullable<typeof submitNotice> = { kind: 'draft', text: 'Draft saved in this browser.' }
@@ -421,6 +428,18 @@ function SocialContent({ linkedBill }: { linkedBill: string | null }) {
                   onChange={(event) => setConsentToShare(event.target.checked)}
                 />
                 <span>Include this review in the Constituent Signal brief for my representative’s office.</span>
+              </label>
+            ) : null}
+
+            {user && selected ? (
+              <label className="review-consent">
+                <input
+                  type="checkbox"
+                  checked={sharePublicly}
+                  disabled={loadingReview || reviewError || submitting}
+                  onChange={(event) => setSharePublicly(event.target.checked)}
+                />
+                <span>Publish my stance, story, action taken and district on Pull.</span>
               </label>
             ) : null}
 

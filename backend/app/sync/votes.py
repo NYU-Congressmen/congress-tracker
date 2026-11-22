@@ -103,8 +103,12 @@ def fetch_member_votes(
                     "party": result.get("voteParty"),
                     "state": result.get("voteState"),
                 }
-        # A short page is the last, and a page with nobody new means paging is not supported
-        if len(results) < PAGE_SIZE or len(positions) == before:
+        # A repeated page leaves the vote pending so another sync can finish it.
+        if results and offset and len(positions) == before:
+            raise httpx.RemoteProtocolError(
+                "House vote member pagination returned no new positions."
+            )
+        if len(results) < PAGE_SIZE:
             return details, list(positions.values())
         offset += len(results)
 

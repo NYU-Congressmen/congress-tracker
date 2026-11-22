@@ -165,13 +165,19 @@ def test_a_failed_vote_stays_pending_and_is_retried(fake):
     assert run_sync(fake) == 1
 
 
-def test_paging_stops_when_the_api_ignores_the_offset(fake):
+def test_a_repeated_page_leaves_the_vote_pending_until_the_next_sync(fake):
     fake.ignore_offset = True
 
-    run_sync(fake)
+    assert run_sync(fake) == 0
 
     (vote,) = TestClient(app).get(URL).json()
-    assert vote["totals"] == {"Yea": 1, "Nay": 1}
+    assert vote["positions_complete"] is False
+    assert vote["totals"] == {}
+    fake.ignore_offset = False
+    assert run_sync(fake) == 1
+    (vote,) = TestClient(app).get(URL).json()
+    assert vote["positions_complete"] is True
+    assert vote["totals"] == {"Yea": 2, "Nay": 1}
 
 
 def test_bills_nobody_follows_are_left_alone(fake):

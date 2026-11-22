@@ -26,7 +26,8 @@ WITHHOLD_AFTER_REPORTS = 3
 SHARED_REVIEW_SQL = f"""
     r.share_publicly AND r.hidden_at IS NULL
     AND (SELECT count(*) FROM review_reports rr
-         WHERE rr.review_id = r.review_id AND rr.reporter_uid IS NOT NULL)
+         WHERE rr.review_id = r.review_id
+           AND rr.reporter_uid IS NOT NULL AND rr.dismissed_at IS NULL)
         < {WITHHOLD_AFTER_REPORTS}
 """
 

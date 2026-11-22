@@ -35,6 +35,12 @@ LOG_CALL_SQL = """
             %(seconds)s, %(succeeded)s, %(error)s, %(uid)s)
 """
 
+FINISH_CALL_SQL = """
+    UPDATE ai_calls SET input_tokens = %(input_tokens)s, output_tokens = %(output_tokens)s,
+        cost_usd = %(cost)s, seconds = %(seconds)s, succeeded = %(succeeded)s, error = %(error)s
+    WHERE call_id = %(reservation_id)s
+"""
+
 
 @dataclass
 class AiAnswer[Result: BaseModel]:
@@ -75,9 +81,12 @@ def cache_key(feature: str, prompt_version: str, model: str, messages: list[dict
     return hashlib.sha256(payload.encode()).hexdigest()
 
 
-def log_call(conn, call: dict) -> None:
-    """Add one real model call to the log, with the reader who asked for it when there is one."""
-    conn.execute(LOG_CALL_SQL, {"uid": None, **call})
+def log_call(conn, call: dict, reservation_id: int | None = None) -> None:
+    """Record a model call or finalize its reserved log entry."""
+    if reservation_id is None:
+        conn.execute(LOG_CALL_SQL, {"uid": None, **call})
+    else:
+        conn.execute(FINISH_CALL_SQL, {**call, "reservation_id": reservation_id})
 
 
 def ask[Result: BaseModel](
@@ -88,12 +97,12 @@ def ask[Result: BaseModel](
     schema: type[Result],
     client: OpenAI | None = None,
     *,
-    uid: str | None = None,
+    reservation_id: int | None = None,
 ) -> AiAnswer[Result]:
     """Return a structured answer from the cache, or from the model when it is not cached.
 
     A failed call is logged and raised, and never cached, so the next request tries again.
-    `uid` records the reader whose request made the call, for per-reader limits.
+    A reserved entry already identifies the reader and counts toward their quota.
     """
     model = settings.llm_model
     if not model:
@@ -103,10 +112,12 @@ def ask[Result: BaseModel](
         row = conn.execute(
             "UPDATE ai_results SET hits = hits + 1 WHERE cache_key = %s RETURNING result", (key,)
         ).fetchone()
+        if row is not None and reservation_id is not None:
+            conn.execute("DELETE FROM ai_calls WHERE call_id = %s", (reservation_id,))
     if row is not None:
         return AiAnswer(schema.model_validate(row["result"]), cached=True, model=model)
 
-    call = {"feature": feature, "bill_id": bill_id, "model": model, "uid": uid}
+    call = {"feature": feature, "bill_id": bill_id, "model": model}
     started = monotonic()
     try:
         options = {"reasoning_effort": REASONING_EFFORT[model]} if model in REASONING_EFFORT else {}
@@ -129,6 +140,7 @@ def ask[Result: BaseModel](
                     "succeeded": False,
                     "error": type(error).__name__,
                 },
+                reservation_id,
             )
         raise
 
@@ -160,5 +172,6 @@ def ask[Result: BaseModel](
                 "succeeded": True,
                 "error": None,
             },
+            reservation_id,
         )
     return AiAnswer(value, False, model, input_tokens, output_tokens, cost)

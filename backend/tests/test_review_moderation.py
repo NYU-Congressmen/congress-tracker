@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 from app.auth import current_uid, optional_uid
 from app.main import app
 from app.models import MAX_REPORT_DETAILS
+from app.review_reports import main as manage_reports
 from tests.conftest import TEST_DATABASE_URL
 
 REVIEW = "/api/bills/119/hr/1/review"
@@ -130,7 +131,7 @@ def test_a_signed_in_person_counts_once(client):
     assert sql("SELECT reporter_uid, reason FROM review_reports") == [("r1", "spam")]
 
 
-def test_three_signed_in_reports_withhold_a_review(client):
+def test_three_signed_in_reports_withhold_a_review_until_staff_dismisses_one(client, monkeypatch):
     review_id = shared_review_id(client)
     for uid in ("r1", "r2"):
         sign_in(uid)
@@ -143,6 +144,11 @@ def test_three_signed_in_reports_withhold_a_review(client):
     assert client.get(SHARED).json()["total"] == 0
     # Withholding changes what others see, not what the author counts as their stance
     assert client.get("/api/bills/119/hr/1/responses").json()["counts"]["oppose"] == 1
+    (report_id,) = sql("SELECT report_id FROM review_reports WHERE reporter_uid = 'r1'")[0]
+    monkeypatch.setattr("sys.argv", ["review_reports", "dismiss", str(report_id)])
+    assert manage_reports() == 0
+    assert client.get(SHARED).json()["total"] == 1
+    assert sql("SELECT count(*) FROM review_reports WHERE dismissed_at IS NOT NULL") == [(1,)]
 
 
 def test_visitor_reports_alone_never_withhold_a_review(client):

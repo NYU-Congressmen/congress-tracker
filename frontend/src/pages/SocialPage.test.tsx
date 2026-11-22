@@ -84,12 +84,16 @@ describe('SocialPage', () => {
     expect(await screen.findByText('maya.bsky.social')).toBeTruthy()
   })
 
-  test('finds a bill, saves the stance, and lists the discussion', async () => {
+  test('keeps a draft written before bill selection and saves it to discussions', async () => {
     renderSocial([
       { match: '/api/bills/119/hr/7/review', body: { detail: 'Sign in to continue' }, status: 401 },
     ])
 
-    // Find the bill
+    fireEvent.click(screen.getByRole('radio', { name: 'Support' }))
+    fireEvent.change(screen.getByLabelText(/your story/i), {
+      target: { value: 'My family used this service.' },
+    })
+
     const search = screen.getByPlaceholderText(/search by keyword/i)
     fireEvent.change(search, { target: { value: 'hospital' } })
     fireEvent.click(screen.getByRole('button', { name: 'Search bills' }))
@@ -97,11 +101,7 @@ describe('SocialPage', () => {
     const billChoice = await screen.findByRole('button', { name: /To expand hospital coverage/ })
     fireEvent.click(billChoice)
 
-    // Weigh in
-    fireEvent.click(screen.getByRole('radio', { name: 'Support' }))
-    fireEvent.change(screen.getByLabelText(/your story/i), {
-      target: { value: 'My family used this service.' },
-    })
+    expect(screen.getByDisplayValue('My family used this service.')).toBeTruthy()
     fireEvent.click(await screen.findByRole('button', { name: 'Save my stance' }))
 
     // A signed-out visitor saves a browser draft.
@@ -138,6 +138,7 @@ describe('SocialPage', () => {
       story: 'My family used this service.',
       action_taken: null,
       consent_to_share: initialConsent,
+      share_publicly: true,
       created_at: '2026-11-11T12:00:00Z',
       updated_at: '2026-11-11T12:00:00Z',
     }
@@ -150,6 +151,8 @@ describe('SocialPage', () => {
     expect(await screen.findByDisplayValue('My family used this service.')).toBeTruthy()
     const consent = screen.getByRole('checkbox', { name: /Constituent Signal brief/i })
     expect((consent as HTMLInputElement).checked).toBe(initialConsent)
+    const publication = screen.getByRole<HTMLInputElement>('checkbox', { name: /Publish my stance/i })
+    expect(publication.checked).toBe(true)
     fireEvent.click(consent)
     fireEvent.click(await screen.findByRole('button', { name: 'Save my stance' }))
 
@@ -158,7 +161,13 @@ describe('SocialPage', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/bills/119/hr/7/review', expect.objectContaining({
       headers: expect.objectContaining({ Authorization: 'Bearer test-id-token' }),
       method: 'PUT',
-      body: JSON.stringify({ stance: 'support', story: review.story, action_taken: null, consent_to_share: !initialConsent }),
+      body: JSON.stringify({
+        stance: 'support',
+        story: review.story,
+        action_taken: null,
+        consent_to_share: !initialConsent,
+        share_publicly: true,
+      }),
     }))
     await waitFor(() => {
       expect(screen.getByText('Saved')).toBeTruthy()
