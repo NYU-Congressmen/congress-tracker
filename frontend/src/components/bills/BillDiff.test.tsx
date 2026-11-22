@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { User } from '@firebase/auth'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { SessionContext } from '../../auth/SessionContext'
@@ -100,14 +100,60 @@ describe('BillDiff', () => {
     expect(screen.getByText('AI-generated')).toBeTruthy()
   })
 
-  test('requests generation with a Firebase token for a signed-in reader', async () => {
-    const user = { getIdToken: async () => 'test-token' } as User
-    const { fetchMock } = renderDiff(VERSIONS, DIFF, 200, user)
-    fireEvent.click(await screen.findByRole('button', { name: 'Compare versions' }))
-    await screen.findByLabelText('Changes between the two versions')
-    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/diff'), {
-      method: 'POST', headers: { Authorization: 'Bearer test-token' },
+  test('shows the diff at once and then asks for a summary for a signed-in reader', async () => {
+    const summary = 'The second version extends the filing deadline by 30 days.'
+    let finishSummary: (response: Response) => void = () => {}
+    const json = (body: unknown) => new Response(JSON.stringify(body), { headers: { 'Content-Type': 'application/json' } })
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url.includes('/texts')) return Promise.resolve(json(VERSIONS))
+      if (init?.method === 'POST') return new Promise<Response>((resolve) => { finishSummary = resolve })
+      return Promise.resolve(json(DIFF))
     })
+    vi.stubGlobal('fetch', fetchMock)
+    const user = { getIdToken: async () => 'test-token' } as User
+    render(
+      <SessionContext.Provider value={{ user, loading: false, error: null, retry: () => {} }}>
+        <BillDiff congress={119} type="hr" number={1} />
+      </SessionContext.Provider>,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Compare versions' }))
+
+    // The comparison is on screen while the summary is still being written
+    expect(await screen.findByText('H.R. 1 EH Filing deadline extended.')).toBeTruthy()
+    expect(await screen.findByText('Summarizing the changes…')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Compare versions' })).toBeTruthy()
+    const diffCalls = fetchMock.mock.calls.filter(([url]) => String(url).includes('/diff'))
+    expect(diffCalls[0][1]).toBeUndefined()
+    expect(diffCalls[1][1]).toEqual({ method: 'POST', headers: { Authorization: 'Bearer test-token' } })
+
+    finishSummary(json({ ...DIFF, summary }))
+    expect(await screen.findByText(summary)).toBeTruthy()
+    expect(screen.queryByText('Summarizing the changes…')).toBeNull()
+  })
+
+  test('keeps the diff when the summary request fails', async () => {
+    const user = { getIdToken: async () => 'test-token' } as User
+    const fetchMock = mockApi([{ match: '/texts', body: VERSIONS }])
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      const [body, status] = url.includes('/texts') ? [VERSIONS, 200]
+        : init?.method === 'POST' ? [{ detail: 'Sign-in is unavailable' }, 503] : [DIFF, 200]
+      return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+    })
+    render(
+      <SessionContext.Provider value={{ user, loading: false, error: null, retry: () => {} }}>
+        <BillDiff congress={119} type="hr" number={1} />
+      </SessionContext.Provider>,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Compare versions' }))
+
+    expect(await screen.findByText('H.R. 1 EH Filing deadline extended.')).toBeTruthy()
+    await waitFor(() => expect(screen.queryByText('Summarizing the changes…')).toBeNull())
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/diff'))).toHaveLength(2)
   })
 
   test('shows an empty state when no text has been published', async () => {
