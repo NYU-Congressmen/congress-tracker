@@ -193,9 +193,9 @@ def bill_version_diff(
     from_: str,
     to: str,
     *,
-    generate: bool,
+    uid: str | None = None,
 ) -> BillDiff:
-    """Return a comparison and include the cached or newly generated summary when available."""
+    """Return a comparison with its saved summary, generating one for a signed-in reader."""
     bill_id = make_bill_id(congress, bill_type, number)
     ensure_text_versions(congress, bill_type, number)
     try:
@@ -208,7 +208,7 @@ def bill_version_diff(
         from_version=from_,
         to_version=to,
         changes=changes,
-        summary=summary_for_diff(bill_id, changes, generate=generate),
+        summary=summary_for_diff(bill_id, changes, uid=uid),
     )
 
 
@@ -221,20 +221,17 @@ def diff_text_versions(
     to: str,
 ) -> BillDiff:
     """Return a bill's text comparison with a saved summary when available."""
-    return bill_version_diff(congress, bill_type, number, from_, to, generate=False)
+    return bill_version_diff(congress, bill_type, number, from_, to)
 
 
-@router.post(
-    "/bills/{congress}/{bill_type}/{number}/diff",
-    response_model=BillDiff,
-    dependencies=[Depends(current_uid)],
-)
+@router.post("/bills/{congress}/{bill_type}/{number}/diff", response_model=BillDiff)
 def summarize_text_versions(
     congress: int,
     bill_type: BillType,
     number: int,
     from_: Annotated[str, Query(alias="from")],
     to: str,
+    uid: Annotated[str, Depends(current_uid)],
 ) -> BillDiff:
-    """Return a bill's text comparison and generate a missing summary when possible."""
-    return bill_version_diff(congress, bill_type, number, from_, to, generate=True)
+    """Return a bill's text comparison, generating a missing summary within daily limits."""
+    return bill_version_diff(congress, bill_type, number, from_, to, uid=uid)

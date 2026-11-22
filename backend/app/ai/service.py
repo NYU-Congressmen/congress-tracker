@@ -30,9 +30,9 @@ SAVE_RESULT_SQL = """
 
 LOG_CALL_SQL = """
     INSERT INTO ai_calls (feature, bill_id, model, input_tokens, output_tokens, cost_usd, seconds,
-                          succeeded, error)
+                          succeeded, error, uid)
     VALUES (%(feature)s, %(bill_id)s, %(model)s, %(input_tokens)s, %(output_tokens)s, %(cost)s,
-            %(seconds)s, %(succeeded)s, %(error)s)
+            %(seconds)s, %(succeeded)s, %(error)s, %(uid)s)
 """
 
 
@@ -76,8 +76,8 @@ def cache_key(feature: str, prompt_version: str, model: str, messages: list[dict
 
 
 def log_call(conn, call: dict) -> None:
-    """Add one real model call to the log."""
-    conn.execute(LOG_CALL_SQL, call)
+    """Add one real model call to the log, with the reader who asked for it when there is one."""
+    conn.execute(LOG_CALL_SQL, {"uid": None, **call})
 
 
 def ask[Result: BaseModel](
@@ -87,10 +87,13 @@ def ask[Result: BaseModel](
     messages: list[dict],
     schema: type[Result],
     client: OpenAI | None = None,
+    *,
+    uid: str | None = None,
 ) -> AiAnswer[Result]:
     """Return a structured answer from the cache, or from the model when it is not cached.
 
     A failed call is logged and raised, and never cached, so the next request tries again.
+    `uid` records the reader whose request made the call, for per-reader limits.
     """
     model = settings.llm_model
     if not model:
@@ -103,7 +106,7 @@ def ask[Result: BaseModel](
     if row is not None:
         return AiAnswer(schema.model_validate(row["result"]), cached=True, model=model)
 
-    call = {"feature": feature, "bill_id": bill_id, "model": model}
+    call = {"feature": feature, "bill_id": bill_id, "model": model, "uid": uid}
     started = monotonic()
     try:
         options = {"reasoning_effort": REASONING_EFFORT[model]} if model in REASONING_EFFORT else {}

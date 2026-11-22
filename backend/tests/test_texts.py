@@ -189,6 +189,53 @@ def test_compare_generates_a_missing_summary_and_returns_the_diff(db, monkeypatc
     assert model.calls == 1
 
 
+def test_readers_cause_new_summaries_only_within_daily_limits(db, monkeypatch):
+    bill_id = "119-hr-1"
+    versions = ["Introduced in House", "Engrossed in House", "Enrolled Bill"]
+    with psycopg.connect(TEST_DATABASE_URL) as conn:
+        conn.execute(
+            "INSERT INTO bills (bill_id, congress, type, number, title) "
+            "VALUES (%s, 119, 'hr', 1, 'Example Act')",
+            (bill_id,),
+        )
+        conn.cursor().executemany(
+            "INSERT INTO text_versions (bill_id, version_type, text) VALUES (%s, %s, %s)",
+            [
+                (bill_id, version, f"Tax rate is {rate}%.")
+                for version, rate in zip(versions, [20, 25, 30], strict=True)
+            ],
+        )
+
+    model = FakeModel(DiffSummary(summary="The rate changes."))
+    monkeypatch.setattr(settings, "llm_model", "test-model")
+    monkeypatch.setattr(settings, "llm_api_key", "test-key")
+    monkeypatch.setattr("app.ai.service.llm_client", lambda: model)
+    monkeypatch.setattr("app.ai.diff_summary.READER_DAILY_LIMIT", 1)
+    monkeypatch.setattr("app.ai.diff_summary.TOTAL_DAILY_LIMIT", 2)
+    client = TestClient(app)
+
+    def compare(reader: str, old: str, new: str) -> str | None:
+        monkeypatch.setitem(app.dependency_overrides, current_uid, lambda: reader)
+        response = client.post("/api/bills/119/hr/1/diff", params={"from": old, "to": new})
+        assert response.status_code == 200
+        assert response.json()["changes"]
+        return response.json()["summary"]
+
+    assert compare("reader-a", versions[0], versions[1]) == "The rate changes."
+    # Reader A's limit is spent, but the comparison itself still comes back
+    assert compare("reader-a", versions[1], versions[2]) is None
+    assert compare("reader-b", versions[1], versions[2]) == "The rate changes."
+    # Both reader calls today fill the shared limit
+    assert compare("reader-c", versions[0], versions[2]) is None
+    # A saved summary is still served past the limit
+    assert compare("reader-c", versions[0], versions[1]) == "The rate changes."
+    assert model.calls == 2
+
+    with psycopg.connect(TEST_DATABASE_URL) as conn:
+        readers = conn.execute("SELECT uid FROM ai_calls ORDER BY call_id").fetchall()
+    assert readers == [("reader-a",), ("reader-b",)]
+
+
 def test_a_new_link_clears_the_cached_text(db):
     with psycopg.connect(TEST_DATABASE_URL) as conn:
         conn.execute(
