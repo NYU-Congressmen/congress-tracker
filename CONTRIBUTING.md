@@ -50,7 +50,7 @@ All commands run from the repo root.
 | `git get-latest` or `npm run get-latest` | Brings your branch up to date with `develop` and pushes it, as described in the daily workflow |
 | `npm run dev` | Runs the API and frontend together and stops both when either exits |
 | `npm run dev:be` / `npm run dev:fe` | Runs only the API or only the frontend |
-| `npm run sync` | Checks the Congress.gov key and copies current members, 119th-Congress bills and their CRS summaries when a database is configured |
+| `npm run sync` | Checks the Congress.gov key and, when a database is configured, copies current members, 119th-Congress bills, their CRS summaries and changed members' office contacts, then the cosponsors, committees, related bills and House votes of every bill someone tracks or reviews. With a Bluesky account set up, it also finds posts carrying share links. The daily sync workflow runs the same command |
 | `npm test` | Runs the setup scripts, backend (pytest) and frontend (Vitest) tests |
 | `npm run lint` | Checks Python with ruff and TypeScript with oxlint |
 | `npm run format` | Reformats the Python code with ruff |

@@ -79,6 +79,14 @@ On Windows, install PostgreSQL from <https://www.postgresql.org/download/windows
 
 The migrations enable the pgvector extension, so the test database needs pgvector installed as well. The commands above include it on Linux and macOS. On Windows, follow the installation steps at <https://github.com/pgvector/pgvector#windows>. CI uses the `pgvector/pgvector:pg17` image, which has it built in.
 
+## Daily sync
+
+`.github/workflows/sync.yml` runs the same sync as `npm run sync` every day at 10:00 UTC, and anyone with write access can start it from the Actions tab. GitHub runs scheduled workflows from the default branch, `develop`. The workflow reads the repository secrets `DATABASE_URL` and `CONGRESS_API_KEY`, plus `BLUESKY_HANDLE` and `BLUESKY_APP_PASSWORD` once Pull's Bluesky account is set up. GitHub's runners use IPv4, so `DATABASE_URL` is the Supabase session pooler string, as for Cloud Run. Until both required secrets exist, each run ends with a warning and changes nothing. A repository admin adds a secret by running the command below and pasting the value when asked, which keeps it out of the shell history. [GitHub Actions secrets](https://docs.github.com/en/actions/security-for-github-actions/security-guides/using-secrets-in-github-actions)
+
+```bash
+gh secret set DATABASE_URL --repo NYU-Congressmen/congress-tracker
+```
+
 ## Deployment setup
 
 The release workflow uses the `congress-pull` Firebase and Google Cloud project, the default Hosting site and the `pull-api` Cloud Run service in `us-east1`. Cloud Run reads `DATABASE_URL` from a pinned version of the `pull-database-url` Secret Manager secret. The runtime service account needs Secret Manager Secret Accessor on that secret. The Supabase session pooler supplies the IPv4 connection string for Cloud Run. [Cloud Run secrets](https://docs.cloud.google.com/run/docs/configuring/services/secrets) [Supabase connection modes](https://supabase.com/docs/guides/database/connecting-to-postgres)
