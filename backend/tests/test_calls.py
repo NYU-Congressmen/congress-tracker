@@ -32,15 +32,19 @@ def test_call_retries_and_account_isolation(db, monkeypatch):
 
     monkeypatch.setitem(app.dependency_overrides, current_uid, lambda: "caller-1")
     assert client.put(path, json={"bioguide_id": "unknown"}).status_code == 404
-    first = client.put(path, json=office)
+    assert client.put(path, json={**office, "note": "a" * 2_001}).status_code == 422
+    first = client.put(path, json={**office, "note": "  Asked about the bill.  "})
     assert first.status_code == 200
     assert first.json()["member_name"] == "First Example"
+    assert first.json()["note"] == "Asked about the bill."
     assert client.put(path, json=office).json() == first.json()
+    assert client.put(path, json={**office, "note": "Changed on retry"}).json() == first.json()
     assert client.put(path, json={"bioguide_id": "X000002"}).status_code == 409
     assert client.get(URL).json() == [first.json()]
 
     later = client.put(f"{URL}/{uuid4()}", json=office)
     assert later.status_code == 200
+    assert later.json()["note"] is None
     assert [entry["action_id"] for entry in client.get(URL).json()] == [
         later.json()["action_id"],
         first.json()["action_id"],

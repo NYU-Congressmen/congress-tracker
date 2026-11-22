@@ -25,16 +25,16 @@ export function listTextVersions(congress: number, type: BillType, number: numbe
   return request<TextVersion[]>(`/api/bills/${congress}/${type}/${number}/texts`)
 }
 
-// Return the diff and request a summary for the reader's comparison.
+// Return a public diff and request generation when the reader supplies a Firebase token.
 export function diffTextVersions(
   congress: number,
   type: BillType,
   number: number,
   from: string,
   to: string,
+  token?: string,
 ): Promise<BillDiff> {
   const search = new URLSearchParams({ from, to })
-  return request<BillDiff>(`/api/bills/${congress}/${type}/${number}/diff?${search.toString()}`, {
-    method: 'POST',
-  })
+  const path = `/api/bills/${congress}/${type}/${number}/diff?${search.toString()}`
+  return request<BillDiff>(path, token ? { method: 'POST', headers: { Authorization: `Bearer ${token}` } } : undefined)
 }

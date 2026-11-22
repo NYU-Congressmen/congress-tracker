@@ -8,7 +8,7 @@
         "headers": [
           {
             "key": "Content-Security-Policy",
-            "value": "default-src 'self'; script-src 'self' 'sha256-8fTO+9YFOZi1KP8mHjksxDQh8yGyXomibCu4dimrrUE=' https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/; script-src-attr 'none'; style-src 'self' https://fonts.googleapis.com; style-src-attr 'none'; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://tigerweb.geo.census.gov https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.google.com/recaptcha/; img-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-src https://www.google.com/recaptcha/ https://recaptcha.google.com/recaptcha/; frame-ancestors 'none'"
+            "value": "default-src 'self'; script-src 'self' 'sha256-8fTO+9YFOZi1KP8mHjksxDQh8yGyXomibCu4dimrrUE=' https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/; script-src-attr 'none'; style-src 'self' https://fonts.googleapis.com; style-src-attr 'none'; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://tigerweb.geo.census.gov https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.google.com/recaptcha/; img-src 'self' https://www.congress.gov/img/member/ https://bioguide.congress.gov/photo/; object-src 'none'; base-uri 'none'; form-action 'self'; frame-src https://www.google.com/recaptcha/ https://recaptcha.google.com/recaptcha/; frame-ancestors 'none'"
           },
           {
             "key": "X-Frame-Options",
@@ -27,7 +27,7 @@
     ],
     "rewrites": [
       {
-        "regex": "^/(api(/.*)?|mcp)$",
+        "regex": "^/(api(/.*)?|mcp|s/[A-Za-z0-9_-]+)$",
         "run": {
           "serviceId": "pull-api",
           "region": "us-east1",

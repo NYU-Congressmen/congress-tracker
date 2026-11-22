@@ -90,23 +90,36 @@ afterEach(() => {
 })
 
 describe('BillDetailPage', () => {
-  test('records a call to the chosen office on the signed-in account', async () => {
+  test('records a call and its private note on the signed-in account', async () => {
     const caller = { uid: 'caller', getIdToken: vi.fn().mockResolvedValue('test-token') } as unknown as User
+    const note = 'Asked about the committee date.'
     const fetchMock = renderBill(caller, [
       { match: '/api/bills/119/hr/7/calls', body: [] },
       { match: '/api/members?state=NY', body: { data: [COSPONSOR], total: 1 } },
     ])
+    const fixtures = fetchMock.getMockImplementation()
+    const entry = { action_id: 1, member_name: COSPONSOR.name, created_at: '2025-03-01T12:00:00Z', note }
+    let logged = false
+    fetchMock.mockImplementation(async (url) => {
+      if (String(url).includes('/calls/')) {
+        logged = true
+        return new Response(JSON.stringify(entry))
+      }
+      return logged && String(url).endsWith('/calls') ? new Response(JSON.stringify([entry])) : fixtures!(url)
+    })
 
     const panel = await screen.findByRole('region', { name: 'Call log' })
     fireEvent.change(within(panel).getByLabelText('State or territory'), { target: { value: 'NY' } })
     await within(panel).findByRole('option', { name: /Schumer, Chuck/ })
     fireEvent.change(within(panel).getByLabelText('Office called'), { target: { value: COSPONSOR.bioguide_id } })
+    fireEvent.change(within(panel).getByLabelText('Note (optional)'), { target: { value: note } })
     fireEvent.click(within(panel).getByRole('button', { name: 'Log a call' }))
 
     expect(await within(panel).findByText('Call logged.')).toBeTruthy()
+    expect(await within(panel).findByText(note)).toBeTruthy()
     expect(fetchMock).toHaveBeenCalledWith(expect.stringMatching(/\/calls\/[0-9a-f-]{36}$/), expect.objectContaining({
       method: 'PUT',
-      body: JSON.stringify({ bioguide_id: COSPONSOR.bioguide_id }),
+      body: JSON.stringify({ bioguide_id: COSPONSOR.bioguide_id, note }),
       headers: expect.objectContaining({ Authorization: 'Bearer test-token' }),
     }))
   })

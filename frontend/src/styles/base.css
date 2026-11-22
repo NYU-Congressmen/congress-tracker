@@ -51,8 +51,9 @@ code {
 }
 
 ::selection {
-  background: var(--hl);
-  color: var(--hl-ink);
+  background: var(--stage-bg);
+  color: var(--stage-ink);
+  text-shadow: none;
 }
 
 :focus-visible {

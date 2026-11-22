@@ -1,10 +1,14 @@
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
+
 import httpx
 import psycopg
 import pytest
 from fastapi.testclient import TestClient
 from openai import OpenAIError
 
-from app.ai.diff_summary import DiffSummary, main, summarize_diff
+from app.ai.diff_summary import DiffSummary, main, reserve_summary_call, summarize_diff
+from app.auth import current_uid
 from app.config import settings
 from app.main import app
 from app.sync.texts import SAVE_VERSION_SQL, clean_version, compare_versions, load_text
@@ -173,8 +177,10 @@ def test_compare_generates_a_missing_summary_and_returns_the_diff(db, monkeypatc
     params = {"from": old, "to": new}
 
     assert client.get(path, params=params).json()["summary"] is None
+    assert client.post(path, params=params).status_code == 401
     assert model.calls == 0
 
+    monkeypatch.setitem(app.dependency_overrides, current_uid, lambda: "verified-reader")
     response = client.post(path, params=params)
     expected = summary if model_error is None else None
     assert response.status_code == 200
@@ -184,6 +190,79 @@ def test_compare_generates_a_missing_summary_and_returns_the_diff(db, monkeypatc
     if expected is not None:
         assert client.post(path, params=params).json()["summary"] == expected
     assert model.calls == 1
+
+
+def test_readers_cause_new_summaries_only_within_daily_limits(db, monkeypatch):
+    bill_id = "119-hr-1"
+    versions = ["Introduced in House", "Engrossed in House", "Enrolled Bill"]
+    with psycopg.connect(TEST_DATABASE_URL) as conn:
+        conn.execute(
+            "INSERT INTO bills (bill_id, congress, type, number, title) "
+            "VALUES (%s, 119, 'hr', 1, 'Example Act')",
+            (bill_id,),
+        )
+        conn.cursor().executemany(
+            "INSERT INTO text_versions (bill_id, version_type, text) VALUES (%s, %s, %s)",
+            [
+                (bill_id, version, f"Tax rate is {rate}%.")
+                for version, rate in zip(versions, [20, 25, 30], strict=True)
+            ],
+        )
+
+    model = FakeModel(DiffSummary(summary="The rate changes."))
+    monkeypatch.setattr(settings, "llm_model", "test-model")
+    monkeypatch.setattr(settings, "llm_api_key", "test-key")
+    monkeypatch.setattr("app.ai.service.llm_client", lambda: model)
+    monkeypatch.setattr("app.ai.diff_summary.READER_DAILY_LIMIT", 1)
+    monkeypatch.setattr("app.ai.diff_summary.TOTAL_DAILY_LIMIT", 2)
+    client = TestClient(app)
+
+    def compare(reader: str, old: str, new: str) -> str | None:
+        monkeypatch.setitem(app.dependency_overrides, current_uid, lambda: reader)
+        response = client.post("/api/bills/119/hr/1/diff", params={"from": old, "to": new})
+        assert response.status_code == 200
+        assert response.json()["changes"]
+        return response.json()["summary"]
+
+    assert compare("reader-a", versions[0], versions[1]) == "The rate changes."
+    # Reader A's limit is spent, but the comparison itself still comes back
+    assert compare("reader-a", versions[1], versions[2]) is None
+    assert compare("reader-b", versions[1], versions[2]) == "The rate changes."
+    # Both reader calls today fill the shared limit
+    assert compare("reader-c", versions[0], versions[2]) is None
+    # A saved summary is still served past the limit
+    assert compare("reader-c", versions[0], versions[1]) == "The rate changes."
+    assert model.calls == 2
+
+    with psycopg.connect(TEST_DATABASE_URL) as conn:
+        readers = conn.execute("SELECT uid FROM ai_calls ORDER BY call_id").fetchall()
+    assert readers == [("reader-a",), ("reader-b",)]
+
+
+def test_pending_summary_reservations_enforce_both_limits(db, monkeypatch):
+    bill_id = "119-hr-1"
+    with psycopg.connect(TEST_DATABASE_URL) as conn:
+        conn.execute(
+            "INSERT INTO bills (bill_id, congress, type, number, title) "
+            "VALUES (%s, 119, 'hr', 1, 'Example Act')",
+            (bill_id,),
+        )
+
+    monkeypatch.setattr("app.ai.diff_summary.READER_DAILY_LIMIT", 1)
+    monkeypatch.setattr("app.ai.diff_summary.TOTAL_DAILY_LIMIT", 2)
+    readers = ["reader-a", "reader-a", "reader-a", "reader-b", "reader-b", "reader-c"]
+    start = Barrier(len(readers))
+
+    def reserve(reader):
+        start.wait(timeout=5)
+        return reader, reserve_summary_call(reader, bill_id, "test-model")
+
+    with ThreadPoolExecutor(max_workers=len(readers)) as pool:
+        admitted = [reader for reader, reservation in pool.map(reserve, readers) if reservation]
+    assert len(admitted) == len(set(admitted)) == 2
+    with psycopg.connect(TEST_DATABASE_URL) as conn:
+        pending = conn.execute("SELECT count(*) FROM ai_calls WHERE error = 'Pending'").fetchone()
+    assert pending == (2,)
 
 
 def test_a_new_link_clears_the_cached_text(db):

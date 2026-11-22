@@ -1,6 +1,6 @@
 # Pull
 
-Pull is a web app for understanding and following U.S. legislation. We treat bills like pull requests, with legislative timelines, side-by-side text comparisons and space to record a stance. Readers can search 119th Congress bills, explore the topic feed and find their representatives. [Open Pull](https://congress-pull.web.app/)
+Pull is a web app for understanding and following U.S. legislation. We treat bills like pull requests, with legislative timelines, side-by-side text comparisons and space to record a stance. Readers can search 119th Congress bills by title or bill number, explore the topic feed and find their representatives. [Open Pull](https://congress-pull.web.app/)
 
 ## Development
 
@@ -8,9 +8,9 @@ Pull is a web app for understanding and following U.S. legislation. We treat bil
 
 ## Status
 
-Onboarding saves a profile, a manually selected congressional district and chosen topics in the browser. The dashboard uses those topics to show matching bills, and the My representatives view uses the selected district. Bill pages show legislative actions and offer text comparisons when multiple versions are available. Compare versions shows a saved summary above the diff or generates one when a model is configured. Member profiles show sponsored bills and display office contact details when the data is available.
+Onboarding uses Census address matching for the 119th Congress and also offers district selection by map or number. Firebase phone verification completes account setup, and Pull saves the address match as a state and district. Choosing a district on the map or by number later clears that saved match, so the account never keeps a district the profile no longer shows. The dashboard uses the topics saved in the browser, and My representatives uses the selected district. Signed-in readers can edit their profile name, district, topics or social handles in any order. Bill pages show legislative actions and offer text comparisons when multiple versions are available. Compare versions shows a saved summary above passages labeled Added and Removed. Readers can show the surrounding text for context. Signed-in readers can generate a missing summary when a model is configured. Member profiles show sponsored bills and display office contact details when the data is available.
 
-The Social page saves stance drafts in the browser. A signed-in account can save one review per bill, choose whether to contribute that review to the Constituent Signal brief and log calls to congressional offices on the bill page. The Explanation panel shows saved explanations with Summary, Limits, Status and Next steps, or the official summary by itself when available. The public deployment serves stored legislative data from Supabase.
+The Social page saves stance drafts in the browser. Signed-in readers can save one review per bill and make separate choices about publishing it on Pull and including it in the Constituent Signal brief. The bill page opens the review form on Social, and the save confirmation links back to the bill. The bill page also has a private call log with optional notes. The Explanation panel shows saved explanations with Summary, Limits, Status and Next steps, or the official summary by itself when available. The public deployment serves stored legislative data from Supabase.
 
 MCP clients can search stored bills, list current members and read saved bill explanations through the read-only `/mcp` endpoint. [MCP setup](SETUP.md#mcp-clients)
 
@@ -41,7 +41,7 @@ The initial roadmap follows the bootcamp's weekly structure. It brings integrati
 
 ## Data flow
 
-A Python sync job copies member and bill records and Congressional Research Service summaries into Postgres. Search reads those records, and the topic feed ranks bills by similarity using saved embeddings, with keyword matching available as a fallback. With a Congress.gov key configured, the API fetches a bill's sponsor, full action history and list of text versions on its first view and refreshes them when the list sync records a newer upstream version. A member's current-Congress sponsored bills are fetched on profile view and kept for a day. The member sync also fetches office contact details for new or changed members. [Congress.gov API](https://github.com/LibraryOfCongress/api.congress.gov)
+A Python sync job copies member and bill records and Congressional Research Service summaries into Postgres. Search reads stored data, and the topic feed ranks bills by similarity using saved embeddings, with keyword matching available as a fallback. With a Congress.gov key configured, the API fetches a bill's sponsor, full action history and list of text versions on its first view and refreshes them when the list sync records a newer upstream version. A member's current-Congress sponsored bills are fetched on profile view and kept for a day. The member sync also fetches office contact details for new or changed members. [Congress.gov API](https://github.com/LibraryOfCongress/api.congress.gov)
 
 Cold and stale detail requests can call Congress.gov. Their upstream work shares a five-second budget across all pages and any missing-sponsor request. A failed refresh leaves cached data intact and postpones retries for that cached resource for one minute, and a bill Congress.gov reports as missing is remembered for ten minutes so repeated requests for it spend no quota. Responses distinguish missing details from complete cached results and report staleness, the last fetch time and a failed refresh. Pagination and missing sponsors mean a new bill view can need more than two upstream requests, so caching reduces quota pressure without eliminating it.
 

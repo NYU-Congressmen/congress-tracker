@@ -1,16 +1,20 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import type { FormEvent } from 'react'
 import { PLATFORMS, platformName } from '../../profile/platforms'
 import type { SocialProfile } from '../../profile/types'
 import { SelectField, TextField } from '../ui/Fields'
+import { StepActions } from './StepActions'
 
 interface SocialStepProps {
   initial: SocialProfile[]
+  nextLabel: string
+  onBack?: () => void
   onDone: (socials: SocialProfile[]) => void
 }
 
 // Save optional social handles with the local profile.
-export function SocialStep({ initial, onDone }: SocialStepProps) {
+export function SocialStep({ initial, nextLabel, onBack, onDone }: SocialStepProps) {
+  const formId = useId()
   const [socials, setSocials] = useState<SocialProfile[]>(initial)
   const [platform, setPlatform] = useState(PLATFORMS[0].id)
   const [handle, setHandle] = useState('')
@@ -38,12 +42,13 @@ export function SocialStep({ initial, onDone }: SocialStepProps) {
   }
 
   return (
-    <div className="onboard-step">
-      <p className="muted">
-        Save the handles you use on social platforms. You can edit them on the Social page.
-      </p>
+    <div className="onboard-step onboard-step--spaced">
+      <div className="onboard-step__intro">
+        <h2>Social profiles</h2>
+        <p className="muted">Add a handle now or later on the Social page.</p>
+      </div>
 
-      <form className="onboard-social__form" onSubmit={add}>
+      <form id={formId} className="onboard-social__form" onSubmit={add}>
         <SelectField
           id="social-platform"
           label="Platform"
@@ -58,9 +63,7 @@ export function SocialStep({ initial, onDone }: SocialStepProps) {
           onChange={setHandle}
           placeholder={PLATFORMS.find((option) => option.id === platform)?.handleHint ?? 'Your handle'}
         />
-        <button type="submit" className="btn btn--secondary">
-          Add handle
-        </button>
+        {onBack ? <button type="submit" className="btn btn--secondary">Add handle</button> : null}
       </form>
 
       {socials.length > 0 ? (
@@ -75,9 +78,7 @@ export function SocialStep({ initial, onDone }: SocialStepProps) {
             </li>
           ))}
         </ul>
-      ) : (
-        <p className="muted onboard-social__empty">No social handles saved.</p>
-      )}
+      ) : null}
 
       {error ? (
         <p className="form-error" role="alert">
@@ -85,11 +86,12 @@ export function SocialStep({ initial, onDone }: SocialStepProps) {
         </p>
       ) : null}
 
-      <div className="onboard-step__actions">
-        <button type="button" className="btn btn--primary btn--lg" onClick={() => onDone(socials)}>
-          {socials.length > 0 ? 'Finish setup' : 'Skip for now and finish'}
+      <StepActions onBack={onBack}>
+        {onBack ? null : <button type="submit" form={formId} className="btn btn--secondary">Add handle</button>}
+        <button type="button" className="btn btn--primary" onClick={() => onDone(socials)}>
+          {nextLabel}
         </button>
-      </div>
+      </StepActions>
     </div>
   )
 }

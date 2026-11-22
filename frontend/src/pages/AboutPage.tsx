@@ -60,15 +60,14 @@ export default function AboutPage() {
           About Pull
         </h1>
         <p className="page-lede">
-          A web app for following U.S. legislation: search bills, follow members of Congress, and see how
-          legislation moves through the {CONGRESS_NUMBER}th Congress.
+          Pull follows bills in the {CONGRESS_NUMBER}th Congress from introduction through their latest recorded action.
         </p>
       </PageBand>
 
       <div className="container page-body about__grid">
         <div className="about__prose">
           <section className="panel">
-            <h2>How the data works</h2>
+            <h2>Legislative data</h2>
             <p>
               A Python sync job copies every current member of Congress and a summary of every bill in the{' '}
               {CONGRESS_NUMBER}th Congress from the <a href="https://www.congress.gov" target="_blank" rel="noreferrer">Congress.gov API</a> into a

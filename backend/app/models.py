@@ -1,7 +1,7 @@
 from datetime import date, datetime
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, StringConstraints, field_validator
 
 BillType = Literal["hr", "s", "hjres", "sjres", "hconres", "sconres", "hres", "sres"]
 Status = Literal[
@@ -13,6 +13,20 @@ Status = Literal[
     "became_law",
 ]
 Stance = Literal["support", "oppose", "unsure"]
+
+
+class DistrictAddress(BaseModel):
+    """Describe a street address submitted for district lookup."""
+
+    address: Annotated[str, StringConstraints(strip_whitespace=True, min_length=5, max_length=300)]
+
+
+class AccountDistrict(BaseModel):
+    """Describe a Census district by state and district number."""
+
+    state: str
+    district: int | None
+
 
 # Far beyond any real post, while keeping huge pastes out of the database and the AI brief
 MAX_REVIEW_TEXT = 20_000
@@ -152,7 +166,10 @@ class ReviewIn(BaseModel):
     stance: Stance
     story: str | None = Field(default=None, max_length=MAX_REVIEW_TEXT)
     action_taken: str | None = Field(default=None, max_length=MAX_REVIEW_TEXT)
+    # Include the review in the Constituent Signal brief for the author's office
     consent_to_share: bool = False
+    # List the review on the bill page with the author's state and district
+    share_publicly: bool = False
 
     @field_validator("story", "action_taken")
     @classmethod
@@ -171,12 +188,197 @@ class Review(ReviewIn):
     moderation_status: Literal["pending", "flagged", "held", "cleared"]
     created_at: datetime
     updated_at: datetime
+    # A hidden review stays the author's own, out of shared lists and response counts
+    hidden: bool = False
+
+
+class Cosponsor(BaseModel):
+    """Describe a member who cosponsored a bill, including one who later withdrew."""
+
+    bioguide_id: str
+    name: str
+    party: str | None
+    state: str | None
+    district: int | None
+    sponsorship_date: date | None
+    is_original: bool
+    withdrawn_date: date | None
+
+
+class BillCommittee(BaseModel):
+    """Describe a committee or subcommittee holding a bill and its latest step on it."""
+
+    system_code: str
+    name: str
+    chamber: str | None
+    type: str | None
+    parent_code: str | None
+    latest_activity: str | None
+    latest_activity_date: datetime | None
+
+
+class RelatedBill(BaseModel):
+    """Describe a bill Congress.gov links to another, and whether Pull has it stored."""
+
+    bill_id: str
+    congress: int
+    type: str
+    number: int
+    title: str | None
+    relationship: str
+    identified_by: str | None
+    latest_action_date: date | None
+    latest_action_text: str | None
+    stored: bool
+
+
+class BillGraph(BaseModel):
+    """Describe who decides a bill and which bills link to it, with the cache's freshness."""
+
+    bill_id: str
+    cosponsors: list[Cosponsor]
+    committees: list[BillCommittee]
+    related_bills: list[RelatedBill]
+    cache: CacheInfo
+
+
+class StanceCounts(BaseModel):
+    """Count responses for each stance."""
+
+    support: int
+    oppose: int
+    unsure: int
+
+
+class BillResponses(BaseModel):
+    """Count verified Pull users' stances on a bill, for everyone or for one state or district."""
+
+    bill_id: str
+    # The words the page shows, so readers know these are respondents rather than a poll
+    label: str
+    state: str | None
+    district: int | None
+    total: int
+    counts: StanceCounts
+
+
+class ReviewVisibility(BaseModel):
+    """Describe whether the author wants their review hidden."""
+
+    hidden: bool
+
+
+class PublicReview(BaseModel):
+    """Describe a review its author agreed to share, with the state and district they saved."""
+
+    review_id: int
+    bill_id: str
+    stance: Stance
+    story: str | None
+    action_taken: str | None
+    state: str | None
+    district: int | None
+    created_at: datetime
+    updated_at: datetime
+    # Platforms where a live post carrying one of the review's share links was found
+    posted_to: list[str] = Field(default_factory=list)
+
+
+class ReviewPage(BaseModel):
+    """Describe a page of shared reviews of a bill and how many there are."""
+
+    total: int
+    page: int
+    limit: int
+    data: list[PublicReview]
+
+
+ReportReason = Literal["spam", "harassment", "misinformation", "personal_info", "other"]
+
+# Room to explain a report without letting it become a second review
+MAX_REPORT_DETAILS = 1_000
+
+
+class ReportIn(BaseModel):
+    """Describe why someone reports a shared review."""
+
+    reason: ReportReason
+    details: str | None = Field(default=None, max_length=MAX_REPORT_DETAILS)
+
+    @field_validator("details")
+    @classmethod
+    def clean_details(cls, value: str | None) -> str | None:
+        """Return the details as written, or None when blank, and refuse a null character."""
+        return ReviewIn.clean_text(value)
+
+
+class VotePosition(BaseModel):
+    """Describe how one House member voted, exactly as the Clerk recorded it."""
+
+    bioguide_id: str
+    name: str | None
+    party: str | None
+    state: str | None
+    district: int | None
+    position: str
+
+
+class HouseVote(BaseModel):
+    """Describe a House roll-call vote on a bill, its totals and members' positions."""
+
+    congress: int
+    session: int
+    roll_number: int
+    vote_date: datetime | None
+    question: str | None
+    result: str | None
+    vote_type: str | None
+    source_url: str | None
+    # False until the sync fetches the positions; totals and positions are empty until then
+    positions_complete: bool
+    # Every member's position counted by how it was recorded, such as {"Yea": 220, "Nay": 210}
+    totals: dict[str, int]
+    positions: list[VotePosition]
+
+
+SharePlatform = Literal[
+    "bluesky", "x", "mastodon", "threads", "instagram", "tiktok", "facebook", "linkedin", "other"
+]
+
+
+class ShareLink(BaseModel):
+    """Describe the signed-in user's share link for one platform and how many people it brought."""
+
+    platform: SharePlatform
+    code: str
+    url: str
+    # People who opened the link, leaving out link-preview robots
+    visits: int
+    last_visited_at: datetime | None
+    created_at: datetime
+
+
+class PostedTo(BaseModel):
+    """Describe a live post found carrying one of the user's share links."""
+
+    platform: str
+    post_url: str
+    posted_at: datetime | None
+    found_at: datetime
+
+
+class ShareSummary(BaseModel):
+    """Describe where the user shared their review and where posts with its links were found."""
+
+    shared_to: list[ShareLink]
+    posted_to: list[PostedTo]
 
 
 class CallIn(BaseModel):
     """Describe the congressional office a person called."""
 
     bioguide_id: str = Field(min_length=1, max_length=32)
+    note: Annotated[str, StringConstraints(strip_whitespace=True, max_length=2_000)] | None = None
 
 
 class CallEntry(CallIn):

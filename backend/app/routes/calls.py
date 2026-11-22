@@ -18,7 +18,7 @@ def list_calls(congress: int, bill_type: BillType, number: int, uid: Uid) -> lis
     """Return this account's most recent calls about the bill."""
     return fetch_all(
         """
-        SELECT a.action_id, a.bioguide_id, m.name AS member_name, a.created_at
+        SELECT a.action_id, a.bioguide_id, m.name AS member_name, a.created_at, a.call_note AS note
         FROM actions a JOIN members m USING (bioguide_id)
         WHERE a.uid = %s AND a.bill_id = %s AND a.action_type = 'call'
         ORDER BY a.created_at DESC, a.action_id DESC LIMIT 20
@@ -52,14 +52,14 @@ def log_call(
         # A retry can arrive while the first request is still committing.
         row = conn.execute(
             """
-            INSERT INTO actions (uid, bill_id, bioguide_id, action_type, request_id)
-            VALUES (%s, %s, %s, 'call', %s)
+            INSERT INTO actions (uid, bill_id, bioguide_id, action_type, request_id, call_note)
+            VALUES (%s, %s, %s, 'call', %s, %s)
             ON CONFLICT (uid, request_id) DO UPDATE SET request_id = EXCLUDED.request_id
             WHERE actions.bill_id = EXCLUDED.bill_id AND actions.bioguide_id = EXCLUDED.bioguide_id
               AND actions.action_type = 'call'
-            RETURNING action_id, bioguide_id, created_at
+            RETURNING action_id, bioguide_id, created_at, call_note AS note
             """,
-            (uid, bill_id, entry.bioguide_id, request_id),
+            (uid, bill_id, entry.bioguide_id, request_id, entry.note or None),
         ).fetchone()
         if row is None:
             raise HTTPException(409, "That request ID belongs to a different call")

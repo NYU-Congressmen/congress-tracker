@@ -1,10 +1,12 @@
+import re
 from datetime import date
-from typing import Annotated, Any
+from typing import Annotated, Any, get_args
 
 import httpx
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.ai.diff_summary import summary_for_diff
+from app.auth import current_uid
 from app.config import settings
 from app.db import fetch_all, fetch_one
 from app.models import BillDetail, BillDiff, BillPage, BillType, Status, TextVersion
@@ -24,6 +26,21 @@ from app.sync.texts import compare_versions, refresh_text_versions
 router = APIRouter(tags=["bills"])
 
 
+def bill_search_reference(query: str) -> tuple[str | None, str | None, int] | None:
+    """Parse a bill number, a bill type and number, or a stored bill ID."""
+    match = re.fullmatch(
+        r"(?:(?:([0-9]{1,3})-)?([a-z. ]*[a-z.])[ -]*)?([0-9]{1,10})", query.lower()
+    )
+    if not match:
+        return None
+    congress, bill_type, digits = match.groups()
+    bill_type = re.sub(r"[. ]", "", bill_type) if bill_type else None
+    number = int(digits)
+    if number > 2_147_483_647 or (bill_type is not None and bill_type not in get_args(BillType)):
+        return None
+    return congress, bill_type, number
+
+
 @router.get("/bills", response_model=BillPage)
 def search_bills(
     q: str | None = None,
@@ -33,12 +50,25 @@ def search_bills(
     page: Annotated[int, Query(ge=1)] = 1,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
 ) -> dict[str, Any]:
-    """Search bills by title keyword, status and introduced-date range, newest action first."""
+    """Search bills by title or bill number, with optional stage and introduced-date filters."""
     where = "WHERE true"
     params: dict[str, Any] = {}
-    if q:
-        where += " AND title ILIKE %(q)s"
-        params["q"] = f"%{q}%"
+    if q and (query := q.strip()):
+        params["q"] = f"%{query}%"
+        reference = bill_search_reference(query)
+        if reference is None:
+            where += " AND title ILIKE %(q)s"
+        else:
+            congress, bill_type, number = reference
+            if congress is not None and bill_type is not None:
+                where += " AND (title ILIKE %(q)s OR bill_id = %(bill_id)s)"
+                params["bill_id"] = make_bill_id(int(congress), bill_type, number)
+            elif bill_type is not None:
+                where += " AND (title ILIKE %(q)s OR (type = %(type)s AND number = %(number)s))"
+                params.update(type=bill_type, number=number)
+            else:
+                where += " AND (title ILIKE %(q)s OR number = %(number)s)"
+                params["number"] = number
     if status:
         where += " AND status = %(status)s"
         params["status"] = status
@@ -163,9 +193,9 @@ def bill_version_diff(
     from_: str,
     to: str,
     *,
-    generate: bool,
+    uid: str | None = None,
 ) -> BillDiff:
-    """Return a comparison and include the cached or newly generated summary when available."""
+    """Return a comparison with its saved summary, generating one for a signed-in reader."""
     bill_id = make_bill_id(congress, bill_type, number)
     ensure_text_versions(congress, bill_type, number)
     try:
@@ -178,7 +208,7 @@ def bill_version_diff(
         from_version=from_,
         to_version=to,
         changes=changes,
-        summary=summary_for_diff(bill_id, changes, generate=generate),
+        summary=summary_for_diff(bill_id, changes, uid=uid),
     )
 
 
@@ -191,7 +221,7 @@ def diff_text_versions(
     to: str,
 ) -> BillDiff:
     """Return a bill's text comparison with a saved summary when available."""
-    return bill_version_diff(congress, bill_type, number, from_, to, generate=False)
+    return bill_version_diff(congress, bill_type, number, from_, to)
 
 
 @router.post("/bills/{congress}/{bill_type}/{number}/diff", response_model=BillDiff)
@@ -201,6 +231,7 @@ def summarize_text_versions(
     number: int,
     from_: Annotated[str, Query(alias="from")],
     to: str,
+    uid: Annotated[str, Depends(current_uid)],
 ) -> BillDiff:
-    """Return a bill's text comparison and generate a missing summary when possible."""
-    return bill_version_diff(congress, bill_type, number, from_, to, generate=True)
+    """Return a bill's text comparison, generating a missing summary within daily limits."""
+    return bill_version_diff(congress, bill_type, number, from_, to, uid=uid)

@@ -1,0 +1,52 @@
+name: Daily sync
+
+on:
+  schedule:
+    # 10:00 UTC, before the US workday. GitHub runs schedules from the default branch.
+    - cron: "0 10 * * *"
+  # Lets anyone with write access start a run from the Actions tab
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A slow run finishes before the next one starts, so two never write at once
+concurrency:
+  group: daily-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check the repository secrets
+        id: secrets
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          CONGRESS_API_KEY: ${{ secrets.CONGRESS_API_KEY }}
+        run: |
+          if [[ -z "$DATABASE_URL" || -z "$CONGRESS_API_KEY" ]]; then
+            echo "::warning::Add the DATABASE_URL and CONGRESS_API_KEY repository secrets to run the sync."
+            exit 0
+          fi
+          echo 'ready=true' >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.secrets.outputs.ready == 'true'
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        if: steps.secrets.outputs.ready == 'true'
+      - name: Install the backend
+        if: steps.secrets.outputs.ready == 'true'
+        working-directory: backend
+        run: uv sync --locked --no-dev
+      - name: Sync Congress.gov data and find shared posts
+        if: steps.secrets.outputs.ready == 'true'
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          CONGRESS_API_KEY: ${{ secrets.CONGRESS_API_KEY }}
+          BLUESKY_HANDLE: ${{ secrets.BLUESKY_HANDLE }}
+          BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_APP_PASSWORD }}
+        run: uv run --no-dev python -m app.sync

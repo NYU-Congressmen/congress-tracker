@@ -1,12 +1,15 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { diffTextVersions, listTextVersions } from '../../api/texts'
 import type { BillDiff as DiffResult, TextVersion } from '../../api/texts'
 import type { BillType } from '../../api/bills'
+import { useSession } from '../../auth/SessionContext'
+import { getAccountToken } from '../../auth/accountToken'
 import { useApi } from '../../hooks/useApi'
 import { formatDate } from '../../lib/format'
 import { EmptyState } from '../ui/EmptyState'
 import { ErrorState } from '../ui/ErrorState'
+import { SelectField } from '../ui/Fields'
 import { LoadingState } from '../ui/LoadingState'
 import { ExternalLinkIcon } from '../icons'
 
@@ -16,17 +19,82 @@ interface BillDiffProps {
   number: number
 }
 
-// Classify one line of the unified diff the backend returns.
-function diffClass(line: string): string {
-  if (line.startsWith('---') || line.startsWith('+++')) return 'diff-line diff-line__file'
-  if (line.startsWith('@@')) return 'diff-line diff-line__hunk'
-  if (line.startsWith('+')) return 'diff-line diff-line__add'
-  if (line.startsWith('-')) return 'diff-line diff-line__del'
-  return 'diff-line'
+interface TextBlock {
+  kind: 'added' | 'removed' | 'context'
+  lines: string[]
+}
+
+// Group adjacent lines within each excerpt so a passage shares one label.
+function comparisonBlocks(changes: string[]): TextBlock[] {
+  const blocks: TextBlock[] = []
+  let block: TextBlock | undefined
+  // The backend starts each nonempty diff with the two version names.
+  for (const line of changes.slice(2)) {
+    if (line.startsWith('@@')) {
+      block = undefined
+      continue
+    }
+    const kind = line.startsWith('+') ? 'added' : line.startsWith('-') ? 'removed' : 'context'
+    if (block?.kind !== kind) {
+      block = { kind, lines: [] }
+      blocks.push(block)
+    }
+    block.lines.push(line.slice(1))
+  }
+  return blocks
+}
+
+// Reflow source lines while keeping paragraph breaks marked by blank lines.
+function passageParagraphs(lines: string[]): string[] {
+  const text = lines.map((line) => line.trim()).join('\n').trim()
+  return text ? text.split(/\n{2,}/).map((paragraph) => paragraph.replace(/\n/g, ' ')) : ['\u00a0']
+}
+
+// Show edited passages with an optional view of the surrounding lines.
+function ComparisonText({ result }: { result: DiffResult }) {
+  const [showContext, setShowContext] = useState(false)
+  const blocks = comparisonBlocks(result.changes)
+
+  return (
+    <section className="diff-viewer" aria-label="Changes between the two versions">
+      <div className="diff-viewer__head">
+        <p>{result.from_version} → {result.to_version}</p>
+        {blocks.some(({ kind }) => kind === 'context') ? (
+          <label className="diff-viewer__toggle">
+            <input type="checkbox" checked={showContext} onChange={(event) => setShowContext(event.target.checked)} />
+            Show surrounding text
+          </label>
+        ) : null}
+      </div>
+      {blocks.length === 0 ? (
+        <p className="diff-viewer__empty">The two versions have identical text.</p>
+      ) : (
+        <div className="diff-viewer__body" role="region" aria-label="Text comparison" tabIndex={0}>
+          {blocks.map(({ kind, lines }, index) => {
+            if (kind === 'context' && !showContext) return null
+            return (
+              <div key={index} className={`diff-passage diff-passage--${kind}`}>
+                {kind !== 'context' ? (
+                  <p className="diff-passage__label">
+                    <span className="diff-passage__mark" aria-hidden="true">{kind === 'added' ? '+' : '−'}</span>
+                    {kind === 'added' ? 'Added' : 'Removed'}
+                  </p>
+                ) : null}
+                {passageParagraphs(lines).map((paragraph, paragraphIndex) => (
+                  <p key={paragraphIndex} className="diff-passage__text">{paragraph}</p>
+                ))}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </section>
+  )
 }
 
 // Show a bill's published versions and the details of a selected comparison.
 export function BillDiff({ congress, type, number }: BillDiffProps) {
+  const { user } = useSession()
   const { data: versions, loading, error, refetch } = useApi(
     () => listTextVersions(congress, type, number),
     [congress, type, number],
@@ -35,10 +103,14 @@ export function BillDiff({ congress, type, number }: BillDiffProps) {
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [comparing, setComparing] = useState(false)
+  const [summarizing, setSummarizing] = useState(false)
   const [compareError, setCompareError] = useState<string | null>(null)
   const [result, setResult] = useState<DiffResult | null>(null)
+  // Counts comparisons so a late answer never replaces a newer one.
+  const latestRequest = useRef(0)
 
   const list: TextVersion[] = versions ?? []
+  const options = list.map(({ version_type }) => ({ value: version_type, label: version_type }))
 
   // Until the reader picks, compare the oldest and newest versions.
   const fromValue = from !== '' ? from : list.length >= 2 ? list[0].version_type : ''
@@ -50,16 +122,39 @@ export function BillDiff({ congress, type, number }: BillDiffProps) {
       setCompareError('Choose two different versions to compare.')
       return
     }
+    const request = ++latestRequest.current
     setComparing(true)
+    setSummarizing(false)
     setCompareError(null)
     setResult(null)
+    let diff: DiffResult
     try {
-      const diff = await diffTextVersions(congress, type, number, fromValue, toValue)
-      setResult(diff)
+      // The public comparison is quick, so show it before any summary is written.
+      diff = await diffTextVersions(congress, type, number, fromValue, toValue)
     } catch (cause) {
-      setCompareError(cause instanceof Error ? cause.message : 'The comparison could not be made.')
+      if (request === latestRequest.current) {
+        setCompareError(cause instanceof Error ? cause.message : 'The comparison could not be made.')
+        setComparing(false)
+      }
+      return
+    }
+    if (request !== latestRequest.current) return
+    setResult(diff)
+    setComparing(false)
+    if (!user || diff.summary || diff.changes.length === 0) return
+
+    // A signed-in reader can have a missing summary written, which can take a while.
+    setSummarizing(true)
+    try {
+      const token = await getAccountToken(user)
+      const { summary } = await diffTextVersions(congress, type, number, fromValue, toValue, token)
+      if (request === latestRequest.current && summary) {
+        setResult((current) => (current ? { ...current, summary } : current))
+      }
+    } catch {
+      // The summary is optional and the comparison is already on screen.
     } finally {
-      setComparing(false)
+      if (request === latestRequest.current) setSummarizing(false)
     }
   }
 
@@ -102,26 +197,8 @@ export function BillDiff({ congress, type, number }: BillDiffProps) {
 
           {list.length >= 2 ? (
             <form className="diff-compare" onSubmit={compare}>
-              <label className="field">
-                <span className="field__label">From version</span>
-                <select className="field__control" value={fromValue} onChange={(event) => setFrom(event.target.value)}>
-                  {list.map((version) => (
-                    <option key={version.version_type} value={version.version_type}>
-                      {version.version_type}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="field">
-                <span className="field__label">To version</span>
-                <select className="field__control" value={toValue} onChange={(event) => setTo(event.target.value)}>
-                  {list.map((version) => (
-                    <option key={version.version_type} value={version.version_type}>
-                      {version.version_type}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <SelectField id="diff-from" label="From version" value={fromValue} onChange={setFrom} options={options} />
+              <SelectField id="diff-to" label="To version" value={toValue} onChange={setTo} options={options} />
               <button type="submit" className="btn btn--primary" disabled={comparing}>
                 {comparing ? 'Comparing…' : 'Compare versions'}
               </button>
@@ -144,23 +221,11 @@ export function BillDiff({ congress, type, number }: BillDiffProps) {
               </div>
               <p>{result.summary}</p>
             </div>
+          ) : summarizing ? (
+            <p className="muted" role="status">Summarizing the changes…</p>
           ) : null}
 
-          {result ? (
-            <div className="diff-viewer">
-              <p className="diff-viewer__head">
-                {result.from_version} → {result.to_version}
-              </p>
-              <pre aria-label="Changes between the two versions">
-                {result.changes.map((line, index) => (
-                  <span key={index} className={diffClass(line)}>
-                    {line || ' '}
-                    {'\n'}
-                  </span>
-                ))}
-              </pre>
-            </div>
-          ) : null}
+          {result ? <ComparisonText result={result} /> : null}
         </>
       )}
     </section>

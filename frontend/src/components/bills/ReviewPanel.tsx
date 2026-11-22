@@ -4,6 +4,7 @@ import type { BillType } from '../../api/bills'
 import { getReview, STANCE_LABELS } from '../../api/reviews'
 import type { ModerationStatus } from '../../api/reviews'
 import { useSession } from '../../auth/SessionContext'
+import { getAccountToken } from '../../auth/accountToken'
 import { useApi } from '../../hooks/useApi'
 import { timeAgo } from '../../lib/format'
 
@@ -24,7 +25,7 @@ export function ReviewPanel(props: ReviewPanelProps) {
   const { user, loading } = useSession()
   if (user) return <AccountReview key={user.uid} user={user} {...props} />
   return (
-    <section className="panel" aria-label="Your stance">
+    <section className="panel panel--stack" aria-label="Your stance">
       <h2>Your stance</h2>
       {loading ? <p className="muted">Checking your account…</p> : (
         <p className="muted">
@@ -37,13 +38,13 @@ export function ReviewPanel(props: ReviewPanelProps) {
 
 function AccountReview({ congress, type, number, user }: ReviewPanelProps & { user: User }) {
   const { data, loading, error } = useApi(
-    async () => getReview(congress, type, number, await user.getIdToken()),
+    async () => getReview(congress, type, number, await getAccountToken(user)),
     [congress, type, number, user],
   )
-  const discussionPath = `/social?bill=${congress}-${type}-${number}`
+  const discussionPath = `/social?bill=${congress}-${type}-${number}#bill-review`
 
   return (
-    <section className="panel" aria-label="Your stance">
+    <section className="panel panel--stack" aria-label="Your stance">
       <div className="panel__heading-row">
         <h2>Your stance</h2>
         <Link to={discussionPath} className="link-more">
@@ -62,7 +63,7 @@ function AccountReview({ congress, type, number, user }: ReviewPanelProps & { us
         <div className="review">
           <span className={`review__stance review__stance--${data.stance}`}>{STANCE_LABELS[data.stance]}</span>
           {data.story ? <p className="review__story">{data.story}</p> : null}
-          {data.action_taken ? <p className="review__action">What they did: {data.action_taken}</p> : null}
+          {data.action_taken ? <p className="review__action"><strong>Action taken</strong>{' '}{data.action_taken}</p> : null}
           {MODERATION_NOTICES[data.moderation_status] ? (
             <p className="muted review__meta">{MODERATION_NOTICES[data.moderation_status]}</p>
           ) : null}
