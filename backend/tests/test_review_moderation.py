@@ -30,7 +30,7 @@ def client(db):
             (uid, f"+1555000000{index}"),
         )
     sql(
-        "INSERT INTO reviews (uid, bill_id, stance, story, consent_to_share) "
+        "INSERT INTO reviews (uid, bill_id, stance, story, share_publicly) "
         "VALUES ('author', '119-hr-1', 'oppose', 'My clinic closed.', true)"
     )
     sql(
@@ -65,6 +65,23 @@ def test_shared_list_shows_only_shared_reviews_with_their_district(client):
     assert "uid" not in review and "phone" not in review
 
 
+def test_consent_to_the_office_brief_never_lists_a_review(client):
+    # Agreeing to the Constituent Signal brief is not agreeing to be listed publicly
+    sign_in("private")
+    saved = client.put(REVIEW, json={"stance": "support", "consent_to_share": True}).json()
+    assert (saved["consent_to_share"], saved["share_publicly"]) == (True, False)
+    assert client.get(SHARED).json()["total"] == 1
+    (private_id,) = sql("SELECT review_id FROM reviews WHERE uid = 'private'")[0]
+    sign_in("r1")
+    assert report(client, private_id).status_code == 404
+
+    # Listing it is its own choice, and either can be made without the other
+    sign_in("private")
+    client.put(REVIEW, json={"stance": "support", "share_publicly": True})
+    assert client.get(SHARED).json()["total"] == 2
+    assert client.get(REVIEW).json()["consent_to_share"] is False
+
+
 def test_author_hides_and_shows_their_review(client):
     sign_in("author")
 
@@ -77,7 +94,7 @@ def test_author_hides_and_shows_their_review(client):
     assert client.get("/api/bills/119/hr/1/responses").json()["counts"]["oppose"] == 0
 
     # Editing keeps it hidden until the author shows it again
-    client.put(REVIEW, json={"stance": "oppose", "story": "Edited.", "consent_to_share": True})
+    client.put(REVIEW, json={"stance": "oppose", "story": "Edited.", "share_publicly": True})
     assert client.get(REVIEW).json()["hidden"] is True
     assert client.put(f"{REVIEW}/visibility", json={"hidden": False}).json()["hidden"] is False
     assert client.get(SHARED).json()["data"][0]["story"] == "Edited."

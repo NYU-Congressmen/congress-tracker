@@ -33,7 +33,7 @@ def client(db, monkeypatch):
     )
     sql("INSERT INTO users (uid, phone) VALUES ('author', '+15550000001')")
     sql(
-        "INSERT INTO reviews (uid, bill_id, stance, consent_to_share) "
+        "INSERT INTO reviews (uid, bill_id, stance, share_publicly) "
         "VALUES ('author', '119-hr-1', 'oppose', true)"
     )
     sql(

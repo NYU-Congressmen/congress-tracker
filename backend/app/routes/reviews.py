@@ -13,17 +13,18 @@ router = APIRouter(tags=["reviews"])
 Uid = Annotated[str, Depends(current_uid)]
 
 REVIEW_COLUMNS = (
-    "bill_id, stance, story, action_taken, consent_to_share, created_at, updated_at, "
-    "hidden_at IS NOT NULL AS hidden"
+    "bill_id, stance, story, action_taken, consent_to_share, share_publicly, created_at, "
+    "updated_at, hidden_at IS NOT NULL AS hidden"
 )
 
 # Reports from this many different signed-in people withhold a review until the team looks.
 # Visitors' reports are recorded too, but one person could send any number of them.
 WITHHOLD_AFTER_REPORTS = 3
 
-# A review is shared when its author agreed, has not hidden it and reports have not withheld it
+# A review is shared when its author chose to list it publicly, has not hidden it and reports
+# have not withheld it. Consent to the office brief (consent_to_share) is a separate choice.
 SHARED_REVIEW_SQL = f"""
-    r.consent_to_share AND r.hidden_at IS NULL
+    r.share_publicly AND r.hidden_at IS NULL
     AND (SELECT count(*) FROM review_reports rr
          WHERE rr.review_id = r.review_id AND rr.reporter_uid IS NOT NULL)
         < {WITHHOLD_AFTER_REPORTS}
@@ -31,14 +32,16 @@ SHARED_REVIEW_SQL = f"""
 
 # A second review of the same bill replaces the first, so each user has one review per bill
 SAVE_REVIEW_SQL = f"""
-    INSERT INTO reviews (uid, bill_id, stance, story, action_taken, consent_to_share)
+    INSERT INTO reviews (uid, bill_id, stance, story, action_taken, consent_to_share,
+                         share_publicly)
     VALUES (%(uid)s, %(bill_id)s, %(stance)s, %(story)s, %(action_taken)s,
-            %(consent_to_share)s)
+            %(consent_to_share)s, %(share_publicly)s)
     ON CONFLICT (uid, bill_id) DO UPDATE SET
         stance = EXCLUDED.stance,
         story = EXCLUDED.story,
         action_taken = EXCLUDED.action_taken,
         consent_to_share = EXCLUDED.consent_to_share,
+        share_publicly = EXCLUDED.share_publicly,
         updated_at = now()
     RETURNING {REVIEW_COLUMNS}
 """
@@ -151,8 +154,7 @@ def report_review(
     """
     with connect() as conn:
         review = conn.execute(
-            "SELECT uid FROM reviews WHERE review_id = %s AND consent_to_share"
-            " AND hidden_at IS NULL",
+            "SELECT uid FROM reviews WHERE review_id = %s AND share_publicly AND hidden_at IS NULL",
             (review_id,),
         ).fetchone()
         if review is None:

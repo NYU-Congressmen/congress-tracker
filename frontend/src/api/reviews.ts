@@ -18,7 +18,11 @@ export interface ReviewIn {
   stance: Stance
   story?: string | null
   action_taken?: string | null
+  // Include the review in the Constituent Signal brief for the author's office.
   consent_to_share: boolean
+  // List the review on the bill page with the author's state and district. Saving replaces
+  // the whole review, so send back the value loaded from GET or it returns to false.
+  share_publicly?: boolean
 }
 
 // Describe a saved review of one bill by the signed-in user.

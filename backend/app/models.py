@@ -166,7 +166,10 @@ class ReviewIn(BaseModel):
     stance: Stance
     story: str | None = Field(default=None, max_length=MAX_REVIEW_TEXT)
     action_taken: str | None = Field(default=None, max_length=MAX_REVIEW_TEXT)
+    # Include the review in the Constituent Signal brief for the author's office
     consent_to_share: bool = False
+    # List the review on the bill page with the author's state and district
+    share_publicly: bool = False
 
     @field_validator("story", "action_taken")
     @classmethod
