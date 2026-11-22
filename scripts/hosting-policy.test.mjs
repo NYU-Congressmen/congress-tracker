@@ -31,3 +31,14 @@ test('routes REST and MCP to one pinned Cloud Run revision before the frontend f
   assert.equal(backend.run.pinTag, true)
   assert.equal(fallback.destination, '/index.html')
 })
+
+test('allows portraits from the official congressional image paths', () => {
+  const config = JSON.parse(readFileSync(new URL('../firebase.json', import.meta.url), 'utf8'))
+  const policy = config.hosting.headers.flatMap(({ headers }) => headers)
+    .find(({ key }) => key === 'Content-Security-Policy')
+  const imageSources = policy.value.split(';').map((directive) => directive.trim())
+    .find((directive) => directive.startsWith('img-src ')).split(/\s+/)
+  assert.deepEqual(imageSources.slice(1), [
+    "'self'", 'https://www.congress.gov/img/member/', 'https://bioguide.congress.gov/photo/',
+  ])
+})

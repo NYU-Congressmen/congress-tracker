@@ -319,8 +319,7 @@
 }
 
 .avatar--sm {
-  width: 38px;
-  height: 38px;
+  --avatar-size: 38px;
   font-size: 13px;
 }
 
