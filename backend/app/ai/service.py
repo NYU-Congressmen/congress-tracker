@@ -15,7 +15,7 @@ from app.db import connect
 LLM_TIMEOUT = 60.0
 
 # Dollars per million input and output tokens. Models not listed log their tokens with no cost.
-PRICES = {"gpt-6-luna": (0.10, 0.50)}
+PRICES = {"gpt-6-luna": (0.10, 0.50), "text-embedding-3-small": (0.02, 0.0)}
 
 # Reasoning effort per model. At none, gpt-6-luna answers in 2 to 4 seconds instead of 5 to 15, and
 # with the bill's stage given it explained bills at five stages as accurately as at its default.
