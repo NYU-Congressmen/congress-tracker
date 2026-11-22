@@ -392,6 +392,19 @@
   margin-bottom: 18px;
 }
 
+.diff-summary {
+  margin-bottom: 16px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+
+.diff-summary p {
+  max-width: 70ch;
+  color: var(--ink-2);
+}
+
 .diff-viewer {
   max-height: 32rem;
   overflow: auto;

@@ -80,7 +80,14 @@ Bill lists return `total`, `page`, `limit` and `data`, ordered by latest action 
 
 `PUT /api/bills/{congress}/{type}/{number}/review` replaces the signed-in user's whole review, so a client sends every field, and anything left out returns to its default. `GET` on the same path returns that review.
 
-Opening a bill stores its list of text versions, and the texts and diff endpoints fetch that list themselves when none is stored yet. `GET /api/bills/{congress}/{type}/{number}/texts` lists them, oldest first, and `.../diff?from=&to=` compares two by version name, downloading and caching each text the first time it is needed.
+Opening a bill stores its list of text versions, and the texts and diff endpoints fetch that list themselves when none is stored yet. `GET /api/bills/{congress}/{type}/{number}/texts` lists them, oldest first. Both methods at `.../diff?from=&to=` compare two versions by name and return any saved summary. Signed-in readers send a verified Firebase token with POST to generate a missing summary when a model is configured. The public GET serves the diff and any saved summary. The line-by-line diff still returns if the comparison exceeds the summary input limit or the model is unavailable. A change to the diff produces a new cache key.
+
+The command-line tool can also generate a summary ahead of a demo. Copy the two version names from the bill page and run it with a configured model.
+
+```bash
+uv run --directory backend python -m app.ai.diff_summary \
+  CONGRESS TYPE NUMBER "FROM VERSION" "TO VERSION"
+```
 
 Both detail endpoints include a `cache` object. `complete` means the bill's details and actions, or the member's entire sponsored-bill list, were fetched successfully. It does not guarantee that the upstream source itself is complete. `stale` means that the detail version is behind the latest recorded bill version or that sponsored bills are older than a day, and is also true for a missing cache. `refreshed_at` is the last successful local fetch time. `refresh_failed` records an unsuccessful refresh, and `retry_after` gives the earliest retry time. Successful refreshes clear the failure state.
 

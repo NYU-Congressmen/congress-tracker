@@ -274,7 +274,7 @@ export default function BillDetailPage() {
 
         <BillExplanation congress={bill.congress} type={bill.type} number={bill.number} title={bill.title} />
 
-        <BillDiff congress={bill.congress} type={bill.type} number={bill.number} />
+        <BillDiff key={bill.bill_id} congress={bill.congress} type={bill.type} number={bill.number} />
 
         <ReviewPanel congress={bill.congress} type={bill.type} number={bill.number} />
       </div>

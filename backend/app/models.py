@@ -119,11 +119,12 @@ class TextVersion(BaseModel):
 
 
 class BillDiff(BaseModel):
-    """Describe the line-by-line changes between two versions of a bill's text."""
+    """Describe the line-by-line changes and any saved summary for a pair of bill versions."""
 
     from_version: str
     to_version: str
     changes: list[str]
+    summary: str | None = None
 
 
 class BillExplanation(BaseModel):
