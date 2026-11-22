@@ -47,7 +47,11 @@ const BILL = {
   cache: { complete: true, stale: false, refreshed_at: null, refresh_failed: false, retry_after: null },
 }
 
-function renderSocial(routes: { match: string; body: unknown; status?: number }[] = [], user: User | null = null) {
+function renderSocial(
+  routes: { match: string; body: unknown; status?: number }[] = [],
+  user: User | null = null,
+  path = '/social',
+) {
   const fetchMock = mockApi([
     ...routes,
     { match: '/api/bills/119/hr/7', body: BILL },
@@ -55,7 +59,7 @@ function renderSocial(routes: { match: string; body: unknown; status?: number }[
   ])
   const result = render(
     <SessionContext.Provider value={{ user, loading: false, error: null, retry: () => {} }}>
-      <MemoryRouter initialEntries={['/social']}>
+      <MemoryRouter initialEntries={[path]}>
         <SocialPage />
       </MemoryRouter>
     </SessionContext.Provider>,
@@ -104,6 +108,7 @@ describe('SocialPage', () => {
     expect(
       await screen.findByText(/draft saved in this browser/i),
     ).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Back to bill' })).toBeNull()
     const discussions = await screen.findByText('Your discussions', { selector: 'h2' })
     expect(discussions).toBeTruthy()
     expect(screen.getAllByText('To expand hospital coverage').length).toBeGreaterThan(1)
@@ -126,32 +131,52 @@ describe('SocialPage', () => {
     expect(listDiscussions(null)).toHaveLength(0)
   })
 
-  test('reports a saved review when the backend accepts it', async () => {
+  test.each([true, false])('opens the linked bill and changes saved brief consent (%s)', async (initialConsent) => {
     const review = {
       bill_id: '119-hr-7',
       stance: 'support',
       story: 'My family used this service.',
       action_taken: null,
-      consent_to_share: false,
+      consent_to_share: initialConsent,
       created_at: '2026-11-11T12:00:00Z',
       updated_at: '2026-11-11T12:00:00Z',
     }
     const user = { uid: 'reviewer', getIdToken: vi.fn().mockResolvedValue('test-id-token') } as unknown as User
-    const { fetchMock } = renderSocial([{ match: '/api/bills/119/hr/7/review', body: review }], user)
-
-    const search = screen.getByPlaceholderText(/search by keyword/i)
-    fireEvent.change(search, { target: { value: 'hospital' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Search bills' }))
-    fireEvent.click(await screen.findByRole('button', { name: /To expand hospital coverage/ }))
-    fireEvent.click(screen.getByRole('radio', { name: 'Oppose' }))
+    const { fetchMock } = renderSocial(
+      [{ match: '/api/bills/119/hr/7/review', body: review }],
+      user,
+      '/social?bill=119-hr-7#bill-review',
+    )
+    expect(await screen.findByDisplayValue('My family used this service.')).toBeTruthy()
+    const consent = screen.getByRole('checkbox', { name: /Constituent Signal brief/i })
+    expect((consent as HTMLInputElement).checked).toBe(initialConsent)
+    fireEvent.click(consent)
     fireEvent.click(await screen.findByRole('button', { name: 'Save my stance' }))
 
     expect(await screen.findByText(/Your review is saved/i)).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Back to bill' }).getAttribute('href')).toBe('/bills/119/hr/7')
     expect(fetchMock).toHaveBeenCalledWith('/api/bills/119/hr/7/review', expect.objectContaining({
       headers: expect.objectContaining({ Authorization: 'Bearer test-id-token' }),
+      method: 'PUT',
+      body: JSON.stringify({ stance: 'support', story: review.story, action_taken: null, consent_to_share: !initialConsent }),
     }))
     await waitFor(() => {
       expect(screen.getByText('Saved')).toBeTruthy()
     })
+    fireEvent.click(screen.getByRole('button', { name: 'Change bill' }))
+    expect(screen.getByRole('searchbox', { name: 'Find a bill' })).toBeTruthy()
+    expect(screen.queryByRole('checkbox', { name: /Constituent Signal brief/i })).toBeNull()
+  })
+
+  test('shows unchecked consent for a linked bill without a saved review', async () => {
+    const user = { uid: 'reviewer', getIdToken: vi.fn().mockResolvedValue('test-id-token') } as unknown as User
+    renderSocial(
+      [{ match: '/api/bills/119/hr/7/review', body: { detail: 'No review found' }, status: 404 }],
+      user,
+      '/social?bill=119-hr-7#bill-review',
+    )
+    const consent = await screen.findByRole<HTMLInputElement>('checkbox', { name: /Constituent Signal brief/i })
+    await waitFor(() => expect(consent.disabled).toBe(false))
+    expect(consent.checked).toBe(false)
   })
 })

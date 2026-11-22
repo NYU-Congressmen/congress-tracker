@@ -5,6 +5,7 @@ from app.mcp import http_app as mcp_app
 from app.routes import (
     account,
     bills,
+    calls,
     explanations,
     feed,
     graph,
@@ -31,5 +32,6 @@ app.include_router(graph.router, prefix="/api")
 app.include_router(responses.router, prefix="/api")
 app.include_router(votes.router, prefix="/api")
 app.include_router(sharing.router, prefix="/api")
+app.include_router(calls.router, prefix="/api")
 # Share links live at /s/{code}, outside /api, so the address people see stays short
 app.include_router(sharing.pages)

@@ -1,8 +1,11 @@
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
+import type { User } from '@firebase/auth'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import BillDetailPage from './BillDetailPage'
+import { SessionContext } from '../auth/SessionContext'
 import { mockApi } from '../test/fetchMock'
+import type { ApiRoute } from '../test/fetchMock'
 
 const SPONSOR = {
   bioguide_id: 'P000614',
@@ -60,22 +63,26 @@ const EXPLANATION = {
   from_stored: false,
 }
 
-function renderBill() {
+function renderBill(user: User | null = null, routes: ApiRoute[] = []) {
   // More specific routes first: the mock matches by URL substring, so the
   // bare bill route would swallow the explanation, text and review calls.
-  mockApi([
+  const fetchMock = mockApi([
+    ...routes,
     { match: '/api/bills/119/hr/7/explanation', body: EXPLANATION },
     { match: '/api/bills/119/hr/7/texts', body: [] },
     { match: '/api/bills/119/hr/7/review', body: { detail: 'not signed in' }, status: 404 },
     { match: '/api/bills/119/hr/7', body: BILL },
   ])
-  return render(
-    <MemoryRouter initialEntries={['/bills/119/hr/7']}>
-      <Routes>
-        <Route path="/bills/:congress/:type/:number" element={<BillDetailPage />} />
-      </Routes>
-    </MemoryRouter>,
+  render(
+    <SessionContext.Provider value={{ user, loading: false, error: null, retry: () => {} }}>
+      <MemoryRouter initialEntries={['/bills/119/hr/7']}>
+        <Routes>
+          <Route path="/bills/:congress/:type/:number" element={<BillDetailPage />} />
+        </Routes>
+      </MemoryRouter>
+    </SessionContext.Provider>,
   )
+  return fetchMock
 }
 
 afterEach(() => {
@@ -83,6 +90,40 @@ afterEach(() => {
 })
 
 describe('BillDetailPage', () => {
+  test('records a call and its private note on the signed-in account', async () => {
+    const caller = { uid: 'caller', getIdToken: vi.fn().mockResolvedValue('test-token') } as unknown as User
+    const note = 'Asked about the committee date.'
+    const fetchMock = renderBill(caller, [
+      { match: '/api/bills/119/hr/7/calls', body: [] },
+      { match: '/api/members?state=NY', body: { data: [COSPONSOR], total: 1 } },
+    ])
+    const fixtures = fetchMock.getMockImplementation()
+    const entry = { action_id: 1, member_name: COSPONSOR.name, created_at: '2025-03-01T12:00:00Z', note }
+    let logged = false
+    fetchMock.mockImplementation(async (url) => {
+      if (String(url).includes('/calls/')) {
+        logged = true
+        return new Response(JSON.stringify(entry))
+      }
+      return logged && String(url).endsWith('/calls') ? new Response(JSON.stringify([entry])) : fixtures!(url)
+    })
+
+    const panel = await screen.findByRole('region', { name: 'Call log' })
+    fireEvent.change(within(panel).getByLabelText('State or territory'), { target: { value: 'NY' } })
+    await within(panel).findByRole('option', { name: /Schumer, Chuck/ })
+    fireEvent.change(within(panel).getByLabelText('Office called'), { target: { value: COSPONSOR.bioguide_id } })
+    fireEvent.change(within(panel).getByLabelText('Note (optional)'), { target: { value: note } })
+    fireEvent.click(within(panel).getByRole('button', { name: 'Log a call' }))
+
+    expect(await within(panel).findByText('Call logged.')).toBeTruthy()
+    expect(await within(panel).findByText(note)).toBeTruthy()
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringMatching(/\/calls\/[0-9a-f-]{36}$/), expect.objectContaining({
+      method: 'PUT',
+      body: JSON.stringify({ bioguide_id: COSPONSOR.bioguide_id, note }),
+      headers: expect.objectContaining({ Authorization: 'Bearer test-token' }),
+    }))
+  })
+
   test('shows the co-sponsors inside the sponsor card, not as a separate card', async () => {
     renderBill()
 
