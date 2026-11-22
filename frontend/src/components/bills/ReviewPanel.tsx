@@ -17,7 +17,7 @@ export function ReviewPanel(props: ReviewPanelProps) {
   const { user, loading } = useSession()
   if (user) return <AccountReview key={user.uid} user={user} {...props} />
   return (
-    <section className="panel" aria-label="Your stance">
+    <section className="panel panel--stack" aria-label="Your stance">
       <h2>Your stance</h2>
       {loading ? <p className="muted">Checking your account…</p> : (
         <p className="muted">
@@ -33,10 +33,10 @@ function AccountReview({ congress, type, number, user }: ReviewPanelProps & { us
     async () => getReview(congress, type, number, await getAccountToken(user)),
     [congress, type, number, user],
   )
-  const discussionPath = `/social?bill=${congress}-${type}-${number}`
+  const discussionPath = `/social?bill=${congress}-${type}-${number}#bill-review`
 
   return (
-    <section className="panel" aria-label="Your stance">
+    <section className="panel panel--stack" aria-label="Your stance">
       <div className="panel__heading-row">
         <h2>Your stance</h2>
         <Link to={discussionPath} className="link-more">
