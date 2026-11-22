@@ -85,6 +85,10 @@ Phone sign-in uses the Firebase Hosting configuration endpoint in the browser an
 
 GitHub Actions uses Workload Identity Federation to impersonate `pull-release@congress-pull.iam.gserviceaccount.com`. The repository variable `PULL_WIF_PROVIDER` holds the full provider resource name. The provider accepts push tokens for this repository's numeric ID on `refs/heads/main` from `.github/workflows/ci.yml`. The release service account uses Cloud Run Source Developer, Service Usage Consumer, Firebase Hosting Admin and API Keys Viewer, with Service Account User on the Cloud Run runtime identity. The Cloud Build identity uses Cloud Run Builder. [Google Cloud federation setup](https://docs.cloud.google.com/iam/docs/workload-identity-federation-with-deployment-pipelines) [Firebase deployment roles](https://firebase.google.com/docs/projects/iam/roles-predefined-product)
 
+## MCP clients
+
+Connect a client using Streamable HTTP. The local FastAPI server exposes `http://127.0.0.1:8000/mcp`, and Firebase Hosting exposes `https://congress-pull.web.app/mcp` once the release containing the endpoint is deployed. Pull's tools read public data from PostgreSQL without extra credentials. [FastMCP clients](https://gofastmcp.com/clients/transports)
+
 ## Troubleshooting
 
 If a command reports that `uv` is not found right after the setup script installed it, open a new terminal. The installer adds uv to your PATH, but terminals that were already open do not see the change.

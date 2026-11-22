@@ -2,13 +2,15 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { setTimeout as delay } from 'node:timers/promises'
 
-const [baseUrl, mode, auth] = process.argv.slice(2)
-assert(baseUrl && (mode === undefined || mode === '--api-only')
-  && (auth === undefined || (mode === '--api-only' && auth === '--token-stdin')),
-  'Usage: node scripts/check-deployment.mjs URL [--api-only [--token-stdin]]')
+const [baseUrl, ...flags] = process.argv.slice(2)
+const apiOnly = flags.includes('--api-only')
+const tokenStdin = flags.includes('--token-stdin')
+assert(baseUrl && flags.every((flag) => ['--api-only', '--token-stdin', '--mcp'].includes(flag))
+  && (!tokenStdin || apiOnly),
+  'Usage: node scripts/check-deployment.mjs URL [--api-only [--token-stdin]] [--mcp]')
 const target = new URL(baseUrl)
 const headers = {}
-if (auth === '--token-stdin') {
+if (tokenStdin) {
   assert.equal(target.protocol, 'https:', 'The private API check requires HTTPS.')
   const token = readFileSync(0, 'utf8').trim()
   assert(token, 'Provide an identity token on stdin.')
@@ -16,14 +18,42 @@ if (auth === '--token-stdin') {
 }
 
 // Fetch a public deployment path and return its response.
-async function request(path) {
+async function request(path, options = {}) {
   const response = await fetch(new URL(path, target), {
-    headers,
+    ...options,
+    headers: { ...headers, ...options.headers },
     redirect: 'error',
     signal: AbortSignal.timeout(15_000),
   })
   assert(response.ok, `${path} returned HTTP ${response.status}`)
   return response
+}
+
+// Check that a remote MCP client can initialize and discover the read-only tools.
+async function checkMcp() {
+  const protocolVersion = '2025-06-18'
+  async function rpc(method, params, version) {
+    const response = await request('/mcp', {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json, text/event-stream',
+        'Content-Type': 'application/json',
+        'MCP-Protocol-Version': version,
+      },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+    })
+    const { result } = await response.json()
+    assert(result, `MCP ${method} returned no result.`)
+    return result
+  }
+  const initialized = await rpc('initialize', {
+    protocolVersion, capabilities: {}, clientInfo: { name: 'pull-deployment-check', version: '1' },
+  }, protocolVersion)
+  assert.equal(initialized.serverInfo.name, 'Pull')
+  const { tools } = await rpc('tools/list', {}, initialized.protocolVersion)
+  for (const name of ['search_bills', 'list_members', 'get_bill_explanation']) {
+    assert.equal(tools.find((tool) => tool.name === name)?.annotations?.readOnlyHint, true)
+  }
 }
 
 // Verify that the API is running and can load a topic and its first feed page.
@@ -51,8 +81,9 @@ async function checkFrontend() {
 
 for (let attempt = 1; attempt <= 5; attempt += 1) {
   try {
-    if (mode !== '--api-only') await checkFrontend()
+    if (!apiOnly) await checkFrontend()
     await checkApi()
+    if (flags.includes('--mcp')) await checkMcp()
     console.log(`Deployment check passed for ${target.origin}`)
     break
   } catch (error) {

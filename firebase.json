@@ -27,7 +27,7 @@
     ],
     "rewrites": [
       {
-        "source": "/api{,/**}",
+        "regex": "^/(api(/.*)?|mcp)$",
         "run": {
           "serviceId": "pull-api",
           "region": "us-east1",

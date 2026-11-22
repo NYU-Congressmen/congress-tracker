@@ -12,6 +12,8 @@ Onboarding saves a profile, a manually selected congressional district and chose
 
 The Social page saves stance drafts in the browser. Firebase phone sign-in creates an account that can save one review per bill. The Explanation panel shows saved explanations with Summary, Limits, Status and Next steps, or the official summary by itself when available. The public deployment serves stored legislative data from Supabase.
 
+MCP clients can search stored bills, list current members and read saved bill explanations through the read-only `/mcp` endpoint. [MCP setup](SETUP.md#mcp-clients)
+
 Pull follows the device theme until a visitor chooses Day or Night. The arrow beside the theme button restores the device setting.
 
 Firebase Hosting serves the React app over HTTPS and forwards `/api` requests to a pinned FastAPI revision on Cloud Run. App pages send a Content Security Policy and block framing. The release workflow checks the API before publishing the tested frontend build and checks the public feed afterward. The live site was deployed manually, and the first automated release awaits a merge to `main` that includes the workflow. [Release workflow](CONTRIBUTING.md#releases)

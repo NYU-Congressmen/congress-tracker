@@ -108,10 +108,10 @@ jobs:
           bash scripts/deploy-api.sh
           api_url=$(gcloud run services describe pull-api --project=congress-pull \
             --region=us-east1 --format='value(status.url)')
-          node scripts/check-deployment.mjs "$api_url" --api-only
+          node scripts/check-deployment.mjs "$api_url" --api-only --mcp
       - name: Publish Firebase Hosting
         if: steps.release.outputs.current == 'true'
         run: npx --yes firebase-tools@15.37.0 deploy --only hosting --project congress-pull --non-interactive
       - name: Check the public site
         if: steps.release.outputs.current == 'true'
-        run: node scripts/check-deployment.mjs https://congress-pull.web.app
+        run: node scripts/check-deployment.mjs https://congress-pull.web.app --mcp
