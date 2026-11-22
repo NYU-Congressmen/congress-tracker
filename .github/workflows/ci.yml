@@ -40,22 +40,32 @@ jobs:
       - run: uv sync --locked
       - run: uv run ruff check .
       - run: uv run ruff format --check .
-      - run: uv run pytest
       - name: Read the release schema revision
         id: schema
         run: |
           head=$(uv run --locked python - <<'PY'
+          import sys
+
           from alembic.config import Config
           from alembic.script import ScriptDirectory
 
-          print(ScriptDirectory.from_config(Config("alembic.ini")).get_current_head() or "")
+          heads = ScriptDirectory.from_config(Config("alembic.ini")).get_heads()
+          if len(heads) != 1:
+              print(
+                  f"::error::The release needs exactly one Alembic head. Found "
+                  f"{', '.join(sorted(heads)) or 'none'}.",
+                  file=sys.stderr,
+              )
+              sys.exit(1)
+          print(heads[0])
           PY
           )
           if [[ ! "$head" =~ ^[A-Za-z0-9_-]+$ ]]; then
-            echo "::error::The release needs exactly one Alembic head."
+            echo "::error::The Alembic head contains unsupported characters."
             exit 1
           fi
           echo "head=$head" >> "$GITHUB_OUTPUT"
+      - run: uv run pytest
 
   frontend:
     runs-on: ubuntu-latest
