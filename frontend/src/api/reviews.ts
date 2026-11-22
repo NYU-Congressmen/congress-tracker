@@ -4,6 +4,7 @@ import type { BillType } from './bills'
 // Keep these types in step with the models in backend/app/models.py
 
 export type Stance = 'support' | 'oppose' | 'unsure'
+export type ModerationStatus = 'pending' | 'flagged' | 'held' | 'cleared'
 
 export const STANCES: readonly Stance[] = ['support', 'oppose', 'unsure']
 
@@ -24,6 +25,7 @@ export interface ReviewIn {
 // Describe a saved review of one bill by the signed-in user.
 export interface Review extends ReviewIn {
   bill_id: string
+  moderation_status: ModerationStatus
   created_at: string
   updated_at: string
 }

@@ -16,3 +16,18 @@ test('authorizes the inline theme script in the Hosting policy', () => {
     .find((directive) => directive.startsWith('script-src ')).split(/\s+/)
   assert(scriptSources.includes(`'sha256-${hash}'`), 'Update the theme script hash in firebase.json.')
 })
+
+test('routes REST and MCP to one pinned Cloud Run revision before the frontend fallback', () => {
+  const config = JSON.parse(readFileSync(new URL('../firebase.json', import.meta.url), 'utf8'))
+  const [backend, fallback] = config.hosting.rewrites
+  const paths = new RegExp(backend.regex)
+  for (const path of ['/api', '/api/health', '/api/bills/119/hr/1', '/mcp']) {
+    assert(paths.test(path), `Expected ${path} to reach Cloud Run.`)
+  }
+  for (const path of ['/', '/bills/119/hr/1', '/mcp-other']) {
+    assert(!paths.test(path), `Expected ${path} to reach the frontend fallback.`)
+  }
+  assert.equal(backend.run.serviceId, 'pull-api')
+  assert.equal(backend.run.pinTag, true)
+  assert.equal(fallback.destination, '/index.html')
+})

@@ -126,13 +126,13 @@ describe('SocialPage', () => {
     expect(listDiscussions(null)).toHaveLength(0)
   })
 
-  test('reports a saved review when the backend accepts it', async () => {
+  test.each([true, false])('loads and changes saved brief consent (%s)', async (initialConsent) => {
     const review = {
       bill_id: '119-hr-7',
       stance: 'support',
       story: 'My family used this service.',
       action_taken: null,
-      consent_to_share: false,
+      consent_to_share: initialConsent,
       created_at: '2026-11-11T12:00:00Z',
       updated_at: '2026-11-11T12:00:00Z',
     }
@@ -143,12 +143,17 @@ describe('SocialPage', () => {
     fireEvent.change(search, { target: { value: 'hospital' } })
     fireEvent.click(screen.getByRole('button', { name: 'Search bills' }))
     fireEvent.click(await screen.findByRole('button', { name: /To expand hospital coverage/ }))
-    fireEvent.click(screen.getByRole('radio', { name: 'Oppose' }))
+    expect(await screen.findByDisplayValue('My family used this service.')).toBeTruthy()
+    const consent = screen.getByRole('checkbox', { name: /Constituent Signal brief/i })
+    expect((consent as HTMLInputElement).checked).toBe(initialConsent)
+    fireEvent.click(consent)
     fireEvent.click(await screen.findByRole('button', { name: 'Save my stance' }))
 
     expect(await screen.findByText(/Your review is saved/i)).toBeTruthy()
     expect(fetchMock).toHaveBeenCalledWith('/api/bills/119/hr/7/review', expect.objectContaining({
       headers: expect.objectContaining({ Authorization: 'Bearer test-id-token' }),
+      method: 'PUT',
+      body: JSON.stringify({ stance: 'support', story: review.story, action_taken: null, consent_to_share: !initialConsent }),
     }))
     await waitFor(() => {
       expect(screen.getByText('Saved')).toBeTruthy()

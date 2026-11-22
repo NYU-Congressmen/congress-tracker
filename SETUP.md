@@ -50,6 +50,7 @@ Each teammate keeps their own `.env` at the repo root, and `.env.example` is the
 | `DATABASE_URL` | To see real data | Connection string for the team's Supabase database. Ask the teammate who manages it to send it privately, and never paste it into the repo or a group chat |
 | `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL` | Once the AI service is added | Your own free Gemini key from <https://aistudio.google.com/apikey>, with the endpoint and model from `.env.example`. The AI service calls the model through OpenAI's SDK, so another provider needs only different values here |
 | `FIREBASE_PROJECT_ID` | For phone sign-in | Identifies the Firebase project whose tokens the API accepts |
+| `MODERATION_API_KEY` | For automatic review moderation | Server-side OpenAI API key for classifying review text. Reviews with text stay pending when the key is absent |
 | `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID` | For local Firebase configuration | Identifies the Firebase project to the browser SDK. Firebase Hosting supplies these values in production |
 
 ## Database tests
@@ -80,6 +81,12 @@ The migrations enable the pgvector extension, so the test database needs pgvecto
 ## Deployment setup
 
 The release workflow uses the `congress-pull` Firebase and Google Cloud project, the default Hosting site and the `pull-api` Cloud Run service in `us-east1`. Cloud Run reads `DATABASE_URL` from a pinned version of the `pull-database-url` Secret Manager secret. The runtime service account needs Secret Manager Secret Accessor on that secret. The Supabase session pooler supplies the IPv4 connection string for Cloud Run. [Cloud Run secrets](https://docs.cloud.google.com/run/docs/configuring/services/secrets) [Supabase connection modes](https://supabase.com/docs/guides/database/connecting-to-postgres)
+
+Hosted automatic moderation uses a separate Secret Manager secret mapped to `MODERATION_API_KEY` on `pull-api`. The Cloud Run runtime account reads the pinned version at startup.
+
+## MCP clients
+
+Connect a client using Streamable HTTP. The local FastAPI server exposes `http://127.0.0.1:8000/mcp`, and Firebase Hosting exposes `https://congress-pull.web.app/mcp` once the release containing the endpoint is deployed. Pull's tools read public data from PostgreSQL without extra credentials. [FastMCP clients](https://gofastmcp.com/clients/transports)
 
 Phone sign-in uses the Firebase Hosting configuration endpoint in the browser and the Cloud Run service identity through Application Default Credentials in the API. The hosted account page is `/sign-in`. A hosted sign-in check uses a domain authorized in Firebase Auth and a configured fictional number, which sends no SMS. The check covers code verification, saving and reopening a review, and signing out. [Firebase phone sign-in](https://firebase.google.com/docs/auth/web/phone-auth)
 

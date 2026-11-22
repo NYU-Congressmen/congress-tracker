@@ -51,6 +51,7 @@ All commands run from the repo root.
 | `npm run dev` | Runs the API and frontend together and stops both when either exits |
 | `npm run dev:be` / `npm run dev:fe` | Runs only the API or only the frontend |
 | `npm run sync` | Checks the Congress.gov key and copies current members, 119th-Congress bills and their CRS summaries when a database is configured |
+| `uv run --directory backend python -m app.ai.embeddings` | Saves missing or changed bill and topic embeddings. `--limit-bills N` runs a sample of at most N pending bills plus pending topics |
 | `npm test` | Runs the setup scripts, backend (pytest) and frontend (Vitest) tests |
 | `npm run lint` | Checks Python with ruff and TypeScript with oxlint |
 | `npm run format` | Reformats the Python code with ruff |
@@ -66,7 +67,9 @@ New endpoints go in a module under `backend/app/routes/` and are registered in `
 
 Routes that act for a user depend on `current_uid` in `backend/app/auth.py`. It verifies the Firebase ID token for the configured project and returns the UID for the phone session. `PUT /api/account` uses the same verification to create or update the account with Firebase's verified phone number. Route tests use FastAPI dependency overrides, and the account tests cover the token checks and database path with a test verifier.
 
-Every model call goes through `ask` in `backend/app/ai/service.py`, which answers from the `ai_results` cache when it can and logs each real call in `ai_calls` with its tokens and cost. The cache key covers the feature, prompt version, model and exact messages, so changed input regenerates by itself. Bump a feature's prompt version when its prompt changes. A failed call is logged and raised, never cached.
+Structured model calls go through `ask` in `backend/app/ai/service.py`, which answers from the `ai_results` cache when it can. The cache key covers the feature, prompt version, model and exact messages, so changed input regenerates by itself. Both structured calls and embedding batches log their tokens and cost in `ai_calls`.
+
+The embedding job uses `LLM_API_KEY` and `LLM_BASE_URL` for an endpoint that serves OpenAI `text-embedding-3-small`. It stores 1,536-dimensional vectors for topic names and keywords and for bill titles with their latest CRS summary where available. The job runs after the embedding migration and can be rerun after a sync to fill new or changed inputs. The Cloud Run feed reads these saved vectors, so feed traffic does not need a model key. The shared database needs the embedding migration before the first release of the semantic feed.
 
 Code that talks to Congress.gov lives in `backend/app/sync/`. The list sync in `bills.py`, `members.py` and `summaries.py` fills the tables cheaply, and `cache.py` fetches a single bill's or member's details when an endpoint needs them, so new endpoints should read from the database and call the cache rather than Congress.gov directly. Tests that need a database use the `db` fixture in `backend/tests/conftest.py`, and [SETUP.md](SETUP.md#database-tests) explains how to run them locally.
 
@@ -76,11 +79,42 @@ To add a package, run `uv add --directory backend package-name` for Python or `n
 
 ## API responses
 
-Bill lists return `total`, `page`, `limit` and `data`, ordered by latest action date descending and then bill ID ascending. The secondary order resolves date ties, although a sync that changes records between requests can still move records between pages. Member profiles include sponsored bills from the configured current Congress only. Bill detail actions retain Congress.gov's supplied sequence, including actions sharing a date. `GET /api/feed` returns the same shape for the bills matching one or more `issue_id` values from `GET /api/issues`, by keyword over titles and CRS summaries.
+Bill lists return `total`, `page`, `limit` and `data`, ordered by latest action date descending and then bill ID ascending. The secondary order resolves date ties, although a sync that changes records between requests can still move records between pages. Member profiles include sponsored bills from the configured current Congress only. Bill detail actions retain Congress.gov's supplied sequence, including actions sharing a date. `GET /api/feed` uses the same response shape. It ranks bills by their closest semantic match to any selected `issue_id`, with latest action date and bill ID breaking ties. It uses keyword matching when a selected topic lacks a current vector or no bill passes the similarity cutoff.
 
 `PUT /api/bills/{congress}/{type}/{number}/review` replaces the signed-in user's whole review, so a client sends every field, and anything left out returns to its default. `GET` on the same path returns that review.
 
-Opening a bill stores its list of text versions, and the texts and diff endpoints fetch that list themselves when none is stored yet. `GET /api/bills/{congress}/{type}/{number}/texts` lists them, oldest first, and `.../diff?from=&to=` compares two by version name, downloading and caching each text the first time it is needed.
+The review form loads the saved review before editing. `consent_to_share` is the author's opt-in for that bill's Constituent Signal brief, and a new review starts unchecked. Saving again with the box unchecked withdraws consent.
+
+The bill page's `#call-log` section links to the authenticated call log. `GET /api/bills/{congress}/{type}/{number}/calls` returns the account's 20 most recent entries for that bill. `PUT` to the same path followed by a request UUID records the member's `bioguide_id`. Reusing that UUID for the same call returns the saved entry. A later call uses a new UUID, even when it is to the same office.
+
+## MCP tools
+
+`backend/app/mcp.py` registers three read-only tools. `search_bills` uses a title keyword and optional status, `list_members` uses a state and optional chamber, and `get_bill_explanation` takes a bill's Congress, type and number. They reuse Pull's public read queries. The explanation tool returns a saved explanation or an official CRS summary. Requests are stateless, so Cloud Run instances can handle them independently. The release checks tool discovery through Cloud Run and again through Firebase Hosting.
+
+## Review moderation
+
+Saving a review commits the author's text before sending the story and action text to OpenAI Moderation. New or edited text stays pending if the service is unavailable. Pull flags harassment and threats for review. Authors can read their own reviews at every stage. The `visible_reviews` database view contains cleared reviews that the author has left visible, so public review features can read from it.
+
+The queue command uses the configured database connection. `list` shows pending and flagged reviews, and `show` displays a selected review's text and revision. `check` retries a pending check, `approve` clears the reviewed revision and `hold` keeps it hidden. Each decision takes the revision shown by `show` so an edit made in the meantime gets its own check.
+
+```bash
+uv run --directory backend python -m app.ai.moderation list
+uv run --directory backend python -m app.ai.moderation show REVIEW_ID
+uv run --directory backend python -m app.ai.moderation check REVIEW_ID REVISION
+uv run --directory backend python -m app.ai.moderation approve REVIEW_ID REVISION
+uv run --directory backend python -m app.ai.moderation hold REVIEW_ID REVISION
+```
+
+## Text comparisons
+
+Opening a bill stores its list of text versions, and the texts and diff endpoints fetch that list themselves when none is stored yet. `GET /api/bills/{congress}/{type}/{number}/texts` lists them, oldest first. Both methods at `.../diff?from=&to=` compare two versions by name and return any saved summary. Compare versions sends a POST, which can generate a missing summary when a model is configured. The line-by-line diff still returns if the comparison exceeds the summary input limit or the model is unavailable. A change to the diff produces a new cache key.
+
+The command-line tool can also generate a summary ahead of a demo. Copy the two version names from the bill page and run it with a configured model.
+
+```bash
+uv run --directory backend python -m app.ai.diff_summary \
+  CONGRESS TYPE NUMBER "FROM VERSION" "TO VERSION"
+```
 
 Both detail endpoints include a `cache` object. `complete` means the bill's details and actions, or the member's entire sponsored-bill list, were fetched successfully. It does not guarantee that the upstream source itself is complete. `stale` means that the detail version is behind the latest recorded bill version or that sponsored bills are older than a day, and is also true for a missing cache. `refreshed_at` is the last successful local fetch time. `refresh_failed` records an unsuccessful refresh, and `retry_after` gives the earliest retry time. Successful refreshes clear the failure state.
 

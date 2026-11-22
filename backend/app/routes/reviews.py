@@ -2,6 +2,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from app.ai.moderation import moderate_review
 from app.auth import current_uid
 from app.db import connect, fetch_one
 from app.models import BillType, Review, ReviewIn
@@ -12,7 +13,10 @@ router = APIRouter(tags=["reviews"])
 # Every review route acts for the signed-in user, so each one asks sign-in for the UID
 Uid = Annotated[str, Depends(current_uid)]
 
-REVIEW_COLUMNS = "bill_id, stance, story, action_taken, consent_to_share, created_at, updated_at"
+REVIEW_COLUMNS = (
+    "bill_id, stance, story, action_taken, consent_to_share, "
+    "created_at, updated_at, moderation_status"
+)
 
 # A second review of the same bill replaces the first, so each user has one review per bill
 SAVE_REVIEW_SQL = f"""
@@ -25,7 +29,7 @@ SAVE_REVIEW_SQL = f"""
         action_taken = EXCLUDED.action_taken,
         consent_to_share = EXCLUDED.consent_to_share,
         updated_at = now()
-    RETURNING {REVIEW_COLUMNS}
+    RETURNING {REVIEW_COLUMNS}, review_id, moderation_revision
 """
 
 
@@ -46,7 +50,13 @@ def save_review(
         if not found["user_found"]:
             raise HTTPException(403, "Finish signing up before reviewing a bill")
         params = {**review.model_dump(), "uid": uid, "bill_id": bill_id}
-        return conn.execute(SAVE_REVIEW_SQL, params).fetchone()
+        saved = conn.execute(SAVE_REVIEW_SQL, params).fetchone()
+
+    # Commit the author's text before calling the provider and release the database connection.
+    status = moderate_review(saved)
+    if status is not None:
+        saved["moderation_status"] = status
+    return saved
 
 
 @router.get("/bills/{congress}/{bill_type}/{number}/review", response_model=Review)

@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     llm_api_key: str | None = None
     llm_base_url: str | None = None
     llm_model: str | None = None
+    moderation_api_key: str | None = None
 
 
 settings = Settings()

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { diffTextVersions, listTextVersions } from '../../api/texts'
-import type { TextVersion } from '../../api/texts'
+import type { BillDiff as DiffResult, TextVersion } from '../../api/texts'
 import type { BillType } from '../../api/bills'
 import { useApi } from '../../hooks/useApi'
 import { formatDate } from '../../lib/format'
@@ -25,8 +25,7 @@ function diffClass(line: string): string {
   return 'diff-line'
 }
 
-// The versions of a bill's text and the line-by-line changes between any two
-// of them, so a reader can see exactly what moved while the bill traveled.
+// Show a bill's published versions and the details of a selected comparison.
 export function BillDiff({ congress, type, number }: BillDiffProps) {
   const { data: versions, loading, error, refetch } = useApi(
     () => listTextVersions(congress, type, number),
@@ -37,8 +36,7 @@ export function BillDiff({ congress, type, number }: BillDiffProps) {
   const [to, setTo] = useState('')
   const [comparing, setComparing] = useState(false)
   const [compareError, setCompareError] = useState<string | null>(null)
-  const [changes, setChanges] = useState<string[] | null>(null)
-  const [compared, setCompared] = useState<{ from: string; to: string } | null>(null)
+  const [result, setResult] = useState<DiffResult | null>(null)
 
   const list: TextVersion[] = versions ?? []
 
@@ -54,12 +52,10 @@ export function BillDiff({ congress, type, number }: BillDiffProps) {
     }
     setComparing(true)
     setCompareError(null)
-    setChanges(null)
-    setCompared(null)
+    setResult(null)
     try {
       const diff = await diffTextVersions(congress, type, number, fromValue, toValue)
-      setChanges(diff.changes)
-      setCompared({ from: fromValue, to: toValue })
+      setResult(diff)
     } catch (cause) {
       setCompareError(cause instanceof Error ? cause.message : 'The comparison could not be made.')
     } finally {
@@ -140,13 +136,23 @@ export function BillDiff({ congress, type, number }: BillDiffProps) {
             </p>
           ) : null}
 
-          {changes ? (
+          {result?.summary ? (
+            <div className="diff-summary">
+              <div className="explain-part__head">
+                <h3>Changes</h3>
+                <span className="explain-tag">AI-generated</span>
+              </div>
+              <p>{result.summary}</p>
+            </div>
+          ) : null}
+
+          {result ? (
             <div className="diff-viewer">
               <p className="diff-viewer__head">
-                {compared?.from} → {compared?.to}
+                {result.from_version} → {result.to_version}
               </p>
               <pre aria-label="Changes between the two versions">
-                {changes.map((line, index) => (
+                {result.changes.map((line, index) => (
                   <span key={index} className={diffClass(line)}>
                     {line || ' '}
                     {'\n'}

@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ApiError } from '../api/client'
 import { getBill, searchBills } from '../api/bills'
 import type { BillSummary } from '../api/bills'
-import { saveReview, STANCES, STANCE_LABELS } from '../api/reviews'
+import { getReview, saveReview, STANCES, STANCE_LABELS } from '../api/reviews'
 import { useSession } from '../auth/SessionContext'
 import { PLATFORMS, platformName } from '../profile/platforms'
 import type { SocialProfile } from '../profile/types'
@@ -51,6 +51,10 @@ function SocialContent() {
   const [stance, setStance] = useState<string>('')
   const [story, setStory] = useState('')
   const [actionTaken, setActionTaken] = useState('')
+  const [consentToShare, setConsentToShare] = useState(false)
+  const [loadingReview, setLoadingReview] = useState(false)
+  const [reviewError, setReviewError] = useState(false)
+  const reviewLoad = useRef(0)
   const [submitting, setSubmitting] = useState(false)
   const [submitNotice, setSubmitNotice] = useState<{ kind: 'ok' | 'draft' | 'error'; text: string } | null>(null)
 
@@ -76,6 +80,39 @@ function SocialContent() {
     setBillResults(null)
     setBillQuery('')
     setSubmitNotice(null)
+    setStance('')
+    setStory('')
+    setActionTaken('')
+    setConsentToShare(false)
+    void loadReview(bill)
+  }
+
+  async function loadReview(bill: BillSummary) {
+    setReviewError(false)
+    if (!user) return
+    const load = ++reviewLoad.current
+    setLoadingReview(true)
+    try {
+      const review = await getReview(bill.congress, bill.type, bill.number, await user.getIdToken())
+      if (load !== reviewLoad.current) return
+      setStance(review.stance)
+      setStory(review.story ?? '')
+      setActionTaken(review.action_taken ?? '')
+      setConsentToShare(review.consent_to_share)
+    } catch (error) {
+      if (load === reviewLoad.current && !(error instanceof ApiError && error.status === 404)) {
+        setReviewError(true)
+      }
+    } finally {
+      if (load === reviewLoad.current) setLoadingReview(false)
+    }
+  }
+
+  function changeBill() {
+    reviewLoad.current += 1
+    setLoadingReview(false)
+    setReviewError(false)
+    setSelected(null)
   }
 
   async function findBills(event: FormEvent) {
@@ -98,6 +135,7 @@ function SocialContent() {
 
   async function submitDiscussion(event: FormEvent) {
     event.preventDefault()
+    if (loadingReview || reviewError || submitting) return
     setSubmitNotice(null)
     if (!selected) {
       setSubmitNotice({ kind: 'error', text: 'Find the bill you want to weigh in on first.' })
@@ -110,9 +148,9 @@ function SocialContent() {
     setSubmitting(true)
     const review = {
       stance: stance as (typeof STANCES)[number],
-      story: story.trim() || null,
-      action_taken: actionTaken.trim() || null,
-      consent_to_share: false,
+      story: story.trim() ? story : null,
+      action_taken: actionTaken.trim() ? actionTaken : null,
+      consent_to_share: Boolean(user && consentToShare),
     }
     let saved = false
     let notice: NonNullable<typeof submitNotice> = { kind: 'draft', text: 'Draft saved in this browser.' }
@@ -122,8 +160,6 @@ function SocialContent() {
         await saveReview(selected.congress, selected.type, selected.number, review, token)
         saved = true
         notice = { kind: 'ok', text: 'Your review is saved. You can see it on the bill page.' }
-        setStory('')
-        setActionTaken('')
       }
     } catch (cause) {
       const isAuth = cause instanceof ApiError && cause.status === 401
@@ -142,7 +178,7 @@ function SocialContent() {
           stance: review.stance,
           story: review.story,
           action_taken: review.action_taken,
-          consent: false,
+          consent: saved && review.consent_to_share,
           saved,
           at: new Date().toISOString(),
         })
@@ -273,7 +309,7 @@ function SocialContent() {
                 <span className="social-bill__id">{billNumber(selected.type, selected.number)}</span>
                 <span className="social-bill__title">{selected.title}</span>
               </Link>
-              <button type="button" className="btn btn--ghost btn--sm" onClick={() => setSelected(null)}>
+              <button type="button" className="btn btn--ghost btn--sm" onClick={changeBill} disabled={submitting}>
                 Change bill
               </button>
             </div>
@@ -317,8 +353,16 @@ function SocialContent() {
             </>
           )}
 
+          {loadingReview ? <LoadingState message="Loading your saved review…" /> : null}
+          {reviewError && selected ? (
+            <p className="form-error" role="alert">
+              Your saved review could not be loaded.{' '}
+              <button type="button" className="btn btn--ghost btn--sm" onClick={() => void loadReview(selected)}>Retry</button>
+            </p>
+          ) : null}
+
           <form className="social-composer" onSubmit={submitDiscussion}>
-            <fieldset className="social-stance">
+            <fieldset className="social-stance" disabled={loadingReview || reviewError || submitting}>
               <legend>Where do you stand?</legend>
               {STANCES.map((option) => (
                 <label key={option} className={`social-stance__option${stance === option ? ' is-selected' : ''}`}>
@@ -339,6 +383,7 @@ function SocialContent() {
               <textarea
                 className="field__control social-composer__textarea"
                 value={story}
+                disabled={loadingReview || reviewError || submitting}
                 maxLength={20000}
                 placeholder="What does this bill mean to you?"
                 onChange={(event) => setStory(event.target.value)}
@@ -350,13 +395,26 @@ function SocialContent() {
               <textarea
                 className="field__control social-composer__textarea"
                 value={actionTaken}
+                disabled={loadingReview || reviewError || submitting}
                 maxLength={20000}
                 placeholder="Called your representative, attended a hearing, organized a neighbor…"
                 onChange={(event) => setActionTaken(event.target.value)}
               />
             </label>
 
-            <button type="submit" className="btn btn--primary btn--lg" disabled={submitting}>
+            {user && selected ? (
+              <label className="review-consent">
+                <input
+                  type="checkbox"
+                  checked={consentToShare}
+                  disabled={loadingReview || reviewError || submitting}
+                  onChange={(event) => setConsentToShare(event.target.checked)}
+                />
+                <span>Include this review in the Constituent Signal brief for my representative’s office.</span>
+              </label>
+            ) : null}
+
+            <button type="submit" className="btn btn--primary btn--lg" disabled={loadingReview || reviewError || submitting}>
               {submitting ? 'Saving…' : 'Save my stance'}
             </button>
           </form>

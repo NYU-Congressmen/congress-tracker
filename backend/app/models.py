@@ -119,11 +119,12 @@ class TextVersion(BaseModel):
 
 
 class BillDiff(BaseModel):
-    """Describe the line-by-line changes between two versions of a bill's text."""
+    """Describe the line-by-line changes and any saved summary for a pair of bill versions."""
 
     from_version: str
     to_version: str
     changes: list[str]
+    summary: str | None = None
 
 
 class BillExplanation(BaseModel):
@@ -167,5 +168,20 @@ class Review(ReviewIn):
     """Describe a saved review of one bill by the signed-in user."""
 
     bill_id: str
+    moderation_status: Literal["pending", "flagged", "held", "cleared"]
     created_at: datetime
     updated_at: datetime
+
+
+class CallIn(BaseModel):
+    """Describe the congressional office a person called."""
+
+    bioguide_id: str = Field(min_length=1, max_length=32)
+
+
+class CallEntry(CallIn):
+    """Describe a call recorded by the signed-in user."""
+
+    action_id: int
+    member_name: str
+    created_at: datetime

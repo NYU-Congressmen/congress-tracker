@@ -2,9 +2,17 @@ import type { User } from '@firebase/auth'
 import { Link } from 'react-router-dom'
 import type { BillType } from '../../api/bills'
 import { getReview, STANCE_LABELS } from '../../api/reviews'
+import type { ModerationStatus } from '../../api/reviews'
 import { useSession } from '../../auth/SessionContext'
 import { useApi } from '../../hooks/useApi'
 import { timeAgo } from '../../lib/format'
+
+const MODERATION_NOTICES: Record<ModerationStatus, string | null> = {
+  pending: 'Moderation pending',
+  flagged: 'Held for review',
+  held: 'Hidden after review',
+  cleared: null,
+}
 
 interface ReviewPanelProps {
   congress: number
@@ -55,6 +63,9 @@ function AccountReview({ congress, type, number, user }: ReviewPanelProps & { us
           <span className={`review__stance review__stance--${data.stance}`}>{STANCE_LABELS[data.stance]}</span>
           {data.story ? <p className="review__story">{data.story}</p> : null}
           {data.action_taken ? <p className="review__action">What they did: {data.action_taken}</p> : null}
+          {MODERATION_NOTICES[data.moderation_status] ? (
+            <p className="muted review__meta">{MODERATION_NOTICES[data.moderation_status]}</p>
+          ) : null}
           <p className="muted review__meta">Saved {timeAgo(data.updated_at) || 'recently'}</p>
         </div>
       ) : null}

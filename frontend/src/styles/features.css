@@ -393,6 +393,19 @@
   margin-bottom: 18px;
 }
 
+.diff-summary {
+  margin-bottom: 16px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+
+.diff-summary p {
+  max-width: 70ch;
+  color: var(--ink-2);
+}
+
 .diff-viewer {
   max-height: 32rem;
   overflow: auto;
@@ -979,6 +992,48 @@ button.chip {
   background: var(--btn);
   border-color: transparent;
   color: var(--btn-ink);
+}
+
+.review-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+}
+
+.review-consent input {
+  flex: none;
+  margin-top: 0.25em;
+}
+
+.call-log__fields {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-inline-size: 0;
+}
+
+.call-log__fields > .field {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.call-log__entries {
+  display: grid;
+  gap: 0.5rem;
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 0;
+}
+
+.call-log__entries > li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
 }
 
 .social-composer__textarea {

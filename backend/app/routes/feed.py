@@ -8,6 +8,38 @@ from app.models import BillPage, Issue
 
 router = APIRouter(tags=["feed"])
 
+# A minimum similarity of 0.28 filled ten results on all five topics in the bill pilot.
+MAX_COSINE_DISTANCE = 0.72
+
+SEMANTIC_FEED = """
+    WITH selected AS MATERIALIZED (
+        SELECT i.embedding
+        FROM issue_embeddings i JOIN issue_embedding_inputs src USING (issue_id)
+        WHERE i.issue_id = ANY(%(ids)s) AND i.source_key = src.source_key
+    ), ranked AS (
+        SELECT b.bill_id, b.congress, b.type, b.number, b.title, b.status, b.passed_house,
+               b.passed_senate, b.introduced_date, b.latest_action_date, b.latest_action_text,
+               nearest.distance
+        FROM bill_embeddings e JOIN bill_embedding_inputs src USING (bill_id)
+        JOIN bills b USING (bill_id)
+        CROSS JOIN LATERAL (
+            SELECT min(e.embedding <=> s.embedding) AS distance FROM selected s
+        ) nearest
+        WHERE (SELECT count(*) FROM selected) = %(issue_count)s
+          AND e.source_key = src.source_key
+          AND nearest.distance <= %(max_distance)s
+    ), page AS (
+        SELECT * FROM ranked
+        ORDER BY distance, latest_action_date DESC NULLS LAST, bill_id
+        LIMIT %(limit)s OFFSET %(offset)s
+    )
+    SELECT (SELECT count(*) FROM ranked) AS total,
+           coalesce(jsonb_agg(to_jsonb(page) - 'distance'
+                              ORDER BY distance, latest_action_date DESC NULLS LAST, bill_id),
+                    '[]'::jsonb) AS data
+    FROM page
+"""
+
 
 def keyword_pattern(keywords: list[str]) -> str:
     """Return a PostgreSQL pattern matching any keyword as whole words."""
@@ -27,13 +59,22 @@ def get_feed(
     page: Annotated[int, Query(ge=1)] = 1,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
 ) -> dict[str, Any]:
-    """Return bills whose title or CRS summary mentions a chosen issue, newest action first."""
+    """Return bills closest to any selected issue, falling back to keyword matching."""
+    ids = sorted(set(issue_id))
     issues = fetch_all(
-        "SELECT issue_id, keywords FROM issues WHERE issue_id = ANY(%(ids)s)", {"ids": issue_id}
+        "SELECT issue_id, keywords FROM issues WHERE issue_id = ANY(%(ids)s)", {"ids": ids}
     )
-    missing = set(issue_id) - {issue["issue_id"] for issue in issues}
+    missing = set(ids) - {issue["issue_id"] for issue in issues}
     if missing:
         raise HTTPException(status_code=404, detail=f"Unknown issues: {sorted(missing)}")
+
+    pagination = {"limit": limit, "offset": (page - 1) * limit}
+    result = fetch_one(
+        SEMANTIC_FEED,
+        {**pagination, "ids": ids, "issue_count": len(ids), "max_distance": MAX_COSINE_DISTANCE},
+    )
+    if result["total"]:
+        return {"page": page, "limit": limit, **result}
 
     keywords = [keyword for issue in issues for keyword in issue["keywords"]]
     if not keywords:
@@ -54,6 +95,6 @@ def get_feed(
         ORDER BY latest_action_date DESC NULLS LAST, bill_id
         LIMIT %(limit)s OFFSET %(offset)s
         """,
-        {**params, "limit": limit, "offset": (page - 1) * limit},
+        {**params, **pagination},
     )
     return {"total": total, "page": page, "limit": limit, "data": bills}

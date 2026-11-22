@@ -57,12 +57,27 @@ describe('BillDiff', () => {
 
     expect(await screen.findByText((content) => (content ?? '').includes('H.R. 1 EH'))).toBeTruthy()
     expect(screen.getByText((content) => (content ?? '').includes('H.R. 1 RH'))).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'Changes' })).toBeNull()
     const call = fetchMock.mock.calls.find((candidate) => String(candidate[0]).includes('/diff'))
     expect(call).toBeTruthy()
+    expect(fetchMock).toHaveBeenCalledWith(call?.[0], { method: 'POST' })
     // URLSearchParams encodes spaces as "+", which decodeURIComponent leaves alone.
     const url = decodeURIComponent(String(call?.[0])).replace(/\+/g, ' ')
     expect(url).toContain('from=Reported in House')
     expect(url).toContain('to=Engrossed in House')
+  })
+
+  test('shows the saved change summary before the line-by-line diff', async () => {
+    const summary = 'The second version extends the filing deadline by 30 days.'
+    renderDiff(VERSIONS, { ...DIFF, summary })
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Compare versions' }))
+
+    const heading = await screen.findByRole('heading', { name: 'Changes' })
+    const changes = screen.getByLabelText('Changes between the two versions')
+    expect(heading.compareDocumentPosition(changes) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByText(summary)).toBeTruthy()
+    expect(screen.getByText('AI-generated')).toBeTruthy()
   })
 
   test('shows an empty state when no text has been published', async () => {

@@ -1,10 +1,10 @@
-import difflib
 from datetime import date
 from typing import Annotated, Any
 
 import httpx
 from fastapi import APIRouter, HTTPException, Query
 
+from app.ai.diff_summary import summary_for_diff
 from app.config import settings
 from app.db import fetch_all, fetch_one
 from app.models import BillDetail, BillDiff, BillPage, BillType, Status, TextVersion
@@ -19,7 +19,7 @@ from app.sync.cache import (
     retry_allowed,
 )
 from app.sync.client import CongressClient
-from app.sync.texts import load_text, refresh_text_versions
+from app.sync.texts import compare_versions, refresh_text_versions
 
 router = APIRouter(tags=["bills"])
 
@@ -156,6 +156,32 @@ def list_text_versions(congress: int, bill_type: BillType, number: int) -> list[
     )
 
 
+def bill_version_diff(
+    congress: int,
+    bill_type: BillType,
+    number: int,
+    from_: str,
+    to: str,
+    *,
+    generate: bool,
+) -> BillDiff:
+    """Return a comparison and include the cached or newly generated summary when available."""
+    bill_id = make_bill_id(congress, bill_type, number)
+    ensure_text_versions(congress, bill_type, number)
+    try:
+        changes = compare_versions(bill_id, from_, to)
+    except LookupError as error:
+        raise HTTPException(404, str(error)) from error
+    except httpx.HTTPError as error:
+        raise HTTPException(502, "The bill text could not be downloaded") from error
+    return BillDiff(
+        from_version=from_,
+        to_version=to,
+        changes=changes,
+        summary=summary_for_diff(bill_id, changes, generate=generate),
+    )
+
+
 @router.get("/bills/{congress}/{bill_type}/{number}/diff", response_model=BillDiff)
 def diff_text_versions(
     congress: int,
@@ -163,19 +189,18 @@ def diff_text_versions(
     number: int,
     from_: Annotated[str, Query(alias="from")],
     to: str,
-) -> dict[str, Any]:
-    """Return the changes between two text versions, downloading either text not yet stored."""
-    bill_id = make_bill_id(congress, bill_type, number)
-    ensure_text_versions(congress, bill_type, number)
-    try:
-        old, new = load_text(bill_id, from_), load_text(bill_id, to)
-    except LookupError as error:
-        raise HTTPException(404, str(error)) from error
-    except httpx.HTTPError as error:
-        raise HTTPException(502, "The bill text could not be downloaded") from error
-    if old is None or new is None:
-        raise HTTPException(404, "One of these versions has no formatted text to compare")
-    changes = difflib.unified_diff(
-        old.splitlines(), new.splitlines(), fromfile=from_, tofile=to, lineterm=""
-    )
-    return {"from_version": from_, "to_version": to, "changes": list(changes)}
+) -> BillDiff:
+    """Return a bill's text comparison with a saved summary when available."""
+    return bill_version_diff(congress, bill_type, number, from_, to, generate=False)
+
+
+@router.post("/bills/{congress}/{bill_type}/{number}/diff", response_model=BillDiff)
+def summarize_text_versions(
+    congress: int,
+    bill_type: BillType,
+    number: int,
+    from_: Annotated[str, Query(alias="from")],
+    to: str,
+) -> BillDiff:
+    """Return a bill's text comparison and generate a missing summary when possible."""
+    return bill_version_diff(congress, bill_type, number, from_, to, generate=True)
