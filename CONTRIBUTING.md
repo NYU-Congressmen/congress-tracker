@@ -94,6 +94,10 @@ Bill stages are `introduced`, `committee`, `passed_one_chamber`, `passed_both_ch
 
 `GET /api/bills/{congress}/{type}/{number}/graph` returns a bill's cosponsors, the committees and subcommittees holding it with each one's latest activity, and its related bills. Withdrawn cosponsors come last and carry a `withdrawn_date`. Each related bill has `stored`, which says whether Pull has that bill to link to. The first request fetches all three from Congress.gov within the five-second budget, and later requests read the stored copy until the bill's update date changes. The daily sync refreshes them for every bill someone tracks or reviews. The response carries the same `cache` object as the detail endpoints.
 
+### What people on Pull think
+
+`GET /api/bills/{congress}/{type}/{number}/responses` counts stances on a bill as `counts.support`, `counts.oppose` and `counts.unsure`, with their `total` and a `label` for the page to show. Every account is phone-verified, so these are people who chose to respond, not a sample of the public. `?state=NY` limits the counts to users whose saved district is in that state, and `&district=12` to one district. An at-large seat has no district number, so its constituents are counted with the state alone. Reviews their authors hid are left out.
+
 ## Merge strategy
 
 Squash merging turns a pull request into one new commit on `develop`, which leaves your dev branch holding the original commits that `develop` does not recognise. Because the dev branches last the whole project, the next merge of `develop` into your branch would conflict with your own earlier work. A merge commit keeps the shared history, so the merge from `develop` that `git get-latest` makes stays clean.

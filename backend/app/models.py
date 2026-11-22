@@ -219,3 +219,23 @@ class BillGraph(BaseModel):
     committees: list[BillCommittee]
     related_bills: list[RelatedBill]
     cache: CacheInfo
+
+
+class StanceCounts(BaseModel):
+    """Count responses for each stance."""
+
+    support: int
+    oppose: int
+    unsure: int
+
+
+class BillResponses(BaseModel):
+    """Count verified Pull users' stances on a bill, for everyone or for one state or district."""
+
+    bill_id: str
+    # The words the page shows, so readers know these are respondents rather than a poll
+    label: str
+    state: str | None
+    district: int | None
+    total: int
+    counts: StanceCounts
