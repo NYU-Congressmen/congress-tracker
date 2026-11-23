@@ -1,143 +1,157 @@
 import { useState } from 'react'
-import type { CSSProperties } from 'react'
-import { PARTY_LABELS } from '../../lib/constants'
-import type { ChamberCounts, PartyCounts } from '../../lib/stats'
+import { PARTY_ICON_PATHS } from '../../lib/constants'
+import type { ChamberCounts } from '../../lib/stats'
 
 export type ChamberView = 'both' | 'house' | 'senate'
 
 const VIEWS: { value: ChamberView; label: string }[] = [
-  { value: 'both', label: 'Both chambers' },
   { value: 'house', label: 'House' },
   { value: 'senate', label: 'Senate' },
+  { value: 'both', label: 'Joint session' },
 ]
 
-interface Dot {
-  party: 'd' | 'i' | 'r'
-  key: number
+const ROW_COUNTS: Record<ChamberView, number> = { both: 10, house: 9, senate: 4 }
+const HALF_SWEEP = 132 * Math.PI / 180
+const PARTY_AISLE = 0.04
+
+interface SeatGroup {
+  color: string
+  label: string
+  count: number
+  icon?: string
 }
 
-// One circle per member, Democrats first, Independents in the middle and
-// Republicans last. The grid flows column by column, so that sequence reads
-// left to right across the chamber: Democrats (left-leaning) in the left
-// columns, Independents at the interface, Republicans (right-leaning) in
-// the right columns — no party stacked above another. The circles are
-// colored with the same party tokens as the member directory cards on the
-// Members page.
-function dotsFor(counts: PartyCounts): Dot[] {
-  const dots: Dot[] = []
-  for (let n = 0; n < counts.D; n += 1) dots.push({ party: 'd', key: n })
-  for (let n = 0; n < counts.I; n += 1) dots.push({ party: 'i', key: n })
-  for (let n = 0; n < counts.R; n += 1) dots.push({ party: 'r', key: n })
-  return dots
-}
+// Allocate each party a sector and distribute its seats across concentric rows.
+function seatPositions(view: ChamberView, total: number, parties: SeatGroup[]) {
+  const rows = ROW_COUNTS[view]
+  const radii = Array.from({ length: rows }, (_, row) => 23 + 24 * row / (rows - 1))
+  const totalRadius = radii.reduce((sum, radius) => sum + radius, 0)
+  const seatingAngle = 2 * HALF_SWEEP - PARTY_AISLE * (parties.length - 1)
+  let nextStart = -HALF_SWEEP
 
-// Roughly square grid: rows and columns track the square root of the
-// membership, so the grid visibly shrinks from both chambers to a single
-// chamber. rows × cols may hold more cells than there are members; the
-// shortfall is split between the two end columns so the outline stays even:
-// the first column misses ceil(shortfall / 2) circles at its top and the
-// last column misses the rest at its bottom.
-interface GridLayout {
-  rows: number
-  cols: number
-  firstShort: number
-  lastShort: number
-}
-
-function gridLayout(total: number): GridLayout {
-  const rows = Math.max(1, Math.ceil(Math.sqrt(total)))
-  const cols = Math.max(1, Math.ceil(total / rows))
-  const shortfall = rows * cols - total
-  const firstShort = Math.ceil(shortfall / 2)
-  return { rows, cols, firstShort, lastShort: shortfall - firstShort }
-}
-
-// The explicit cell for the nth dot (0-indexed, in the D, I, R order). The
-// first column is bottom-aligned so its missing circles sit at the top, and
-// the last column is top-aligned so its missing circles sit at the bottom.
-function dotCell(index: number, layout: GridLayout, total: number): { row: number; col: number } {
-  const { rows, cols, firstShort, lastShort } = layout
-  const firstCount = rows - firstShort
-  const lastCount = rows - lastShort
-  if (index < firstCount) {
-    return { row: firstShort + 1 + index, col: 1 }
-  }
-  if (index >= total - lastCount) {
-    return { row: index - (total - lastCount) + 1, col: cols }
-  }
-  const middle = index - firstCount
-  return { row: (middle % rows) + 1, col: 2 + Math.floor(middle / rows) }
+  return parties.flatMap(({ color, count }) => {
+    const start = nextStart
+    const sector = seatingAngle * count / total
+    nextStart += sector + PARTY_AISLE
+    let usedRadius = 0
+    let placed = 0
+    return radii.flatMap((radius, row) => {
+      usedRadius += radius
+      const throughRow = Math.round(count * usedRadius / totalRadius)
+      const seats = throughRow - placed
+      placed = throughRow
+      return Array.from({ length: seats }, (_, index) => {
+        const angle = start + sector * (index + 0.5) / seats
+        return {
+          key: `${color}-${row}-${index}`,
+          color,
+          x: 50 + radius * Math.sin(angle),
+          y: (49 - radius * Math.cos(angle)) / 0.86,
+        }
+      })
+    })
+  })
 }
 
 interface ChamberCompositionProps {
   counts: ChamberCounts
 }
 
-// The party split of the current membership as a grid of one circle per
-// member, with a switch between both chambers, the House and the Senate.
+// Render a party count beside its icon or seat marker.
+function PartyLabel({ label, count, color, icon }: SeatGroup) {
+  return (
+    <li className={`composition-legend__item composition-legend__item--${color}`}>
+      {icon ? (
+        <span className="composition-legend__icon" aria-hidden="true">
+          <span style={{ maskImage: `url(${icon})` }} />
+        </span>
+      ) : (
+        <span className={`composition-dot composition-dot--${color}`} aria-hidden="true" />
+      )}
+      <span className="composition-legend__text">
+        <strong className="composition-legend__count">{count}</strong>{' '}{label}
+      </span>
+    </li>
+  )
+}
+
+// Show current membership in a horseshoe with one sector per party.
 export function ChamberComposition({ counts }: ChamberCompositionProps) {
-  const [view, setView] = useState<ChamberView>('both')
+  const [view, setView] = useState<ChamberView>('house')
   const active = counts[view]
-  const dots = dotsFor(active)
-  const layout = gridLayout(active.total)
+  const rankedAffiliations = Object.entries(active.other)
+    .sort(([leftName, left], [rightName, right]) => right - left || leftName.localeCompare(rightName))
+  const namedGroups = rankedAffiliations
+    .slice(0, 3)
+    .map(([label, count], index) => ({ color: `minor-${index + 1}`, label, count }))
+  // Keep Independents first among tied groups and put the remainder after the named groups.
+  const smallerGroups = [
+    { color: 'i', label: 'Independents', count: active.I },
+    ...namedGroups,
+    { color: 'unaffiliated', label: 'Unaffiliated', count: active.unaffiliated },
+  ].sort((left, right) => right.count - left.count)
+  const overflow = rankedAffiliations.slice(3).reduce((sum, [, count]) => sum + count, 0)
+  const democrats = { color: 'd', label: 'Democrats', count: active.D, icon: PARTY_ICON_PATHS.get('D') }
+  const republicans = { color: 'r', label: 'Republicans', count: active.R, icon: PARTY_ICON_PATHS.get('R') }
+  const additional = [
+    ...smallerGroups,
+    { color: 'other', label: 'Others', count: overflow },
+  ].filter(({ count }) => count > 0)
+  const parties = [democrats, ...additional, republicans].filter(({ count }) => count > 0)
+  const viewLabel = VIEWS.find(({ value }) => value === view)?.label
+  const totalLabel = `${active.total} current ${active.total === 1 ? 'member' : 'members'}`
+  const description = [`${viewLabel} seating`, totalLabel, ...parties.map(({ label, count }) => `${label} ${count}`)].join(', ')
 
   return (
-    <div>
-      <div className="page-views composition-switch" role="group" aria-label="Chamber view">
-        {VIEWS.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            className={`btn btn--sm ${view === option.value ? 'btn--primary' : 'btn--ghost'}`}
-            aria-pressed={view === option.value}
-            onClick={() => setView(option.value)}
-          >
-            {option.label}
-          </button>
-        ))}
+    <div className="composition">
+      <div className="composition-toolbar">
+        <h2 id="chambers-title">Seats</h2>
+        <div className="page-views composition-switch" role="group" aria-label="Chamber view">
+          {VIEWS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className={`btn btn--sm ${view === option.value ? 'btn--primary' : 'btn--ghost'}`}
+              aria-pressed={view === option.value}
+              onClick={() => setView(option.value)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {active.total > 0 ? (
-        <div className="composition-scroll">
-          <ul
-            className="composition-grid"
-            style={{ '--composition-rows': layout.rows, '--composition-cols': layout.cols } as CSSProperties}
-            aria-label={`${active.total} members, one circle each: Democrats on the left, Independents in the middle, Republicans on the right`}
-          >
-            {dots.map((dot, index) => {
-              const cell = dotCell(index, layout, dots.length)
-              return (
-                <li
-                  key={`${dot.party}-${dot.key}`}
-                  className={`composition-dot composition-dot--${dot.party}`}
-                  style={{ gridRowStart: cell.row, gridColumnStart: cell.col } as CSSProperties}
-                />
-              )
-            })}
+        <div className="composition-figure">
+          <ul className="composition-legend" aria-label="Party counts">
+            <PartyLabel {...democrats} />
+            <PartyLabel {...republicans} />
           </ul>
+          <div className="composition-chart">
+            <div className={`composition-floor composition-floor--${view}`} role="img" aria-label={description}>
+              {seatPositions(view, active.total, parties).map(({ key, color, x, y }) => (
+                <span
+                  key={key}
+                  aria-hidden="true"
+                  className={`composition-dot composition-seat composition-dot--${color}`}
+                  style={{ left: `${x}%`, top: `${y}%` }}
+                />
+              ))}
+            </div>
+            <p className="composition-total" aria-hidden="true">
+              <span className="composition-total__count">{active.total}</span>
+              {active.total === 1 ? 'member' : 'members'}
+            </p>
+            {additional.length > 0 && (
+              <ul className="composition-legend composition-legend--additional" aria-label="Additional affiliations">
+                {additional.map((party) => <PartyLabel key={party.color} {...party} />)}
+              </ul>
+            )}
+          </div>
         </div>
       ) : (
         <p className="muted">No current members on record for that view.</p>
       )}
-
-      <ul className="composition-legend" aria-label="Party counts">
-        <li className="composition-legend__item">
-          <span className="composition-dot composition-dot--d" aria-hidden="true" />
-          {PARTY_LABELS.D} <span className="composition-legend__count">{active.D}</span>
-        </li>
-        <li className="composition-legend__item">
-          <span className="composition-dot composition-dot--i" aria-hidden="true" />
-          {PARTY_LABELS.I} <span className="composition-legend__count">{active.I}</span>
-        </li>
-        <li className="composition-legend__item">
-          <span className="composition-dot composition-dot--r" aria-hidden="true" />
-          {PARTY_LABELS.R} <span className="composition-legend__count">{active.R}</span>
-        </li>
-      </ul>
-
-      <p className="composition-total" aria-live="polite">
-        <span className="composition-total__count">{active.total}</span> current members
-      </p>
     </div>
   )
 }

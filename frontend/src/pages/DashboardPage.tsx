@@ -200,7 +200,7 @@ export default function DashboardPage() {
           <div className="home__grid">
             <section className="card" aria-labelledby="stages-title">
               <div className="card__head">
-                <h2 id="stages-title">Progress through Congress</h2>
+                <h2 id="stages-title">Stage</h2>
                 <Link to="/bills" className="more">
                   See all bills
                 </Link>
@@ -226,13 +226,14 @@ export default function DashboardPage() {
             </section>
 
             <section className="card" aria-labelledby="chambers-title">
-              <div className="card__head">
-                <h2 id="chambers-title">House and Senate</h2>
-                <Link to="/members" className="more">
-                  All members
-                </Link>
-              </div>
-              {chambers ? <ChamberComposition counts={chambers} /> : <LoadingState message="Counting current members…" />}
+              {chambers ? (
+                <ChamberComposition counts={chambers} />
+              ) : (
+                <>
+                  <div className="composition-toolbar"><h2 id="chambers-title">Seats</h2></div>
+                  <LoadingState message="Counting current members…" />
+                </>
+              )}
             </section>
           </div>
 
@@ -240,10 +241,10 @@ export default function DashboardPage() {
               topics; without a profile, one card invites them to set it up. */}
           {district ? (
             <div className="home__mine">
-              <section className="card" aria-label="Your district">
+              <section className="card panel--stack" aria-label="Your district">
                 <DistrictBills state={district.state} district={district.district} />
               </section>
-              <section className="card" aria-label="Topics you follow">
+              <section className="card panel--stack" aria-label="Topics you follow">
                 <TopicFeed topicIds={topics} />
               </section>
             </div>

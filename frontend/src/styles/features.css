@@ -234,39 +234,87 @@
   }
 }
 
-/* --------------------------------------------- chamber composition */
+.composition {
+  container-type: inline-size;
+}
 
-/* One dot per member, Democrats on the left and Republicans on the right.
-   The component sets the row and column counts; the grid keeps the dots
-   square and shrinks to fit the card. */
-.composition-switch {
+.composition-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 18px;
 }
 
-.composition-scroll {
-  margin-bottom: 16px;
+.composition-toolbar h2 {
+  order: 1;
+  margin-inline-start: auto;
+  text-align: end;
 }
 
-.composition-grid {
-  display: grid;
-  grid-template-columns: repeat(var(--composition-cols, 10), minmax(0, 1fr));
-  grid-template-rows: repeat(var(--composition-rows, 10), minmax(0, 1fr));
-  gap: 3px;
-  width: min(100%, calc(var(--composition-cols, 10) * 13px));
-  aspect-ratio: var(--composition-cols, 10) / var(--composition-rows, 10);
-  list-style: none;
-  margin: 0;
-  padding: 0;
+.composition-switch {
+  flex-wrap: nowrap;
+}
+
+.composition-switch .btn {
+  padding-inline: 7px;
+  padding-inline: clamp(5px, 2.1cqw, 12px);
+  white-space: nowrap;
+}
+
+.composition-figure {
+  position: relative;
+  width: 100%;
+  max-width: 408px;
+  margin-inline: auto;
+  padding-top: 41px;
+  padding-bottom: 40px;
+}
+
+.composition-chart {
+  position: relative;
+  width: 100%;
+  max-width: 380px;
+  margin: 0 auto;
+  min-height: 288px;
+  aspect-ratio: 100 / 86;
+  container-type: inline-size;
+}
+
+.composition-floor {
+  position: absolute;
+  top: 57%;
+  left: 50%;
+  translate: -50% -57%;
+  width: 100%;
+  aspect-ratio: 100 / 86;
+}
+
+.composition-floor--senate {
+  max-width: 310px;
+}
+
+.composition-seat {
+  position: absolute;
+  translate: -50% -50%;
+  width: 1.82%;
+  aspect-ratio: 1;
+}
+
+.composition-floor--house .composition-seat {
+  width: 2.02%;
+}
+
+.composition-floor--senate .composition-seat {
+  width: 3.5%;
 }
 
 .composition-dot {
-  width: 100%;
-  height: 100%;
   border-radius: 50%;
 }
 
 .composition-dot--d {
   background: var(--d);
+  box-shadow: 0 0 0 0.5px var(--d-edge);
 }
 
 .composition-dot--i {
@@ -275,29 +323,117 @@
 
 .composition-dot--r {
   background: var(--r);
+  box-shadow: 0 0 0 0.5px var(--r-edge);
+}
+
+.composition-dot--other {
+  background: var(--ink-3);
+}
+
+.composition-dot--unaffiliated {
+  box-shadow: inset 0 0 0 1px var(--ink-3);
+}
+
+.composition-dot--minor-1 {
+  background: color-mix(in srgb, var(--ink-2) 70%, var(--d));
+}
+
+.composition-dot--minor-2 {
+  background: color-mix(in srgb, var(--ink-2) 70%, var(--r));
+}
+
+.composition-dot--minor-3 {
+  background: var(--ink-2);
 }
 
 .composition-legend {
   list-style: none;
-  margin: 0 0 12px;
+  margin: 0;
   padding: 0;
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px 18px;
-  font-size: 14px;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--ink-2);
+}
+
+.composition-legend--additional {
+  position: absolute;
+  top: 92%;
+  left: 50%;
+  translate: -50% -50%;
+  width: min(42%, 154px);
+  gap: 4px;
+  text-align: center;
+}
+
+.composition-legend--additional .composition-legend__text {
+  overflow-wrap: anywhere;
 }
 
 .composition-legend__item {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
+  line-height: 1.14;
+}
+
+.composition-legend__item--d,
+.composition-legend__item--r {
+  position: absolute;
+  top: 0;
+}
+
+.composition-legend__item--d {
+  left: 0;
+}
+
+.composition-legend__item--r {
+  right: 0;
+  flex-direction: row-reverse;
+  text-align: right;
+}
+
+.composition-legend__icon {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  filter: drop-shadow(0 0 0.75px var(--party-edge));
+}
+
+.composition-legend__icon > span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--party-color);
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: contain;
+}
+
+.composition-legend__item--d .composition-legend__icon {
+  --party-color: var(--d);
+  --party-edge: var(--d-edge);
+}
+
+.composition-legend__item--r .composition-legend__icon {
+  --party-color: var(--r);
+  --party-edge: var(--r-edge);
+  transform: scaleX(-1);
+}
+
+.composition-legend__icon + .composition-legend__text .composition-legend__count {
+  display: block;
+  font-size: 19px;
+  font-variant-numeric: tabular-nums;
 }
 
 .composition-legend__item .composition-dot {
-  width: 10px;
-  height: 10px;
+  width: 9px;
+  height: 9px;
   flex: none;
 }
 
@@ -308,10 +444,22 @@
 }
 
 .composition-total {
-  padding-top: 12px;
-  border-top: 1px solid var(--line);
-  font-size: 14px;
+  position: absolute;
+  left: 50%;
+  top: 57%;
+  translate: -50% -50%;
+  margin: 0;
+  text-align: center;
+  font-size: clamp(12px, 5cqw, 16px);
+  line-height: 1.25;
   color: var(--ink-2);
+}
+
+.composition-total__count {
+  display: block;
+  font-size: clamp(20px, 10cqw, 38px);
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
 }
 
 /* --------------------------------------------------------- bill page */
@@ -407,7 +555,7 @@
 /* text versions and the diff between two of them */
 .diff-versions {
   list-style: none;
-  margin: 0 0 18px;
+  margin: 0;
   padding: 0;
 }
 
@@ -446,8 +594,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: 12px;
-  margin-bottom: 18px;
+  gap: 16px 12px;
 }
 
 .diff-compare .field {
@@ -455,7 +602,8 @@
 }
 
 .diff-summary {
-  margin-bottom: 16px;
+  display: grid;
+  gap: 8px;
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
@@ -479,25 +627,12 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 0 16px;
+  gap: 6px 16px;
   padding: 8px 14px;
   border-bottom: 1px solid var(--line);
   font-size: 14px;
   font-weight: 800;
   color: var(--ink-2);
-}
-
-.diff-viewer__toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 44px;
-  cursor: pointer;
-}
-
-.diff-viewer__toggle input {
-  margin: 0;
-  accent-color: var(--focus);
 }
 
 .diff-viewer__body {
@@ -961,6 +1096,10 @@ a.onboard-steps__item[aria-disabled] {
   gap: 8px;
 }
 
+.topics__browse {
+  justify-self: start;
+}
+
 button.chip {
   font-family: var(--font);
   min-height: 36px;
@@ -1095,7 +1234,8 @@ button.chip {
   }
 
   .social-add,
-  .social-find {
+  .social-find,
+  .diff-compare {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     justify-items: stretch;

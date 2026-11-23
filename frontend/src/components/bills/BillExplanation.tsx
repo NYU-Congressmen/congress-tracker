@@ -58,7 +58,7 @@ export function BillExplanation({ congress, type, number, title }: BillExplanati
 
   if (loading) {
     return (
-      <section className="panel" aria-label="Explanation">
+      <section className="panel panel--stack" aria-label="Explanation">
         <h2>Explanation</h2>
         <LoadingState message="Loading the explanation…" />
       </section>
@@ -66,7 +66,7 @@ export function BillExplanation({ congress, type, number, title }: BillExplanati
   }
   if (error || !data) {
     return (
-      <section className="panel" aria-label="Explanation">
+      <section className="panel panel--stack" aria-label="Explanation">
         <h2>Explanation</h2>
         <ErrorState
           title={error?.status === 404 ? 'Explanation unavailable' : 'The explanation could not be loaded'}
@@ -96,7 +96,7 @@ export function BillExplanation({ congress, type, number, title }: BillExplanati
   ]
 
   return (
-    <section className="panel" aria-label="Explanation">
+    <section className="panel panel--stack" aria-label="Explanation">
       <h2>Explanation</h2>
       {notes.length > 0 ? <p className="explain-note">{notes.join(' ')}</p> : null}
       <div className="explain-grid">

@@ -8,6 +8,8 @@ Install [Git](https://git-scm.com/downloads) and [Node 24](https://nodejs.org) b
 
 Python does not need to be installed separately. The setup script installs [uv](https://docs.astral.sh/uv/) if it is missing, and uv downloads Python 3.13 for this project alone.
 
+The release script tests also use [jq](https://jqlang.org/download/), available through Homebrew or apt.
+
 ## Installation
 
 Clone the repo and run the setup script:
@@ -99,7 +101,19 @@ Phone sign-in uses the Firebase Hosting configuration endpoint in the browser an
 
 GitHub Actions uses Workload Identity Federation to impersonate `pull-release@congress-pull.iam.gserviceaccount.com`. The repository variable `PULL_WIF_PROVIDER` holds the full provider resource name. The provider accepts push tokens for this repository's numeric ID on `refs/heads/main` from `.github/workflows/ci.yml`. The release service account uses Cloud Run Source Developer, Service Usage Consumer, Firebase Hosting Admin and API Keys Viewer, with Service Account User on the Cloud Run runtime and Cloud Build identities. The Cloud Build identity uses Cloud Run Builder. [Google Cloud federation setup](https://docs.cloud.google.com/iam/docs/workload-identity-federation-with-deployment-pipelines) [Firebase deployment roles](https://firebase.google.com/docs/projects/iam/roles-predefined-product)
 
-The private `pull-schema-check` job in `us-east1` runs a pinned image built from `scripts/release-schema` as the Cloud Run runtime account. It mounts the same pinned database secret version as `pull-api` and reads the Alembic revision in a read-only transaction. The release account's existing Cloud Run Source Developer role lets GitHub execute the job with the expected revision as an argument. If the API's database secret version changes, the job needs to point to the same version before a release can proceed. [Cloud Run jobs](https://docs.cloud.google.com/run/docs/execute/jobs)
+The private `pull-schema-check` job in `us-east1` runs a pinned image built from `scripts/release-schema` as the Cloud Run runtime account. It reads the Alembic revision and checks the feed and call log schema in a read-only transaction. The release account's Cloud Run Source Developer role lets GitHub execute the job with the expected revision as an argument. The API and job use the same numbered database secret version. When that version changes, the release check resumes after both references match. [Cloud Run jobs](https://docs.cloud.google.com/run/docs/execute/jobs)
+
+### Schema checker image
+
+After a change to the checker, build its image from the reviewed checkout and update the job using the SHA-256 digest shown in the Cloud Build results. Replace `REVIEWED_COMMIT` and `IMAGE_DIGEST` with the commit identifier and full digest, including the `sha256:` prefix.
+
+```bash
+image=us-east1-docker.pkg.dev/congress-pull/cloud-run-source-deploy/pull-schema-check
+gcloud builds submit scripts/release-schema \
+  --project=congress-pull --region=us-east1 --tag="$image:REVIEWED_COMMIT"
+gcloud run jobs update pull-schema-check \
+  --project=congress-pull --region=us-east1 --image="$image@IMAGE_DIGEST"
+```
 
 ## MCP clients
 

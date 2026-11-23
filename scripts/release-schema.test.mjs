@@ -8,7 +8,11 @@ import { fileURLToPath } from 'node:url'
 
 const script = fileURLToPath(new URL('./check-release-schema.sh', import.meta.url))
 
-function runSchemaCheck(t, { jobDatabaseVersion = '1', jobExitCode = '0' } = {}) {
+function runSchemaCheck(t, {
+  apiDatabaseVersion = '1',
+  jobDatabaseVersion = '1',
+  jobExitCode = '0',
+} = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'pull-schema-test-'))
   t.after(() => rmSync(directory, { recursive: true, force: true }))
   const callsFile = join(directory, 'calls')
@@ -17,7 +21,7 @@ function runSchemaCheck(t, { jobDatabaseVersion = '1', jobExitCode = '0' } = {})
 set -eu
 printf '%s\\n' "$*" >> "$MOCK_CALLS"
 case "$2 $3" in
-  'services describe') version=1 ;;
+  'services describe') version=$API_DATABASE_VERSION ;;
   'jobs describe') version=$JOB_DATABASE_VERSION ;;
   'jobs execute') exit "$JOB_EXIT_CODE" ;;
   *) exit 2 ;;
@@ -31,6 +35,7 @@ printf '{"env":[{"name":"DATABASE_URL","valueFrom":{"secretKeyRef":{"name":"pull
       ...process.env,
       PATH: directory + delimiter + process.env.PATH,
       MOCK_CALLS: callsFile,
+      API_DATABASE_VERSION: apiDatabaseVersion,
       JOB_DATABASE_VERSION: jobDatabaseVersion,
       JOB_EXIT_CODE: jobExitCode,
     },
@@ -54,5 +59,15 @@ test('stops if the API and job use different database secret versions', (t) => {
   const { result, calls } = runSchemaCheck(t, { jobDatabaseVersion: '2' })
   assert.equal(result.status, 1)
   assert.match(result.stderr, /different database secret versions/)
+  assert.doesNotMatch(calls, /jobs execute/)
+})
+
+test('stops even when both database secret references say latest', (t) => {
+  const { result, calls } = runSchemaCheck(t, {
+    apiDatabaseVersion: 'latest',
+    jobDatabaseVersion: 'latest',
+  })
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /numbered Secret Manager version/)
   assert.doesNotMatch(calls, /jobs execute/)
 })
