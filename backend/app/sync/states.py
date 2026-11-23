@@ -57,4 +57,4 @@ STATE_CODES = {
     "Northern Mariana Islands": "MP",
 }
 
-PARTY_CODES = {"Democratic": "D", "Republican": "R", "Independent": "I"}
+PARTY_CODES = {"Democrat": "D", "Democratic": "D", "Republican": "R", "Independent": "I"}

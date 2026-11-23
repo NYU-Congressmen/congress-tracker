@@ -34,6 +34,8 @@ const DIFF = {
 
 function renderDiff(versions: unknown[] = VERSIONS, diff: unknown = DIFF, diffStatus = 200, user: User | null = null) {
   const fetchMock = mockApi([
+    { match: '/texts/content', body: { version_type: 'Engrossed in House', text: 'Full text of H.R. 1.\n\nSection 1. Filing deadlines.' } },
+    { match: 'full_text=true', body: { ...DIFF, changes: [...DIFF.changes, ' A later unchanged section.'] } },
     { match: '/diff', body: diff, status: diffStatus },
     { match: '/texts', body: versions },
   ])
@@ -43,6 +45,12 @@ function renderDiff(versions: unknown[] = VERSIONS, diff: unknown = DIFF, diffSt
     </SessionContext.Provider>,
   )
   return { result, fetchMock }
+}
+
+async function openComparison() {
+  const select = await screen.findByRole('combobox', { name: 'Compare with' })
+  fireEvent.change(select, { target: { value: 'Reported in House' } })
+  fireEvent.click(screen.getByRole('button', { name: 'View' }))
 }
 
 afterEach(() => {
@@ -59,11 +67,33 @@ describe('BillDiff', () => {
     expect(screen.getByRole('link', { name: /PDF/ })).toBeTruthy()
   })
 
-  test('compares the oldest and newest versions by default and renders the changes', async () => {
+  test('opens the newest version in place without comparison controls', async () => {
+    const { fetchMock } = renderDiff()
+    expect(await screen.findByRole('combobox', { name: 'Version' })).toHaveProperty('value', 'Engrossed in House')
+    expect(screen.getByRole('combobox', { name: 'Compare with' })).toHaveProperty('value', '')
+    fireEvent.click(screen.getByRole('button', { name: 'View' }))
+    expect(await screen.findByRole('region', { name: 'Full bill text' })).toBeTruthy()
+    expect(screen.getByText('Section 1. Filing deadlines.')).toBeTruthy()
+    expect(screen.queryByRole('group', { name: 'Comparison display' })).toBeNull()
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/texts/content?version=Engrossed+in+House'), undefined)
+
+    await openComparison()
+    expect(await screen.findByRole('group', { name: 'Comparison display' })).toBeTruthy()
+    fireEvent.change(screen.getByRole('combobox', { name: 'Compare with' }), { target: { value: '' } })
+    expect(screen.queryByRole('group', { name: 'Comparison display' })).toBeNull()
+  })
+
+  test('opens the text when a bill has only one version', async () => {
+    renderDiff(VERSIONS.slice(1))
+    fireEvent.click(await screen.findByRole('button', { name: 'View' }))
+    expect(await screen.findByText('Full text of H.R. 1.')).toBeTruthy()
+    expect(screen.queryByRole('combobox', { name: 'Compare with' })).toBeNull()
+  })
+
+  test('compares from older to newer and renders the three comparison modes', async () => {
     const { fetchMock } = renderDiff()
 
-    const compare = await screen.findByRole('button', { name: 'Compare versions' })
-    fireEvent.click(compare)
+    await openComparison()
 
     expect(await screen.findByText('H.R. 1 EH Filing deadline extended.')).toBeTruthy()
     expect(screen.getByText('The effective date is unchanged.').tagName).toBe('P')
@@ -71,11 +101,14 @@ describe('BillDiff', () => {
     expect(screen.getByText('Added')).toBeTruthy()
     expect(screen.getByText('Removed')).toBeTruthy()
     expect(screen.queryByText('119th Congress')).toBeNull()
-    const context = screen.getByRole('checkbox', { name: 'Show surrounding text' })
-    fireEvent.click(context)
+    fireEvent.click(screen.getByRole('button', { name: 'Context' }))
     expect(screen.getByText('119th Congress')).toBeTruthy()
+    expect(screen.queryByText('A later unchanged section.')).toBeNull()
     expect(screen.queryByText(/@@/)).toBeNull()
-    fireEvent.click(context)
+    fireEvent.click(screen.getByRole('button', { name: 'Full text' }))
+    expect(await screen.findByText('A later unchanged section.')).toBeTruthy()
+    expect(screen.getByText('Added')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Changes' }))
     expect(screen.queryByText('119th Congress')).toBeNull()
     expect(screen.queryByRole('heading', { name: 'Changes' })).toBeNull()
     const call = fetchMock.mock.calls.find((candidate) => String(candidate[0]).includes('/diff'))
@@ -91,7 +124,7 @@ describe('BillDiff', () => {
     const summary = 'The second version extends the filing deadline by 30 days.'
     renderDiff(VERSIONS, { ...DIFF, summary })
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Compare versions' }))
+    await openComparison()
 
     const heading = await screen.findByRole('heading', { name: 'Changes' })
     const changes = screen.getByLabelText('Changes between the two versions')
@@ -118,12 +151,12 @@ describe('BillDiff', () => {
       </SessionContext.Provider>,
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Compare versions' }))
+    await openComparison()
 
     // The comparison is on screen while the summary is still being written
     expect(await screen.findByText('H.R. 1 EH Filing deadline extended.')).toBeTruthy()
     expect(await screen.findByText('Summarizing the changes…')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Compare versions' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'View' })).toBeTruthy()
     const diffCalls = fetchMock.mock.calls.filter(([url]) => String(url).includes('/diff'))
     expect(diffCalls[0][1]).toBeUndefined()
     expect(diffCalls[1][1]).toEqual({ method: 'POST', headers: { Authorization: 'Bearer test-token' } })
@@ -148,7 +181,7 @@ describe('BillDiff', () => {
       </SessionContext.Provider>,
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Compare versions' }))
+    await openComparison()
 
     expect(await screen.findByText('H.R. 1 EH Filing deadline extended.')).toBeTruthy()
     await waitFor(() => expect(screen.queryByText('Summarizing the changes…')).toBeNull())
@@ -160,13 +193,13 @@ describe('BillDiff', () => {
     renderDiff([])
 
     expect(await screen.findByText('No published text yet')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Compare versions' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'View' })).toBeNull()
   })
 
   test('reports a failed comparison', async () => {
     renderDiff(VERSIONS, { detail: 'One of these versions has no formatted text to compare' }, 404)
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Compare versions' }))
+    await openComparison()
 
     expect(await screen.findByText(/no formatted text to compare/)).toBeTruthy()
   })

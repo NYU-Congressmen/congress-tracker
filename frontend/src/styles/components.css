@@ -161,7 +161,7 @@ a.chip:hover {
   text-decoration: underline;
 }
 
-/* party badge: color plus a letter, never color alone */
+/* Use a party outline when available and a text abbreviation for other affiliations. */
 .pb {
   display: inline-grid;
   place-items: center;
@@ -185,6 +185,31 @@ a.chip:hover {
 
 .pb--i {
   background: var(--i);
+}
+
+.pb--neutral {
+  width: max-content;
+  min-width: 18px;
+  max-width: 70px;
+  padding-inline: 3px;
+  background: var(--ink-2);
+  color: var(--card);
+  overflow: hidden;
+}
+
+.pb--icon {
+  min-width: 21px;
+  min-height: 21px;
+  color: #fff;
+}
+
+.pb__icon {
+  width: 92%;
+  height: 84%;
+  background: currentColor;
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: 100% 100%;
 }
 
 /* six fixed-size cells, filled up to the bill's stage */

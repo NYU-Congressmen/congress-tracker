@@ -79,18 +79,24 @@ def load_text(bill_id: str, version_type: str) -> str | None:
     return text
 
 
-def compare_versions(bill_id: str, from_version: str, to_version: str) -> list[str]:
-    """Return the unified diff for two formatted versions of a bill."""
+def compare_versions(
+    bill_id: str, from_version: str, to_version: str, *, full_text: bool = False
+) -> list[str]:
+    """Return the unified diff for two bill versions with optional full context."""
     old = load_text(bill_id, from_version)
     new = load_text(bill_id, to_version)
     if old is None or new is None:
         raise LookupError("One of these versions has no formatted text to compare")
+    old_lines, new_lines = old.splitlines(), new.splitlines()
+    if full_text and old_lines == new_lines and new_lines:
+        return [f"--- {from_version}", f"+++ {to_version}", *(f" {line}" for line in new_lines)]
     return list(
         difflib.unified_diff(
-            old.splitlines(),
-            new.splitlines(),
+            old_lines,
+            new_lines,
             fromfile=from_version,
             tofile=to_version,
+            n=max(len(old_lines), len(new_lines)) if full_text else 3,
             lineterm="",
         )
     )

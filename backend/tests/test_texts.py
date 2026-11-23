@@ -113,6 +113,37 @@ def test_diff_downloads_only_the_missing_version_and_shows_the_changes(db, monke
     assert client.get("/api/bills/119/hr/1/diff", params=params).status_code == 404
 
 
+def test_full_diff_keeps_distant_context_and_identical_text(db):
+    bill_id = "119-hr-1"
+    old, new, identical = "Introduced in House", "Engrossed in House", "Enrolled Bill"
+    before = "\n".join(f"Unchanged line {i}" for i in range(1, 12))
+    old_text = f"{before}\nPrevious provision."
+    new_text = f"{before}\nRevised provision."
+    with psycopg.connect(TEST_DATABASE_URL) as conn:
+        conn.execute(
+            "INSERT INTO bills (bill_id, congress, type, number, title) "
+            "VALUES ('119-hr-1', 119, 'hr', 1, 'Example Act')"
+        )
+        conn.cursor().executemany(
+            "INSERT INTO text_versions (bill_id, version_type, text) VALUES (%s, %s, %s)",
+            [(bill_id, old, old_text), (bill_id, new, new_text), (bill_id, identical, new_text)],
+        )
+
+    client = TestClient(app)
+    path = "/api/bills/119/hr/1/diff"
+    content = client.get("/api/bills/119/hr/1/texts/content", params={"version": new})
+    assert content.json() == {"version_type": new, "text": new_text}
+    missing = client.get("/api/bills/119/hr/1/texts/content", params={"version": "Not published"})
+    assert missing.status_code == 404
+    excerpt = client.get(path, params={"from": old, "to": new}).json()
+    assert " Unchanged line 1" not in excerpt["changes"]
+    full = client.get(path, params={"from": old, "to": new, "full_text": "true"}).json()
+    assert " Unchanged line 1" in full["changes"]
+    assert full["changes"][-2:] == ["-Previous provision.", "+Revised provision."]
+    same = client.get(path, params={"from": new, "to": identical, "full_text": "true"}).json()
+    assert same["changes"][2:] == [f" {line}" for line in new_text.splitlines()]
+
+
 def test_public_diff_reads_only_the_saved_summary_for_the_current_pair(db, monkeypatch, capsys):
     bill_id = "119-hr-1"
     old, new = "Introduced in House", "Engrossed in House"
