@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'vitest'
-import { ProfileError, currentProfile, selectProfile, leaveProfile, createProfile, updateProfile } from './store'
+import { ProfileError, activateRestoredProfile, currentProfile, selectProfile, leaveProfile, createProfile, updateProfile } from './store'
 
 afterEach(() => {
   localStorage.clear()
@@ -53,6 +53,19 @@ describe('local profile store', () => {
     expect(stored.maya.topics).toEqual([1, 2])
     expect(stored.maya).not.toHaveProperty('password')
     expect(profile).not.toHaveProperty('password')
+  })
+
+  test('activates a restored profile only while its Firebase link is available', () => {
+    createProfile('maya', { firebase_uid: 'maya-id', district: null, topics: [], socials: [] })
+    leaveProfile()
+    activateRestoredProfile('maya', 'another-id')
+    expect(currentProfile()).toBeNull()
+    activateRestoredProfile('maya', 'maya-id')
+    expect(currentProfile()?.username).toBe('maya')
+
+    localStorage.clear()
+    activateRestoredProfile('maya', 'maya-id')
+    expect(localStorage.getItem('pull:session')).toBeNull()
   })
 
   test('preserves older profiles and removes stored credentials', () => {

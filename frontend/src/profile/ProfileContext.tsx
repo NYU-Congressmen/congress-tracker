@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { ProfileError, currentProfile, profileForUser, selectProfile as storeSelectProfile, leaveProfile as storeLeaveProfile, createProfile as storeCreateProfile, updateProfile as storeUpdateProfile } from './store'
+import { ProfileError, activateRestoredProfile, currentProfile, profileForUser, selectProfile as storeSelectProfile, leaveProfile as storeLeaveProfile, createProfile as storeCreateProfile, updateProfile as storeUpdateProfile } from './store'
 import type { NewProfile, ProfileChanges } from './store'
 import type { Profile } from './types'
 import { useSession } from '../auth/SessionContext'
@@ -45,7 +45,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const profile = selected?.firebase_uid && selected.firebase_uid !== uid ? null : selected
 
   useEffect(() => {
-    if (uid && profile?.firebase_uid === uid) storeSelectProfile(profile.username, uid)
+    if (uid && profile?.firebase_uid === uid) activateRestoredProfile(profile.username, uid)
   }, [profile, uid])
 
   const createProfile = useCallback((username: string, base: NewProfile) => {
