@@ -200,7 +200,7 @@ export default function DashboardPage() {
           <div className="home__grid">
             <section className="card" aria-labelledby="stages-title">
               <div className="card__head">
-                <h2 id="stages-title">Progress through Congress</h2>
+                <h2 id="stages-title">Stage</h2>
                 <Link to="/bills" className="more">
                   See all bills
                 </Link>
@@ -226,13 +226,14 @@ export default function DashboardPage() {
             </section>
 
             <section className="card" aria-labelledby="chambers-title">
-              <div className="card__head">
-                <h2 id="chambers-title">House and Senate</h2>
-                <Link to="/members" className="more">
-                  All members
-                </Link>
-              </div>
-              {chambers ? <ChamberComposition counts={chambers} /> : <LoadingState message="Counting current members…" />}
+              {chambers ? (
+                <ChamberComposition counts={chambers} />
+              ) : (
+                <>
+                  <div className="composition-toolbar"><h2 id="chambers-title">Seats</h2></div>
+                  <LoadingState message="Counting current members…" />
+                </>
+              )}
             </section>
           </div>
 

@@ -1,20 +1,31 @@
 import type { Member } from '../api/members'
+import { SMALLER_PARTY_NAMES } from './constants'
 
 export interface PartyCounts {
   total: number
   R: number
   D: number
   I: number
+  unaffiliated: number
+  other: Record<string, number>
 }
 
-// Party split of a group of members.
+const UNRECORDED_AFFILIATIONS = new Set(['unaffiliated', 'no party affiliation', 'other', 'others'])
+
+// Count members by affiliation and track members without one separately.
 function countParties(members: Member[]): PartyCounts {
-  const counts: PartyCounts = { total: members.length, R: 0, D: 0, I: 0 }
+  const counts: PartyCounts = { total: members.length, R: 0, D: 0, I: 0, unaffiliated: 0, other: {} }
+  const other = new Map<string, number>()
   for (const member of members) {
-    if (member.party === 'R') counts.R += 1
-    else if (member.party === 'D') counts.D += 1
-    else if (member.party === 'I') counts.I += 1
+    const party = member.party?.trim()
+    if (party === 'R' || party === 'D' || party === 'I') counts[party] += 1
+    else if (!party || UNRECORDED_AFFILIATIONS.has(party.toLowerCase())) counts.unaffiliated += 1
+    else {
+      const label = SMALLER_PARTY_NAMES.get(party) ?? party
+      other.set(label, (other.get(label) ?? 0) + 1)
+    }
   }
+  counts.other = Object.fromEntries(other)
   return counts
 }
 

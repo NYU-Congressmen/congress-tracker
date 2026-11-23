@@ -127,6 +127,10 @@
   font-size: 15.5px;
 }
 
+.office__address span {
+  display: block;
+}
+
 .office__phone a {
   font-size: 26px;
   font-weight: 900;

@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { diffTextVersions, listTextVersions } from '../../api/texts'
-import type { BillDiff as DiffResult, TextVersion } from '../../api/texts'
+import { diffTextVersions, listTextVersions, readTextVersion } from '../../api/texts'
+import type { BillDiff as DiffResult, BillText, TextVersion } from '../../api/texts'
 import type { BillType } from '../../api/bills'
 import { useSession } from '../../auth/SessionContext'
 import { getAccountToken } from '../../auth/accountToken'
@@ -50,28 +50,66 @@ function passageParagraphs(lines: string[]): string[] {
   return text ? text.split(/\n{2,}/).map((paragraph) => paragraph.replace(/\n/g, ' ')) : ['\u00a0']
 }
 
-// Show edited passages with an optional view of the surrounding lines.
-function ComparisonText({ result }: { result: DiffResult }) {
-  const [showContext, setShowContext] = useState(false)
-  const blocks = comparisonBlocks(result.changes)
+const DISPLAY_OPTIONS = [
+  { value: 'changes', label: 'Changes' },
+  { value: 'context', label: 'Context' },
+  { value: 'full', label: 'Full text' },
+] as const
+
+type ComparisonDisplay = typeof DISPLAY_OPTIONS[number]['value']
+
+// Show the edited passages with the amount of context the reader chooses.
+function ComparisonText({ result, loadFull }: { result: DiffResult; loadFull: () => Promise<DiffResult> }) {
+  const [display, setDisplay] = useState<ComparisonDisplay>('changes')
+  const [full, setFull] = useState<DiffResult | null>(null)
+  const [loadingFull, setLoadingFull] = useState(false)
+  const [fullError, setFullError] = useState(false)
+  const blocks = comparisonBlocks(display === 'full' ? full?.changes ?? [] : result.changes)
+
+  async function choose(mode: ComparisonDisplay) {
+    setDisplay(mode)
+    if (mode !== 'full' || full || loadingFull) return
+    setLoadingFull(true)
+    setFullError(false)
+    try {
+      setFull(await loadFull())
+    } catch {
+      setFullError(true)
+    } finally {
+      setLoadingFull(false)
+    }
+  }
 
   return (
     <section className="diff-viewer" aria-label="Changes between the two versions">
       <div className="diff-viewer__head">
         <p>{result.from_version} → {result.to_version}</p>
-        {blocks.some(({ kind }) => kind === 'context') ? (
-          <label className="diff-viewer__toggle">
-            <input type="checkbox" checked={showContext} onChange={(event) => setShowContext(event.target.checked)} />
-            Show surrounding text
-          </label>
-        ) : null}
+        <div className="page-views" role="group" aria-label="Comparison display">
+          {DISPLAY_OPTIONS.map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              className={`btn btn--sm ${value === display ? 'btn--primary' : 'btn--ghost'}`}
+              aria-pressed={value === display}
+              onClick={() => void choose(value)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
-      {blocks.length === 0 ? (
+      {display === 'full' && loadingFull ? (
+        <div className="diff-viewer__empty"><LoadingState message="Loading the full text…" /></div>
+      ) : display === 'full' && fullError ? (
+        <div className="diff-viewer__empty">
+          <ErrorState title="Full text could not be loaded" onRetry={() => void choose('full')} />
+        </div>
+      ) : blocks.length === 0 ? (
         <p className="diff-viewer__empty">The two versions have identical text.</p>
       ) : (
         <div className="diff-viewer__body" role="region" aria-label="Text comparison" tabIndex={0}>
           {blocks.map(({ kind, lines }, index) => {
-            if (kind === 'context' && !showContext) return null
+            if (kind === 'context' && display === 'changes') return null
             return (
               <div key={index} className={`diff-passage diff-passage--${kind}`}>
                 {kind !== 'context' ? (
@@ -100,59 +138,75 @@ export function BillDiff({ congress, type, number }: BillDiffProps) {
     [congress, type, number],
   )
 
-  const [from, setFrom] = useState('')
-  const [to, setTo] = useState('')
-  const [comparing, setComparing] = useState(false)
+  const [version, setVersion] = useState('')
+  const [compareWith, setCompareWith] = useState('')
+  const [opening, setOpening] = useState(false)
   const [summarizing, setSummarizing] = useState(false)
-  const [compareError, setCompareError] = useState<string | null>(null)
+  const [viewError, setViewError] = useState<string | null>(null)
+  const [text, setText] = useState<BillText | null>(null)
   const [result, setResult] = useState<DiffResult | null>(null)
-  // Counts comparisons so a late answer never replaces a newer one.
+  // Count view requests so a late answer cannot replace a more recent selection.
   const latestRequest = useRef(0)
 
   const list: TextVersion[] = versions ?? []
-  const options = list.map(({ version_type }) => ({ value: version_type, label: version_type }))
+  const readable = list.filter((item) => item.downloaded || item.text_url)
+  const options = readable.map(({ version_type }) => ({ value: version_type, label: version_type }))
+  const newest = readable.findLast((item) => item.version_date) ?? readable.at(-1)
+  const versionValue = options.some(({ value }) => value === version) ? version : newest?.version_type ?? ''
+  const compareOptions = options.filter(({ value }) => value !== versionValue)
+  const compareValue = compareOptions.some(({ value }) => value === compareWith) ? compareWith : ''
 
-  // Until the reader picks, compare the oldest and newest versions.
-  const fromValue = from !== '' ? from : list.length >= 2 ? list[0].version_type : ''
-  const toValue = to !== '' ? to : list.length >= 2 ? list[list.length - 1].version_type : ''
-
-  async function compare(event: FormEvent) {
-    event.preventDefault()
-    if (!fromValue || !toValue || fromValue === toValue) {
-      setCompareError('Choose two different versions to compare.')
-      return
-    }
-    const request = ++latestRequest.current
-    setComparing(true)
+  function clearView() {
+    latestRequest.current += 1
+    setOpening(false)
     setSummarizing(false)
-    setCompareError(null)
+    setViewError(null)
+    setText(null)
     setResult(null)
+  }
+
+  async function view(event: FormEvent) {
+    event.preventDefault()
+    if (!versionValue) return
+    clearView()
+    const request = latestRequest.current
+    setOpening(true)
+
+    // Use publication order so additions and removals describe the newer version.
+    const pair = compareValue ? options.filter(({ value }) => value === versionValue || value === compareValue) : []
+    const [from, to] = pair.map(({ value }) => value)
     let diff: DiffResult
     try {
-      // The public comparison is quick, so show it before any summary is written.
-      diff = await diffTextVersions(congress, type, number, fromValue, toValue)
+      if (!from || !to) {
+        const content = await readTextVersion(congress, type, number, versionValue)
+        if (request === latestRequest.current) {
+          setText(content)
+          setOpening(false)
+        }
+        return
+      }
+      // Open the public comparison before the optional summary request.
+      diff = await diffTextVersions(congress, type, number, from, to)
     } catch (cause) {
       if (request === latestRequest.current) {
-        setCompareError(cause instanceof Error ? cause.message : 'The comparison could not be made.')
-        setComparing(false)
+        setViewError(cause instanceof Error ? cause.message : 'The bill text could not be opened.')
+        setOpening(false)
       }
       return
     }
     if (request !== latestRequest.current) return
     setResult(diff)
-    setComparing(false)
+    setOpening(false)
     if (!user || diff.summary || diff.changes.length === 0) return
 
-    // A signed-in reader can have a missing summary written, which can take a while.
     setSummarizing(true)
     try {
       const token = await getAccountToken(user)
-      const { summary } = await diffTextVersions(congress, type, number, fromValue, toValue, token)
-      if (request === latestRequest.current && summary) {
-        setResult((current) => (current ? { ...current, summary } : current))
-      }
+      if (request !== latestRequest.current) return
+      const { summary } = await diffTextVersions(congress, type, number, from, to, token)
+      if (request === latestRequest.current && summary) setResult({ ...diff, summary })
     } catch {
-      // The summary is optional and the comparison is already on screen.
+      // The comparison is available while the summary service is unavailable.
     } finally {
       if (request === latestRequest.current) setSummarizing(false)
     }
@@ -195,23 +249,48 @@ export function BillDiff({ congress, type, number }: BillDiffProps) {
             ))}
           </ul>
 
-          {list.length >= 2 ? (
-            <form className="diff-compare" onSubmit={compare}>
-              <SelectField id="diff-from" label="From version" value={fromValue} onChange={setFrom} options={options} />
-              <SelectField id="diff-to" label="To version" value={toValue} onChange={setTo} options={options} />
-              <button type="submit" className="btn btn--primary" disabled={comparing}>
-                {comparing ? 'Comparing…' : 'Compare versions'}
-              </button>
+          {readable.length > 0 && (
+            <form className="diff-compare" onSubmit={view}>
+              <SelectField
+                id="bill-text-version"
+                label="Version"
+                value={versionValue}
+                options={options}
+                onChange={(value) => {
+                  clearView()
+                  setVersion(value)
+                  if (compareWith === value) setCompareWith('')
+                }}
+              />
+              {compareOptions.length > 0 && (
+                <SelectField
+                  id="bill-compare-with"
+                  label="Compare with"
+                  value={compareValue}
+                  options={[{ value: '', label: 'None' }, ...compareOptions]}
+                  onChange={(value) => {
+                    clearView()
+                    setCompareWith(value)
+                  }}
+                />
+              )}
+              <button type="submit" className="btn btn--primary" disabled={opening}>View</button>
             </form>
-          ) : (
-            <p className="muted">One version is published so far; more can be compared once Congress.gov posts them.</p>
           )}
 
-          {compareError ? (
-            <p className="form-error" role="alert">
-              {compareError}
-            </p>
-          ) : null}
+          {opening && <LoadingState message="Opening bill text…" />}
+          {viewError && <p className="form-error" role="alert">{viewError}</p>}
+
+          {text && (
+            <section className="diff-viewer" aria-label="Bill text">
+              <h3 className="diff-viewer__head">{text.version_type}</h3>
+              <div className="diff-viewer__body" role="region" aria-label="Full bill text" tabIndex={0}>
+                {passageParagraphs(text.text.split('\n')).map((paragraph, index) => (
+                  <p key={index} className="diff-passage__text">{paragraph}</p>
+                ))}
+              </div>
+            </section>
+          )}
 
           {result?.summary ? (
             <div className="diff-summary">
@@ -225,7 +304,12 @@ export function BillDiff({ congress, type, number }: BillDiffProps) {
             <p className="muted" role="status">Summarizing the changes…</p>
           ) : null}
 
-          {result ? <ComparisonText result={result} /> : null}
+          {result && (
+            <ComparisonText
+              result={result}
+              loadFull={() => diffTextVersions(congress, type, number, result.from_version, result.to_version, undefined, true)}
+            />
+          )}
         </>
       )}
     </section>

@@ -9,7 +9,7 @@ import { EmptyState } from '../components/ui/EmptyState'
 import { ErrorState } from '../components/ui/ErrorState'
 import { LoadingState } from '../components/ui/LoadingState'
 import { useApi } from '../hooks/useApi'
-import { memberUrl, stateName } from '../lib/format'
+import { memberUrl, officeAddressLines, stateName } from '../lib/format'
 import { CONGRESS_NUMBER, PARTY_LABELS } from '../lib/constants'
 import { useProfile } from '../profile/ProfileContext'
 
@@ -63,7 +63,8 @@ export default function MemberDetailPage() {
     member.chamber === 'House' && member.district !== null ? `District ${member.district}` : null,
     member.chamber,
   ].filter((chip): chip is string => Boolean(chip))
-  const hasContacts = Boolean(member.office_phone || member.office_address || member.website_url)
+  const officeAddress = officeAddressLines(member.office_address ?? '')
+  const hasContacts = Boolean(member.office_phone || officeAddress.length || member.website_url)
 
   // Flag the member when they sit in the signed-in person's district, so the
   // profile page doubles as the "my representatives" detail view.
@@ -174,12 +175,14 @@ export default function MemberDetailPage() {
                   </dd>
                 </div>
               ) : null}
-              {member.office_address ? (
+              {officeAddress.length > 0 && (
                 <div>
                   <dt>Address</dt>
-                  <dd>{member.office_address}</dd>
+                  <dd className="office__address">
+                    {officeAddress.map((line, index) => <span key={index}>{line}</span>)}
+                  </dd>
                 </div>
-              ) : null}
+              )}
               {member.website_url ? (
                 <div>
                   <dt>Website</dt>
