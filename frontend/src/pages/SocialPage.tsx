@@ -36,7 +36,7 @@ export default function SocialPage() {
 
 function SocialContent({ linkedBill }: { linkedBill: string | null }) {
   const { profile, updateProfile } = useProfile()
-  const { user } = useSession()
+  const { user, loading: sessionLoading } = useSession()
   const discussionOwner = user ? `firebase:${user.uid}` : profile?.username ?? null
 
   // Saved social handles
@@ -61,6 +61,7 @@ function SocialContent({ linkedBill }: { linkedBill: string | null }) {
   const reviewLoad = useRef(0)
   const billPicked = useRef(false)
   const [submitting, setSubmitting] = useState(false)
+  const reviewBlocked = sessionLoading || loadingReview || reviewError || submitting
   const [submitNotice, setSubmitNotice] = useState<{ kind: 'ok' | 'draft' | 'error'; text: string } | null>(null)
 
   // Local discussion records, newest first
@@ -154,7 +155,7 @@ function SocialContent({ linkedBill }: { linkedBill: string | null }) {
 
   async function submitDiscussion(event: FormEvent) {
     event.preventDefault()
-    if (loadingReview || reviewError || submitting) return
+    if (reviewBlocked) return
     setSubmitNotice(null)
     if (!selected) {
       setSubmitNotice({ kind: 'error', text: 'Find the bill you want to weigh in on first.' })
@@ -372,6 +373,7 @@ function SocialContent({ linkedBill }: { linkedBill: string | null }) {
             </>
           )}
 
+          {sessionLoading ? <LoadingState message="Checking sign-in…" /> : null}
           {loadingReview ? <LoadingState message="Loading your saved review…" /> : null}
           {reviewError && selected ? (
             <p className="form-error" role="alert">
@@ -381,7 +383,7 @@ function SocialContent({ linkedBill }: { linkedBill: string | null }) {
           ) : null}
 
           <form className="social-composer" onSubmit={submitDiscussion}>
-            <fieldset className="social-stance" disabled={loadingReview || reviewError || submitting}>
+            <fieldset className="social-stance" disabled={reviewBlocked}>
               <legend>Your stance</legend>
               {STANCES.map((option) => (
                 <label key={option} className={`social-stance__option${stance === option ? ' is-selected' : ''}`}>
@@ -402,7 +404,7 @@ function SocialContent({ linkedBill }: { linkedBill: string | null }) {
               <textarea
                 className="field__control social-composer__textarea"
                 value={story}
-                disabled={loadingReview || reviewError || submitting}
+                disabled={reviewBlocked}
                 maxLength={20000}
                 onChange={(event) => setStory(event.target.value)}
               />
@@ -413,7 +415,7 @@ function SocialContent({ linkedBill }: { linkedBill: string | null }) {
               <textarea
                 className="field__control social-composer__textarea"
                 value={actionTaken}
-                disabled={loadingReview || reviewError || submitting}
+                disabled={reviewBlocked}
                 maxLength={20000}
                 onChange={(event) => setActionTaken(event.target.value)}
               />
@@ -424,7 +426,7 @@ function SocialContent({ linkedBill }: { linkedBill: string | null }) {
                 <input
                   type="checkbox"
                   checked={consentToShare}
-                  disabled={loadingReview || reviewError || submitting}
+                  disabled={reviewBlocked}
                   onChange={(event) => setConsentToShare(event.target.checked)}
                 />
                 <span>Include this review in the Constituent Signal brief for my representative’s office.</span>
@@ -436,14 +438,14 @@ function SocialContent({ linkedBill }: { linkedBill: string | null }) {
                 <input
                   type="checkbox"
                   checked={sharePublicly}
-                  disabled={loadingReview || reviewError || submitting}
+                  disabled={reviewBlocked}
                   onChange={(event) => setSharePublicly(event.target.checked)}
                 />
                 <span>Publish my stance, story, action taken and district on Pull.</span>
               </label>
             ) : null}
 
-            <button type="submit" className="btn btn--primary btn--lg" disabled={loadingReview || reviewError || submitting}>
+            <button type="submit" className="btn btn--primary btn--lg" disabled={reviewBlocked}>
               {submitting ? 'Saving…' : 'Save my stance'}
             </button>
           </form>

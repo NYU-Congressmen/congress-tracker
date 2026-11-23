@@ -555,7 +555,7 @@
 /* text versions and the diff between two of them */
 .diff-versions {
   list-style: none;
-  margin: 0 0 18px;
+  margin: 0;
   padding: 0;
 }
 
@@ -594,8 +594,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: 12px;
-  margin-bottom: 18px;
+  gap: 16px 12px;
 }
 
 .diff-compare .field {
@@ -603,7 +602,8 @@
 }
 
 .diff-summary {
-  margin-bottom: 16px;
+  display: grid;
+  gap: 8px;
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
@@ -1096,6 +1096,10 @@ a.onboard-steps__item[aria-disabled] {
   gap: 8px;
 }
 
+.topics__browse {
+  justify-self: start;
+}
+
 button.chip {
   font-family: var(--font);
   min-height: 36px;
@@ -1230,7 +1234,8 @@ button.chip {
   }
 
   .social-add,
-  .social-find {
+  .social-find,
+  .diff-compare {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     justify-items: stretch;

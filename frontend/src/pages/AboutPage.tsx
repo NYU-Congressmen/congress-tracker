@@ -8,7 +8,7 @@ import { CONGRESS_NUMBER } from '../lib/constants'
 function ApiStatusPanel() {
   const { data: health, loading, error, refetch } = useApi(getHealth, [])
   return (
-    <section className="panel" aria-label="API status">
+    <section className="panel panel--stack" aria-label="API status">
       <div className="panel__heading-row">
         <h2>API status</h2>
         {!loading && !error ? (
@@ -66,7 +66,7 @@ export default function AboutPage() {
 
       <div className="container page-body about__grid">
         <div className="about__prose">
-          <section className="panel">
+          <section className="panel panel--stack">
             <h2>Legislative data</h2>
             <p>
               A Python sync job copies every current member of Congress and a summary of every bill in the{' '}
@@ -81,7 +81,7 @@ export default function AboutPage() {
             </p>
           </section>
 
-          <section className="panel">
+          <section className="panel panel--stack">
             <h2>Roadmap</h2>
             <table className="roadmap-table">
               <thead>
@@ -103,7 +103,7 @@ export default function AboutPage() {
             </table>
           </section>
 
-          <section className="panel">
+          <section className="panel panel--stack">
             <h2>Stack</h2>
             <ul className="stack-list">
               <li>React 19, TypeScript and Vite for this interface</li>
@@ -116,7 +116,7 @@ export default function AboutPage() {
 
         <div className="about__side">
           <ApiStatusPanel />
-          <section className="panel" aria-label="Links">
+          <section className="panel panel--stack" aria-label="Links">
             <h2>Links</h2>
             <ul className="link-list">
               {import.meta.env.DEV && (
