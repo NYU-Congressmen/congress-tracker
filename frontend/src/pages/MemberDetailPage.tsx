@@ -115,9 +115,9 @@ export default function MemberDetailPage() {
 
       <div className="container page-body member-grid-page">
         <div className="member-grid-page__main">
-          <section className="card" aria-labelledby="sponsored-title">
+          <section className="card panel--stack" aria-labelledby="sponsored-title">
             <div className="card__head">
-              <h2 id="sponsored-title">Bills they've sponsored</h2>
+              <h2 id="sponsored-title">Sponsored bills</h2>
               <span className="card__note">
                 {member.sponsored_bills.length} in the {CONGRESS_NUMBER}th Congress
               </span>
@@ -137,9 +137,9 @@ export default function MemberDetailPage() {
             )}
           </section>
 
-          <section className="card" aria-labelledby="cosponsored-title">
+          <section className="card panel--stack" aria-labelledby="cosponsored-title">
             <div className="card__head">
-              <h2 id="cosponsored-title">Bills they've co-sponsored</h2>
+              <h2 id="cosponsored-title">Co-sponsored bills</h2>
               {coSponsored.length > 0 ? (
                 <span className="card__note">
                   {coSponsored.length} in the {CONGRESS_NUMBER}th Congress
@@ -161,7 +161,7 @@ export default function MemberDetailPage() {
           </section>
         </div>
 
-        <section className="card" aria-labelledby="office-title">
+        <section className="card panel--stack" aria-labelledby="office-title">
           <h2 id="office-title" className="card__title">
             Reach their office
           </h2>

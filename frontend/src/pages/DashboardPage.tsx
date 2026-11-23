@@ -241,10 +241,10 @@ export default function DashboardPage() {
               topics; without a profile, one card invites them to set it up. */}
           {district ? (
             <div className="home__mine">
-              <section className="card" aria-label="Your district">
+              <section className="card panel--stack" aria-label="Your district">
                 <DistrictBills state={district.state} district={district.district} />
               </section>
-              <section className="card" aria-label="Topics you follow">
+              <section className="card panel--stack" aria-label="Topics you follow">
                 <TopicFeed topicIds={topics} />
               </section>
             </div>

@@ -213,7 +213,7 @@ export function BillDiff({ congress, type, number }: BillDiffProps) {
   }
 
   return (
-    <section className="panel" aria-label="Text versions and changes">
+    <section className="panel panel--stack" aria-label="Text versions and changes">
       <div className="panel__heading-row">
         <h2>Text versions and changes</h2>
         <span className="panel__count">{list.length > 0 ? `${list.length} ${list.length === 1 ? 'version' : 'versions'}` : ''}</span>

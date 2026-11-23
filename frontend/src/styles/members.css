@@ -106,7 +106,7 @@
 
 .office div {
   display: grid;
-  gap: 2px;
+  gap: 8px;
   padding: 14px 0;
   border-top: 1px solid var(--line);
 }
