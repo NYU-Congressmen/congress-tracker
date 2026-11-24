@@ -56,6 +56,27 @@ export function memberUrl(bioguideId: string): string {
   return `https://www.congress.gov/member/${bioguideId}`
 }
 
+// Format saved office address lines and supply the mailing locality for recognized Capitol buildings.
+export function officeAddressLines(address: string): string[] {
+  const lines = address.split(/\r\n?|\n/).map((line) => line.trim()).filter(Boolean)
+  const last = lines.at(-1) ?? ''
+  const locality = /(?:^|[,\s]+)(Washington,?\s+D\.?C\.?\s+\d{5}(?:-\d{4})?)$/i.exec(last)
+    ?? /,\s*([^,]+,\s*[A-Z]{2}\s+\d{5}(?:-\d{4})?)$/.exec(last)
+  if (locality) {
+    lines.splice(-1, 1, ...[last.slice(0, locality.index).trimEnd(), locality[1]].filter(Boolean))
+  } else if (!/\b[A-Z]{2}\s+\d{5}(?:-\d{4})?$/i.test(last)) {
+    if (/\b(?:Cannon|Longworth|Rayburn) House Office Building\b/i.test(address)) {
+      lines.push('Washington, DC 20515')
+    } else if (/\b(?:Dirksen|Hart|Russell) Senate Office Building\b/i.test(address)) {
+      lines.push('Washington, DC 20510')
+    }
+  }
+  return lines.flatMap((line) => {
+    const suite = /^(.*?)(?:,\s*|\s+)((?:Suite|Ste\.?)\s+.+)$/i.exec(line)
+    return suite ? [suite[1].trimEnd(), suite[2]].filter(Boolean) : [line]
+  })
+}
+
 // Parse the first "YYYY-MM-DD" of an ISO value as a local date so formatting
 // never shifts the day across time zones.
 function parseIsoDate(value: string): Date | null {

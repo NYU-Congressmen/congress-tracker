@@ -132,6 +132,13 @@ class TextVersion(BaseModel):
     downloaded: bool
 
 
+class BillText(BaseModel):
+    """Describe the full text of one published bill version."""
+
+    version_type: str
+    text: str
+
+
 class BillDiff(BaseModel):
     """Describe the line-by-line changes and any saved summary for a pair of bill versions."""
 

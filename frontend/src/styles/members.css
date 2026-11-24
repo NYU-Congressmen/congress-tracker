@@ -106,7 +106,7 @@
 
 .office div {
   display: grid;
-  gap: 2px;
+  gap: 8px;
   padding: 14px 0;
   border-top: 1px solid var(--line);
 }
@@ -125,6 +125,10 @@
 .office dd {
   margin: 0;
   font-size: 15.5px;
+}
+
+.office__address span {
+  display: block;
 }
 
 .office__phone a {

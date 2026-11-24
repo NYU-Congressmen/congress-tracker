@@ -52,10 +52,10 @@ test('renders the dashboard with the live bills and members', async () => {
   expect(await screen.findByText('To amend the Clean Air Act')).toBeTruthy()
   expect(screen.getByText('H.R. 1 · In committee')).toBeTruthy()
 
-  // Stage tallies and the chamber composition, one circle per member
-  expect(await screen.findByRole('heading', { name: 'Progress through Congress' })).toBeTruthy()
+  // Stage tallies and the chamber composition from the member list
+  expect(await screen.findByRole('heading', { name: 'Stage' })).toBeTruthy()
   expect((await screen.findAllByText('In committee')).length).toBeGreaterThan(0)
-  expect(await screen.findByRole('list', { name: /^1 members, one circle each/ })).toBeTruthy()
+  expect(await screen.findByRole('img', { name: /^House seating, 1 current member, Democrats 1/ })).toBeTruthy()
 
   // Without a profile, the home page invites the reader to set one up
   expect(screen.getByRole('heading', { name: 'Your district in Congress' })).toBeTruthy()

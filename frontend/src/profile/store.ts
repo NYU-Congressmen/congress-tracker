@@ -113,6 +113,27 @@ export function currentProfile(): Profile | null {
   return name && Object.hasOwn(accounts, name) ? accounts[name] : null
 }
 
+// Find the active or most recently updated local profile for the signed-in account.
+export function profileForUser(uid: string): Profile | null {
+  const accounts = readAccounts()
+  const activeName = localStorage.getItem(SESSION_KEY)
+  const active = activeName && Object.hasOwn(accounts, activeName) ? accounts[activeName] : null
+  if (active?.firebase_uid === uid) return active
+
+  return Object.values(accounts)
+    .filter((profile) => profile.firebase_uid === uid)
+    .sort((left, right) => (right.updated_at ?? '').localeCompare(left.updated_at ?? ''))[0] ?? null
+}
+
+// Activate a restored profile if browser storage still links it to the signed-in account.
+export function activateRestoredProfile(username: string, uid: string): void {
+  if (localStorage.getItem(SESSION_KEY) === username) return
+  const accounts = readAccounts()
+  if (Object.hasOwn(accounts, username) && accounts[username].firebase_uid === uid) {
+    localStorage.setItem(SESSION_KEY, username)
+  }
+}
+
 // Save changes to the active local profile and return it.
 export function updateProfile(patch: ProfileChanges, expectedName?: string): Profile {
   const name = localStorage.getItem(SESSION_KEY)

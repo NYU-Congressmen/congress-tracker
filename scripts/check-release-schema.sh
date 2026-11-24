@@ -15,7 +15,10 @@ secret_ref() {
   jq -er '
     [.. | objects | select(.name == "DATABASE_URL") | .valueFrom.secretKeyRef
       | select(.name and .key) | [.name, .key]]
-    | if length == 1 then .[0] | @tsv else error("Missing DATABASE_URL secret reference") end
+    | if length != 1 then error("Expected one DATABASE_URL secret reference")
+      elif (.[0][1] | test("^[1-9][0-9]*$") | not)
+      then error("DATABASE_URL needs a numbered Secret Manager version")
+      else .[0] | @tsv end
   '
 }
 

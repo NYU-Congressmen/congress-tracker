@@ -71,6 +71,16 @@ export const PARTY_LABELS: Record<string, string> = {
   I: 'Independent',
 }
 
+export const PARTY_ICON_PATHS = new Map([
+  ['D', '/chambers/donkey.webp'],
+  ['R', '/chambers/elephant.webp'],
+])
+
+export const SMALLER_PARTY_NAMES = new Map([
+  ['ID', 'Independent Democrat'],
+  ['L', 'Libertarian'],
+])
+
 export const CHAMBER_OPTIONS: SelectOption[] = [
   { value: 'House', label: 'House of Representatives' },
   { value: 'Senate', label: 'Senate' },

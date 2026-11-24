@@ -28,13 +28,22 @@ def chamber_name(term_chamber: str) -> str:
     return "House" if term_chamber.startswith("House") else "Senate"
 
 
+def clean_party(name: str | None, abbreviation: str | None = None) -> str | None:
+    """Keep standard party codes and retain the published name of any other affiliation."""
+    if abbreviation in PARTY_CODES.values():
+        return abbreviation
+    if name:
+        return PARTY_CODES.get(name, name)
+    return abbreviation
+
+
 def clean_member(m: dict[str, Any]) -> dict[str, Any]:
     """Turn one member from the Congress.gov member list into a current-member row."""
     current_term = m["terms"]["item"][-1]
     return {
         "bioguide_id": m["bioguideId"],
         "name": m["name"],
-        "party": PARTY_CODES.get(m.get("partyName")),
+        "party": clean_party(m.get("partyName")),
         "state": STATE_CODES.get(m.get("state")),
         "chamber": chamber_name(current_term["chamber"]),
         "district": m.get("district"),
@@ -51,10 +60,11 @@ def clean_member_detail(m: dict[str, Any]) -> dict[str, Any]:
     is still serving.
     """
     last_term = m["terms"][-1]
+    party = (m.get("partyHistory") or [{}])[-1]
     return {
         "bioguide_id": m["bioguideId"],
         "name": m["invertedOrderName"],
-        "party": m["partyHistory"][-1].get("partyAbbreviation"),
+        "party": clean_party(party.get("partyName"), party.get("partyAbbreviation")),
         "state": last_term.get("stateCode"),
         "chamber": chamber_name(last_term["chamber"]),
         "district": last_term.get("district"),

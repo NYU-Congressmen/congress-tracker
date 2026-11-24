@@ -3,6 +3,8 @@ import { MemoryRouter } from 'react-router-dom'
 import type { User } from '@firebase/auth'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { SessionContext } from '../auth/SessionContext'
+import { ProfileProvider } from '../profile/ProfileContext'
+import { createProfile, currentProfile, leaveProfile } from '../profile/store'
 import SocialPage from './SocialPage'
 import { listDiscussions, recordDiscussion } from '../social/drafts'
 import { mockApi } from '../test/fetchMock'
@@ -73,6 +75,40 @@ afterEach(() => {
 })
 
 describe('SocialPage', () => {
+
+  test('restores the signed-in profile and loads a linked review after the session check', async () => {
+    createProfile('maya', { firebase_uid: 'reviewer', district: null, topics: [1], socials: [] })
+    createProfile('sam', { firebase_uid: 'other-user', district: null, topics: [], socials: [] })
+    leaveProfile()
+    mockApi([
+      {
+        match: '/api/bills/119/hr/7/review',
+        body: { stance: 'support', story: 'Saved account review.', consent_to_share: false },
+      },
+      { match: '/api/bills/119/hr/7', body: BILL },
+      { match: '/api/bills', body: BILL_PAGE },
+    ])
+    const user = { uid: 'reviewer', getIdToken: vi.fn().mockResolvedValue('test-id-token') } as unknown as User
+    const view = (signedIn: User | null) => (
+      <SessionContext.Provider value={{ user: signedIn, loading: !signedIn, error: null, retry: () => {} }}>
+        <ProfileProvider>
+          <MemoryRouter initialEntries={['/social?bill=119-hr-7']}>
+            <SocialPage />
+          </MemoryRouter>
+        </ProfileProvider>
+      </SessionContext.Provider>
+    )
+    const { rerender } = render(view(null))
+    await screen.findByRole('button', { name: 'Change bill' })
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Save my stance' }).disabled).toBe(true)
+    expect(currentProfile()).toBeNull()
+
+    rerender(view(user))
+    expect(await screen.findByDisplayValue('Saved account review.')).toBeTruthy()
+    expect(currentProfile()?.username).toBe('maya')
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Save my stance' }).disabled).toBe(false)
+  })
+
   test('connects a social profile and shows it in the list', async () => {
     renderSocial()
 

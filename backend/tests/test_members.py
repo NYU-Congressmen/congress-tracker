@@ -4,7 +4,13 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.sync.client import CongressClient
-from app.sync.members import SAVE_MEMBER_SQL, clean_contact, clean_member, sync_contacts
+from app.sync.members import (
+    SAVE_MEMBER_SQL,
+    clean_contact,
+    clean_member,
+    clean_member_detail,
+    sync_contacts,
+)
 from tests.conftest import TEST_DATABASE_URL
 
 HOUSE_MEMBER = {
@@ -48,6 +54,17 @@ def test_clean_senator_without_district_or_photo():
     assert row["state"] == "NY"
     assert row["district"] is None
     assert row["image_url"] is None
+
+
+def test_member_sync_preserves_the_name_of_a_smaller_party():
+    assert clean_member({**HOUSE_MEMBER, "partyName": "Libertarian"})["party"] == "Libertarian"
+    details = {
+        **HOUSE_MEMBER,
+        "invertedOrderName": HOUSE_MEMBER["name"],
+        "terms": HOUSE_MEMBER["terms"]["item"],
+        "partyHistory": [{"partyName": "Libertarian", "partyAbbreviation": "L"}],
+    }
+    assert clean_member_detail(details)["party"] == "Libertarian"
 
 
 # Trimmed from a real /member/S000148 response

@@ -1,6 +1,6 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { ProfileError, currentProfile, selectProfile as storeSelectProfile, leaveProfile as storeLeaveProfile, createProfile as storeCreateProfile, updateProfile as storeUpdateProfile } from './store'
+import { ProfileError, activateRestoredProfile, currentProfile, profileForUser, selectProfile as storeSelectProfile, leaveProfile as storeLeaveProfile, createProfile as storeCreateProfile, updateProfile as storeUpdateProfile } from './store'
 import type { NewProfile, ProfileChanges } from './store'
 import type { Profile } from './types'
 import { useSession } from '../auth/SessionContext'
@@ -34,9 +34,19 @@ const FALLBACK: ProfileContextValue = {
 // Provide the active local profile and actions for changing it.
 export function ProfileProvider({ children }: { children: ReactNode }) {
   const { user } = useSession()
-  const [selected, setProfile] = useState<Profile | null>(() => currentProfile())
   const uid = user?.uid
+  const [profileUid, setProfileUid] = useState(uid)
+  const [selected, setProfile] = useState<Profile | null>(() => (uid ? profileForUser(uid) : null) ?? currentProfile())
+  if (profileUid !== uid) {
+    setProfileUid(uid)
+    const restored = uid ? profileForUser(uid) : null
+    if (restored) setProfile(restored)
+  }
   const profile = selected?.firebase_uid && selected.firebase_uid !== uid ? null : selected
+
+  useEffect(() => {
+    if (uid && profile?.firebase_uid === uid) activateRestoredProfile(profile.username, uid)
+  }, [profile, uid])
 
   const createProfile = useCallback((username: string, base: NewProfile) => {
     const nextProfile = storeCreateProfile(username, base)
