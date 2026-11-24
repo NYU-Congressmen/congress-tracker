@@ -294,56 +294,42 @@
 }
 
 .composition-seat {
-  position: absolute;
-  translate: -50% -50%;
-  width: 1.82%;
-  aspect-ratio: 1;
-}
-
-.composition-floor--house .composition-seat {
-  width: 2.02%;
-}
-
-.composition-floor--senate .composition-seat {
-  width: 3.5%;
-}
-
-.composition-dot {
-  border-radius: 50%;
+  fill: var(--seat-color, none);
+  stroke: var(--seat-edge, none);
 }
 
 .composition-dot--d {
-  background: var(--d);
-  box-shadow: 0 0 0 0.5px var(--d-edge);
+  --seat-color: var(--d);
+  --seat-edge: var(--d-edge);
 }
 
 .composition-dot--i {
-  background: var(--i);
+  --seat-color: var(--i);
 }
 
 .composition-dot--r {
-  background: var(--r);
-  box-shadow: 0 0 0 0.5px var(--r-edge);
+  --seat-color: var(--r);
+  --seat-edge: var(--r-edge);
 }
 
 .composition-dot--other {
-  background: var(--ink-3);
+  --seat-color: var(--ink-3);
 }
 
 .composition-dot--unaffiliated {
-  box-shadow: inset 0 0 0 1px var(--ink-3);
+  --seat-edge: var(--ink-3);
 }
 
 .composition-dot--minor-1 {
-  background: color-mix(in srgb, var(--ink-2) 70%, var(--d));
+  --seat-color: color-mix(in srgb, var(--ink-2) 70%, var(--d));
 }
 
 .composition-dot--minor-2 {
-  background: color-mix(in srgb, var(--ink-2) 70%, var(--r));
+  --seat-color: color-mix(in srgb, var(--ink-2) 70%, var(--r));
 }
 
 .composition-dot--minor-3 {
-  background: var(--ink-2);
+  --seat-color: var(--ink-2);
 }
 
 .composition-legend {
@@ -435,6 +421,9 @@
   width: 9px;
   height: 9px;
   flex: none;
+  border-radius: 50%;
+  background: var(--seat-color, transparent);
+  box-shadow: inset 0 0 0 1px var(--seat-edge, transparent);
 }
 
 .composition-legend__count,
