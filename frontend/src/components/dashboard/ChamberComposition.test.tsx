@@ -10,10 +10,12 @@ const COUNTS: ChamberCounts = {
 }
 
 function seats(floor: HTMLElement, party?: string) {
-  const selector = party ? `.composition-seat.composition-dot--${party}` : '.composition-seat'
-  return Array.from(floor.querySelectorAll<HTMLElement>(selector), (seat) => ({
-    x: Number.parseFloat(seat.style.left),
-    y: Number.parseFloat(seat.style.top),
+  const selector = party ? `circle.composition-dot--${party}` : 'circle'
+  return Array.from(floor.querySelectorAll(selector), (seat) => ({
+    x: Number(seat.getAttribute('cx')),
+    y: Number(seat.getAttribute('cy')),
+    radius: Number(seat.getAttribute('r')),
+    stroke: Number(seat.getAttribute('stroke-width')),
   }))
 }
 
@@ -49,18 +51,20 @@ describe('ChamberComposition', () => {
       fireEvent.click(screen.getByRole('button', { name: view }))
       const floor = screen.getByRole('img')
       const positions = seats(floor)
-      const angle = ({ x, y }: (typeof positions)[number]) => Math.atan2(x - 50, 49 - y * 0.86)
-      const radii = positions.map(({ x, y }) => Math.hypot(x - 50, 49 - y * 0.86).toFixed(3))
+      const angle = ({ x, y }: (typeof positions)[number]) => Math.atan2(x - 50, 49 - y)
+      const radii = positions.map(({ x, y }) => Math.hypot(x - 50, 49 - y).toFixed(3))
+      expect(floor.getAttribute('viewBox')).toBe('0 0 100 86')
+      expect(positions.every(({ radius, stroke }) => radius * 2 === seatWidth && stroke === 0.3)).toBe(true)
       expect(new Set(radii).size).toBe(rows)
       expect(positions.every((position) => Math.abs(angle(position)) < 2.31)).toBe(true)
       expect(Math.max(...seats(floor, 'd').map(angle))).toBeLessThan(Math.min(...seats(floor, 'r').map(angle)))
       let minimumGap = Infinity
       positions.forEach((seat, index) => {
         for (const another of positions.slice(index + 1)) {
-          minimumGap = Math.min(minimumGap, Math.hypot(seat.x - another.x, (seat.y - another.y) * 0.86))
+          minimumGap = Math.min(minimumGap, Math.hypot(seat.x - another.x, seat.y - another.y))
         }
       })
-      expect(minimumGap).toBeGreaterThan(seatWidth)
+      expect(minimumGap).toBeGreaterThan(seatWidth + 0.3)
     }
 
     expect(seats(screen.getByRole('img', { name: /^Senate seating,/ }), 'i')).toHaveLength(2)

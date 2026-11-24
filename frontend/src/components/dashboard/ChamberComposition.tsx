@@ -11,6 +11,7 @@ const VIEWS: { value: ChamberView; label: string }[] = [
 ]
 
 const ROW_COUNTS: Record<ChamberView, number> = { both: 10, house: 9, senate: 4 }
+const SEAT_RADII: Record<ChamberView, number> = { both: 0.91, house: 1.01, senate: 1.75 }
 const HALF_SWEEP = 132 * Math.PI / 180
 const PARTY_AISLE = 0.04
 
@@ -46,7 +47,7 @@ function seatPositions(view: ChamberView, total: number, parties: SeatGroup[]) {
           key: `${color}-${row}-${index}`,
           color,
           x: 50 + radius * Math.sin(angle),
-          y: (49 - radius * Math.cos(angle)) / 0.86,
+          y: 49 - radius * Math.cos(angle),
         }
       })
     })
@@ -128,16 +129,19 @@ export function ChamberComposition({ counts }: ChamberCompositionProps) {
             <PartyLabel {...republicans} />
           </ul>
           <div className="composition-chart">
-            <div className={`composition-floor composition-floor--${view}`} role="img" aria-label={description}>
+            <svg className={`composition-floor composition-floor--${view}`} viewBox="0 0 100 86" role="img" aria-label={description}>
               {seatPositions(view, active.total, parties).map(({ key, color, x, y }) => (
-                <span
+                <circle
                   key={key}
                   aria-hidden="true"
                   className={`composition-dot composition-seat composition-dot--${color}`}
-                  style={{ left: `${x}%`, top: `${y}%` }}
+                  cx={x}
+                  cy={y}
+                  r={SEAT_RADII[view]}
+                  strokeWidth={0.3}
                 />
               ))}
-            </div>
+            </svg>
             <p className="composition-total" aria-hidden="true">
               <span className="composition-total__count">{active.total}</span>
               {active.total === 1 ? 'member' : 'members'}
