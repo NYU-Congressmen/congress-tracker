@@ -125,6 +125,15 @@ export function profileForUser(uid: string): Profile | null {
     .sort((left, right) => (right.updated_at ?? '').localeCompare(left.updated_at ?? ''))[0] ?? null
 }
 
+// Activate a restored profile if browser storage still links it to the signed-in account.
+export function activateRestoredProfile(username: string, uid: string): void {
+  if (localStorage.getItem(SESSION_KEY) === username) return
+  const accounts = readAccounts()
+  if (Object.hasOwn(accounts, username) && accounts[username].firebase_uid === uid) {
+    localStorage.setItem(SESSION_KEY, username)
+  }
+}
+
 // Save changes to the active local profile and return it.
 export function updateProfile(patch: ProfileChanges, expectedName?: string): Profile {
   const name = localStorage.getItem(SESSION_KEY)
