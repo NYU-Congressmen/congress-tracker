@@ -135,6 +135,15 @@ def test_one_members_position_keeps_the_full_totals(fake):
     assert vote["totals"] == {"Yea": 2, "Nay": 1}
 
 
+def test_totals_only_omits_member_positions(fake):
+    run_sync(fake)
+
+    (vote,) = TestClient(app).get(URL, params={"include_positions": "false"}).json()
+
+    assert vote["positions"] == []
+    assert vote["totals"] == {"Yea": 2, "Nay": 1}
+
+
 def test_a_quiet_day_costs_no_requests(fake):
     run_sync(fake)
     requests = len(fake.paths)

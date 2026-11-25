@@ -71,6 +71,7 @@ function renderBill(user: User | null = null, routes: ApiRoute[] = []) {
     { match: '/api/bills/119/hr/7/explanation', body: EXPLANATION },
     { match: '/api/bills/119/hr/7/texts', body: [] },
     { match: '/api/bills/119/hr/7/review', body: { detail: 'not signed in' }, status: 404 },
+    { match: '/api/bills/119/hr/7/house-votes', body: [] },
     { match: '/api/bills/119/hr/7/responses', body: {
       label: 'Verified Pull users who responded', total: 0, counts: { support: 0, oppose: 0, unsure: 0 },
     } },

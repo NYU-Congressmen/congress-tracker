@@ -9,6 +9,7 @@ import { useProfile } from '../../profile/ProfileContext'
 import type { DistrictSelection } from '../../profile/types'
 import { ErrorState } from '../ui/ErrorState'
 import { LoadingState } from '../ui/LoadingState'
+import { HouseVotes } from './HouseVotes'
 
 const percent = new Intl.NumberFormat('en-US', { style: 'percent', maximumFractionDigits: 1 })
 
@@ -30,13 +31,16 @@ export function BillStances({ bill, revision = 0 }: { bill: BillDetail; revision
           </select>
         </label>
       ) : null}
-      <StanceCounts key={scope ? `${scope.state}-${scope.district}` : 'all'} bill={bill} scope={scope} revision={revision} />
+      <StanceCounts key={scope ? `stances-${scope.state}-${scope.district}` : 'stances-all'}
+        bill={bill} scope={scope} revision={revision} />
       <div className="bill-stances__outcome">
         <h3>Official bill stage</h3>
         <p><strong>{STATUS_LABELS[bill.status]}</strong></p>
         {bill.latest_action_date ? <p className="muted">Latest action {formatDate(bill.latest_action_date)}</p> : null}
         <a href={billUrl(bill.congress, bill.type, bill.number)} target="_blank" rel="noreferrer">Bill record on Congress.gov</a>
       </div>
+      <HouseVotes key={district ? `votes-${district.state}-${district.district}` : 'votes-all'}
+        bill={bill} district={district} />
     </section>
   )
 }
