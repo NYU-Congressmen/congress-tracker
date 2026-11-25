@@ -12,7 +12,7 @@ import { LoadingState } from '../ui/LoadingState'
 
 const percent = new Intl.NumberFormat('en-US', { style: 'percent', maximumFractionDigits: 1 })
 
-export function BillStances({ bill }: { bill: BillDetail }) {
+export function BillStances({ bill, revision = 0 }: { bill: BillDetail; revision?: number }) {
   const district = useProfile().profile?.district ?? null
   const [showAll, setShowAll] = useState(false)
   const scope = showAll ? null : district
@@ -30,7 +30,7 @@ export function BillStances({ bill }: { bill: BillDetail }) {
           </select>
         </label>
       ) : null}
-      <StanceCounts key={scope ? `${scope.state}-${scope.district}` : 'all'} bill={bill} scope={scope} />
+      <StanceCounts key={scope ? `${scope.state}-${scope.district}` : 'all'} bill={bill} scope={scope} revision={revision} />
       <div className="bill-stances__outcome">
         <h3>Official bill stage</h3>
         <p><strong>{STATUS_LABELS[bill.status]}</strong></p>
@@ -41,11 +41,11 @@ export function BillStances({ bill }: { bill: BillDetail }) {
   )
 }
 
-function StanceCounts({ bill, scope }: { bill: BillDetail; scope: DistrictSelection | null }) {
+function StanceCounts({ bill, scope, revision }: { bill: BillDetail; scope: DistrictSelection | null; revision: number }) {
   const { congress, type, number } = bill
   const { data, error, loading, refetch } = useApi(
     () => getBillResponses(congress, type, number, scope?.state, scope?.district),
-    [congress, type, number, scope?.state, scope?.district],
+    [congress, type, number, scope?.state, scope?.district, revision],
   )
   if (loading) return <LoadingState message="Loading stances…" />
   if (error) return <ErrorState title="Stances could not be loaded" message={error.message} onRetry={refetch} />

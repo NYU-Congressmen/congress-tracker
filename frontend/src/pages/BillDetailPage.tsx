@@ -70,6 +70,7 @@ function CopyLinkButton() {
 }
 
 export default function BillDetailPage() {
+  const [stanceRevision, setStanceRevision] = useState(0)
   const { congress: congressParam, type: typeParam, number: numberParam } = useParams()
   const congress = Number(congressParam)
   const number = Number(numberParam)
@@ -278,8 +279,9 @@ export default function BillDetailPage() {
 
         <BillDiff key={bill.bill_id} congress={bill.congress} type={bill.type} number={bill.number} />
 
-        <ReviewPanel congress={bill.congress} type={bill.type} number={bill.number} />
-        <BillStances key={bill.bill_id} bill={bill} />
+        <ReviewPanel key={bill.bill_id} congress={bill.congress} type={bill.type} number={bill.number}
+          onStanceSaved={() => setStanceRevision((value) => value + 1)} />
+        <BillStances key={bill.bill_id} bill={bill} revision={stanceRevision} />
         <CallLog key={bill.bill_id} congress={bill.congress} type={bill.type} number={bill.number} />
       </div>
     </div>

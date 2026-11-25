@@ -93,6 +93,39 @@ afterEach(() => {
 })
 
 describe('BillDetailPage', () => {
+  test('saves a stance without sending review fields and refreshes the breakdown', async () => {
+    const reader = { uid: 'reader', getIdToken: vi.fn().mockResolvedValue('test-token') } as unknown as User
+    const calls = renderBill(reader)
+    const fixtures = calls.getMockImplementation()
+    const review = {
+      bill_id: BILL.bill_id, stance: 'support', story: 'Existing review text',
+      consent_to_share: true, share_publicly: true, updated_at: '2026-11-25T12:00:00Z',
+    }
+    let changed = false
+    calls.mockImplementation(async (url) => {
+      if (String(url).endsWith('/review/stance')) {
+        changed = true
+        return Response.json({ ...review, stance: 'oppose' })
+      }
+      if (String(url).endsWith('/review')) return Response.json(review)
+      if (changed && String(url).endsWith('/responses')) {
+        return Response.json({ label: 'Verified Pull users who responded', total: 1,
+          counts: { support: 0, oppose: 1, unsure: 0 } })
+      }
+      return fixtures!(url)
+    })
+
+    const stance = await screen.findByRole('button', { name: 'Oppose' })
+    fireEvent.click(stance)
+    expect(await screen.findByText('Oppose saved.')).toBeTruthy()
+    expect(stance.getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByText('Existing review text')).toBeTruthy()
+    expect(await screen.findByText('100% · 1')).toBeTruthy()
+    expect(calls).toHaveBeenCalledWith('/api/bills/119/hr/7/review/stance', expect.objectContaining({
+      method: 'PUT', body: JSON.stringify({ stance: 'oppose' }),
+    }))
+  })
+
   test('records a call and its private note on the signed-in account', async () => {
     const caller = { uid: 'caller', getIdToken: vi.fn().mockResolvedValue('test-token') } as unknown as User
     const note = 'Asked about the committee date.'

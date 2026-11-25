@@ -71,3 +71,13 @@ export function saveReview(
     body: JSON.stringify(review),
   })
 }
+
+export function saveStance(
+  congress: number, type: BillType, number: number, stance: Stance, token: string,
+): Promise<Review> {
+  return request<Review>(`/api/bills/${congress}/${type}/${number}/review/stance`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ stance }),
+  })
+}

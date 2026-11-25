@@ -1373,6 +1373,21 @@ button.chip {
   margin-top: 0.25em;
 }
 
+.stance-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.stance-actions .btn[aria-pressed="true"] {
+  outline: 2px solid currentColor;
+  outline-offset: -2px;
+}
+
+.stance-actions ~ p[role="status"]:empty {
+  display: none;
+}
+
 .call-log__offices {
   display: grid;
   gap: 8px;
