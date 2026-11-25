@@ -1373,6 +1373,34 @@ button.chip {
   margin-top: 0.25em;
 }
 
+.call-log__offices {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.call-log__offices li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.call-log__offices li > span {
+  flex: 1 1 12ch;
+  font-weight: 600;
+}
+
+.call-log__other > summary {
+  cursor: pointer;
+}
+
+.call-log__other[open] > summary {
+  margin-bottom: 12px;
+}
+
 .call-log__fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
