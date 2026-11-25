@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { listIssues } from '../../api/feed'
+import type { Issue } from '../../api/feed'
 import { useApi } from '../../hooks/useApi'
 import { ErrorState } from '../ui/ErrorState'
 import { TextField } from '../ui/Fields'
@@ -13,7 +14,8 @@ interface TopicsStepProps {
   onDone: (topics: number[]) => void
 }
 
-const STARTERS = ['Health care', 'Housing', 'Jobs and wages', 'Climate and energy', 'Education']
+// Start with concerns relevant to students and people entering the workforce.
+const STARTERS = ['Jobs and wages', 'Housing', 'Technology and AI', 'Education', 'Health care']
 
 // Match catalog names so the suggestions work across databases with different issue IDs.
 const RELATED: Record<string, string[]> = {
@@ -79,6 +81,24 @@ export function TopicsStep({ initial, nextLabel = 'Continue to social profiles',
   const cloud = [...cloudNames].flatMap((name) => byName.get(name) ?? [])
   const query = search.trim().toLowerCase()
   const visible = query ? issues.filter((issue) => issue.name.toLowerCase().includes(query)) : showAll ? issues : cloud
+  const visibleIds = new Set(visible.map((issue) => issue.issue_id))
+  const hiddenChoices = chosen.flatMap((id) => visibleIds.has(id) ? [] : byId.get(id) ?? [])
+  const scope = query ? 'Search results' : showAll ? 'All topics' : 'Suggested topics'
+
+  function chip(issue: Issue) {
+    const selected = chosen.includes(issue.issue_id)
+    return (
+      <button
+        key={issue.issue_id}
+        type="button"
+        className={`chip${selected ? ' chip--active' : ''}`}
+        aria-pressed={selected}
+        onClick={() => toggle(issue.issue_id)}
+      >
+        {issue.name}
+      </button>
+    )
+  }
 
   return (
     <div className="onboard-step onboard-step--spaced">
@@ -88,19 +108,16 @@ export function TopicsStep({ initial, nextLabel = 'Continue to social profiles',
       </div>
 
       <TextField id="topic-search" label="Search topics" type="search" value={search} onChange={setSearch} />
-      <div className="topics__chips" role="group" aria-label="Topics to follow">
+      <p className="muted" role="status">{chosen.length} {chosen.length === 1 ? 'topic' : 'topics'} selected</p>
+      {hiddenChoices.length > 0 ? (
+        <div className="topics__chips" role="group" aria-label="Selected topics outside the results">
+          {hiddenChoices.map(chip)}
+        </div>
+      ) : null}
+      <h3>{scope}</h3>
+      <div className="topics__chips" role="group" aria-label={scope}>
         {!visible.length && <p className="muted">No matching topics.</p>}
-        {visible.map((issue) => (
-          <button
-            key={issue.issue_id}
-            type="button"
-            className={`chip${chosen.includes(issue.issue_id) ? ' chip--active' : ''}`}
-            aria-pressed={chosen.includes(issue.issue_id)}
-            onClick={() => toggle(issue.issue_id)}
-          >
-            {issue.name}
-          </button>
-        ))}
+        {visible.map(chip)}
       </div>
       {!query && cloud.length < issues.length && (
         <button className="btn btn--ghost btn--sm topics__browse" type="button" onClick={() => setShowAll(!showAll)}>
