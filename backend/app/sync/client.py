@@ -22,6 +22,8 @@ class CongressClient:
         api_key: str,
         transport: httpx.BaseTransport | None = None,
         budget: float | None = None,
+        *,
+        retry_read_timeouts: bool = False,
     ):
         # The key goes in a header so it never appears in URLs, logs or error messages
         self._http = httpx.Client(
@@ -33,6 +35,7 @@ class CongressClient:
         )
         # Every request in one refresh shares a single deadline
         self._deadline = None if budget is None else monotonic() + budget
+        self._read_attempts = 3 if retry_read_timeouts else 1
 
     def __enter__(self) -> "CongressClient":
         return self
@@ -47,13 +50,24 @@ class CongressClient:
         stalled connection ends at the deadline, although a server that keeps trickling
         bytes can still run past it.
         """
-        timeout = TIMEOUT
-        if self._deadline is not None:
-            remaining = self._deadline - monotonic()
-            if remaining <= 0:
-                raise httpx.TimeoutException("Congress.gov refresh deadline expired")
-            timeout = min(TIMEOUT, remaining)
-        response = self._http.get(path, params=params, timeout=timeout)
+        for attempt in range(1, self._read_attempts + 1):
+            timeout = TIMEOUT
+            if self._deadline is not None:
+                remaining = self._deadline - monotonic()
+                if remaining <= 0:
+                    raise httpx.TimeoutException("Congress.gov refresh deadline expired")
+                timeout = min(TIMEOUT, remaining)
+            try:
+                response = self._http.get(path, params=params, timeout=timeout)
+            except httpx.ReadTimeout:
+                if attempt == self._read_attempts:
+                    raise
+                print(
+                    f"Congress.gov read timed out on {path} (attempt {attempt}). Retrying.",
+                    flush=True,
+                )
+            else:
+                break
         response.raise_for_status()
         return response.json()
 
