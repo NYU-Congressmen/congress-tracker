@@ -1,3 +1,4 @@
+import json
 from types import SimpleNamespace
 
 import psycopg
@@ -187,3 +188,37 @@ def test_bills_without_a_vector_follow_the_ranked_ones(saved_embeddings):
     response = client.get("/api/feed", params=params)
     assert response.json()["total"] == 3
     assert titles(response) == ["Rural Roads Act", "Housing Vouchers Act", "Affordable Housing Act"]
+
+
+def test_feed_scores_a_changed_embedding_before_the_distance_cache_refresh(saved_embeddings):
+    housing = saved_embeddings["Housing"]
+    same = json.dumps([1.0, 0.0] + [0.0] * (DIMENSIONS - 2))
+    different = json.dumps([0.0, 1.0] + [0.0] * (DIMENSIONS - 2))
+    with psycopg.connect(TEST_DATABASE_URL) as conn:
+        conn.execute(
+            """
+            INSERT INTO issue_embeddings (issue_id, source_key, embedding)
+            SELECT issue_id, source_key, %s::vector FROM issue_embedding_inputs WHERE issue_id = %s
+            """,
+            (same, housing),
+        )
+        conn.execute(
+            """
+            INSERT INTO bill_embeddings (bill_id, source_key, embedding)
+            SELECT bill_id, source_key, %s::vector FROM bill_embedding_inputs
+            WHERE bill_id IN ('119-hr-2', '119-hr-4')
+            """,
+            (same,),
+        )
+        conn.execute("REFRESH MATERIALIZED VIEW feed_embedding_distances")
+        conn.execute("UPDATE bills SET title = 'Rural Housing Roads' WHERE bill_id = '119-hr-2'")
+        conn.execute(
+            """
+            UPDATE bill_embeddings e SET source_key = src.source_key, embedding = %s::vector
+            FROM bill_embedding_inputs src WHERE e.bill_id = src.bill_id AND e.bill_id = '119-hr-2'
+            """,
+            (different,),
+        )
+
+    response = client.get("/api/feed", params={"issue_id": housing})
+    assert titles(response) == ["Affordable Housing Act"]

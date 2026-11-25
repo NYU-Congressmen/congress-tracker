@@ -14,23 +14,29 @@ MAX_COSINE_DISTANCE = 0.72
 # Bills ranked by meaning come first. Bills with no current vector (new since the last
 # embedding run, or changed since) are matched by keyword after them, so the feed never
 # drops a bill for lack of a vector. With no ranked bills, every keyword match is listed.
+# Compute a distance on demand when newer embeddings have not reached the score cache.
 FEED = """
     WITH selected AS MATERIALIZED (
-        SELECT i.embedding
+        SELECT i.issue_id, i.source_key, i.embedding
         FROM issue_embeddings i JOIN issue_embedding_inputs src USING (issue_id)
         WHERE i.issue_id = ANY(%(ids)s) AND i.source_key = src.source_key
     ), current_vectors AS MATERIALIZED (
-        SELECT e.bill_id
+        SELECT e.bill_id, e.source_key
         FROM bill_embeddings e JOIN bill_embedding_inputs src USING (bill_id)
         WHERE e.source_key = src.source_key
-    ), ranked AS (
-        SELECT e.bill_id, 0 AS tier, nearest.distance
-        FROM bill_embeddings e JOIN current_vectors USING (bill_id)
-        CROSS JOIN LATERAL (
-            SELECT min(e.embedding <=> s.embedding) AS distance FROM selected s
-        ) nearest
+    ), distances AS (
+        SELECT c.bill_id, COALESCE(d.distance, (
+            SELECT e.embedding <=> s.embedding FROM bill_embeddings e WHERE e.bill_id = c.bill_id
+        )) AS distance
+        FROM current_vectors c CROSS JOIN selected s
+        LEFT JOIN feed_embedding_distances d
+          ON d.bill_id = c.bill_id AND d.issue_id = s.issue_id
+          AND d.bill_source_key = c.source_key AND d.issue_source_key = s.source_key
         WHERE (SELECT count(*) FROM selected) = %(issue_count)s
-          AND nearest.distance <= %(max_distance)s
+    ), ranked AS (
+        SELECT bill_id, 0 AS tier, min(distance) AS distance
+        FROM distances GROUP BY bill_id
+        HAVING min(distance) <= %(max_distance)s
     ), matched AS (
         SELECT b.bill_id, 1 AS tier, NULL::double precision AS distance
         FROM bills b

@@ -144,6 +144,9 @@ def backfill(client: OpenAI, limit_bills: int | None = None) -> tuple[int, int]:
         saved_bills += save_batch(client, SAVE_BILL, rows)
         last_id = batch[-1]["bill_id"]
         scanned_bills += len(batch)
+    # A previous run can save every vector and stop before refreshing its distances.
+    with connect() as conn:
+        conn.execute("REFRESH MATERIALIZED VIEW CONCURRENTLY feed_embedding_distances")
     return saved_issues, saved_bills
 
 
