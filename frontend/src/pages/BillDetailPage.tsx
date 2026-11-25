@@ -7,6 +7,7 @@ import { PageBand } from '../components/layout/PageBand'
 import { ActionTimeline } from '../components/bills/ActionTimeline'
 import { BillDiff } from '../components/bills/BillDiff'
 import { BillExplanation } from '../components/bills/BillExplanation'
+import { BillStances } from '../components/bills/BillStances'
 import { CallLog } from '../components/bills/CallLog'
 import { ReviewPanel } from '../components/bills/ReviewPanel'
 import { MemberAvatar } from '../components/members/MemberAvatar'
@@ -278,6 +279,7 @@ export default function BillDetailPage() {
         <BillDiff key={bill.bill_id} congress={bill.congress} type={bill.type} number={bill.number} />
 
         <ReviewPanel congress={bill.congress} type={bill.type} number={bill.number} />
+        <BillStances key={bill.bill_id} bill={bill} />
         <CallLog key={bill.bill_id} congress={bill.congress} type={bill.type} number={bill.number} />
       </div>
     </div>

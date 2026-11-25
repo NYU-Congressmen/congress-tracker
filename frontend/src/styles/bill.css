@@ -384,3 +384,44 @@
     white-space: normal;
   }
 }
+.bill-stances__scope {
+  width: min(100%, 18rem);
+}
+
+.bill-stances__counts {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bill-stances__counts li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+}
+
+.bill-stances__bar {
+  grid-column: 1 / -1;
+  display: block;
+  height: 5px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: color-mix(in srgb, currentColor 15%, transparent);
+}
+
+.bill-stances__bar > span {
+  display: block;
+  height: 100%;
+  background: currentColor;
+}
+
+.bill-stances__outcome {
+  display: grid;
+  gap: 4px;
+}
+
+.bill-stances__outcome > :is(h3, p) {
+  margin: 0;
+}
