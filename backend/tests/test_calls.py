@@ -49,5 +49,15 @@ def test_call_retries_and_account_isolation(db, monkeypatch):
         later.json()["action_id"],
         first.json()["action_id"],
     ]
+    note_path = f"{URL}/{later.json()['action_id']}/note"
     monkeypatch.setitem(app.dependency_overrides, current_uid, lambda: "caller-2")
     assert client.get(URL).json() == []
+    assert client.patch(note_path, json={"note": "Another account"}).status_code == 404
+
+    monkeypatch.setitem(app.dependency_overrides, current_uid, lambda: "caller-1")
+    assert client.patch(note_path, json={"note": "a" * 2_001}).status_code == 422
+    updated = client.patch(note_path, json={"note": "  Added after the call.  "})
+    assert updated.status_code == 200
+    assert updated.json() == {**later.json(), "note": "Added after the call."}
+    assert client.get(URL).json()[0] == updated.json()
+    assert client.patch(note_path, json={"note": None}).json() == later.json()

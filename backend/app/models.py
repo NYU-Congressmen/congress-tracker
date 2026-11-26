@@ -423,6 +423,12 @@ class CallIn(BaseModel):
     note: Annotated[str, StringConstraints(strip_whitespace=True, max_length=2_000)] | None = None
 
 
+class CallNoteIn(BaseModel):
+    """Describe the replacement note for a saved call."""
+
+    note: Annotated[str, StringConstraints(strip_whitespace=True, max_length=2_000)] | None
+
+
 class CallEntry(CallIn):
     """Describe a call recorded by the signed-in user."""
 

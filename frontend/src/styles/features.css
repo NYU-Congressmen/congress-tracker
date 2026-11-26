@@ -1468,6 +1468,18 @@ button.chip {
   overflow-wrap: anywhere;
 }
 
+.call-log__edit {
+  display: grid;
+  gap: 8px;
+}
+
+.call-log__edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .social-composer__textarea {
   width: 100%;
   min-height: 6.5rem;

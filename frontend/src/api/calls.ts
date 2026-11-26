@@ -25,3 +25,14 @@ export function saveCall(
     body: JSON.stringify({ bioguide_id: bioguideId, note }),
   })
 }
+
+// Update or clear the note on one saved call.
+export function updateCallNote(
+  congress: number, type: BillType, number: number, actionId: number, token: string, note: string | null,
+): Promise<CallEntry> {
+  return request<CallEntry>(`/api/bills/${congress}/${type}/${number}/calls/${actionId}/note`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ note }),
+  })
+}

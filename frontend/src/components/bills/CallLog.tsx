@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 import type { User } from '@firebase/auth'
 import { Link } from 'react-router-dom'
 import type { BillType } from '../../api/bills'
-import { listCalls, saveCall } from '../../api/calls'
+import { listCalls, saveCall, updateCallNote, type CallEntry } from '../../api/calls'
 import { ApiError } from '../../api/client'
 import { listMembers } from '../../api/members'
 import { useSession } from '../../auth/SessionContext'
@@ -97,6 +97,11 @@ function AccountCalls({ user, congress, type, number }: CallLogProps & { user: U
     }
   }
 
+  async function saveNote(actionId: number, text: string | null) {
+    await updateCallNote(congress, type, number, actionId, await getAccountToken(user), text)
+    calls.refetch()
+  }
+
   const directoryForm = (
       <form onSubmit={submit}>
         <fieldset className="call-log__fields" disabled={saving}>
@@ -169,17 +174,77 @@ function AccountCalls({ user, congress, type, number }: CallLogProps & { user: U
       {calls.error ? <ErrorState title="Calls could not be loaded" message={calls.error.message} onRetry={calls.refetch} /> : null}
       {calls.data?.length ? (
         <ul className="call-log__entries" aria-label="Recent calls">
-          {calls.data.map((call) => (
-            <li key={call.action_id}>
-              <div className="call-log__entry-heading">
-                <span>{call.member_name}</span>
-                <time className="muted" dateTime={call.created_at}>{formatDateTime(call.created_at)}</time>
-              </div>
-              {call.note ? <p className="call-log__entry-note muted">{call.note}</p> : null}
-            </li>
-          ))}
+          {calls.data.map((call) => <SavedCall key={call.action_id} call={call} onSave={saveNote} />)}
         </ul>
       ) : null}
     </>
+  )
+}
+
+// Show a saved call and edit its note in place.
+function SavedCall({ call, onSave }: {
+  call: CallEntry
+  onSave: (actionId: number, text: string | null) => Promise<void>
+}) {
+  const [draft, setDraft] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState<{ error: boolean; text: string } | null>(null)
+
+  async function save(event: FormEvent) {
+    event.preventDefault()
+    if (saving || draft === null) return
+    setSaving(true)
+    setMessage(null)
+    try {
+      await onSave(call.action_id, draft.trim() || null)
+      setDraft(null)
+      setMessage({ error: false, text: 'Note saved.' })
+    } catch (error) {
+      setMessage({ error: true, text: error instanceof ApiError ? error.message : 'The note could not be saved.' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <li>
+      <div className="call-log__entry-heading">
+        <span>{call.member_name}</span>
+        <time className="muted" dateTime={call.created_at}>{formatDateTime(call.created_at)}</time>
+      </div>
+      {draft === null ? (
+        <>
+          {call.note ? <p className="call-log__entry-note muted">{call.note}</p> : null}
+          <div>
+            <button type="button" className="btn btn--ghost btn--sm" onClick={() => {
+              setMessage(null)
+              setDraft(call.note ?? '')
+            }}>
+              {call.note ? 'Edit note' : 'Add note'}
+            </button>
+          </div>
+        </>
+      ) : (
+        <form className="call-log__edit" onSubmit={save}>
+          <label className="field">
+            <span className="field__label">Call note</span>
+            <textarea className="field__control call-log__note-input" value={draft} maxLength={2000} rows={2}
+              onChange={(event) => setDraft(event.target.value)} />
+          </label>
+          <div className="call-log__edit-actions">
+            <button type="button" className="btn btn--ghost btn--sm" disabled={saving} onClick={() => {
+              setMessage(null)
+              setDraft(null)
+            }}>Cancel</button>
+            <button type="submit" className="btn btn--secondary btn--sm" disabled={saving}>
+              {saving ? 'Saving…' : 'Save note'}
+            </button>
+          </div>
+        </form>
+      )}
+      {message ? <p role={message.error ? 'alert' : 'status'} className={message.error ? 'form-error' : 'muted'}>
+        {message.text}
+      </p> : null}
+    </li>
   )
 }

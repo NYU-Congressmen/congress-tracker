@@ -11,7 +11,7 @@ vi.mock('../../profile/ProfileContext', () => ({
 
 afterEach(() => vi.unstubAllGlobals())
 
-test('logs the phone link and retries the same entry', async () => {
+test('logs the phone link, retries the same entry and adds a note later', async () => {
   const writes: { url: string; body: unknown }[] = []
   const entry = { action_id: 1, bioguide_id: 'R000001', member_name: 'District office',
     created_at: '2026-11-25T12:00:00Z', note: null as string | null }
@@ -19,6 +19,10 @@ test('logs the phone link and retries the same entry', async () => {
     if (init?.method === 'PUT') {
       writes.push({ url, body: init.body })
       if (writes.length === 1) return Response.json({ detail: 'Try again.' }, { status: 502 })
+      return Response.json(entry)
+    }
+    if (init?.method === 'PATCH') {
+      entry.note = JSON.parse(String(init.body)).note
       return Response.json(entry)
     }
     if (url.includes('/members')) {
@@ -56,4 +60,13 @@ test('logs the phone link and retries the same entry', async () => {
   expect(writes).toHaveLength(2)
   expect(writes[0]).toEqual(writes[1])
   expect(writes[1].body).toBe(JSON.stringify({ bioguide_id: 'R000001' }))
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Add note' }))
+  fireEvent.change(screen.getByLabelText('Call note'), { target: { value: 'Asked about the bill.' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Save note' }))
+  expect(await screen.findByText('Asked about the bill.')).toBeTruthy()
+  expect(fetchMock).toHaveBeenCalledWith('/api/bills/119/hr/7/calls/1/note', expect.objectContaining({
+    method: 'PATCH',
+    body: JSON.stringify({ note: 'Asked about the bill.' }),
+  }))
 })

@@ -1,11 +1,11 @@
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Path
 
 from app.auth import current_uid
-from app.db import connect, fetch_all
-from app.models import BillType, CallEntry, CallIn
+from app.db import connect, fetch_all, fetch_one
+from app.models import BillType, CallEntry, CallIn, CallNoteIn
 from app.sync.bills import make_bill_id
 
 router = APIRouter(tags=["calls"])
@@ -64,3 +64,30 @@ def log_call(
         if row is None:
             raise HTTPException(409, "That request ID belongs to a different call")
         return {**row, "member_name": found["member_name"]}
+
+
+@router.patch(CALL_PATH + "/{action_id}/note", response_model=CallEntry)
+def update_call_note(
+    congress: int,
+    bill_type: BillType,
+    number: int,
+    action_id: Annotated[int, Path(gt=0, le=2_147_483_647)],
+    entry: CallNoteIn,
+    uid: Uid,
+) -> dict[str, Any]:
+    """Save the caller's note on an existing call and return the updated entry."""
+    row = fetch_one(
+        """
+        UPDATE actions AS a
+        SET call_note = %s
+        FROM members AS m
+        WHERE a.bioguide_id = m.bioguide_id AND a.action_id = %s
+          AND a.uid = %s AND a.bill_id = %s AND a.action_type = 'call'
+        RETURNING a.action_id, a.bioguide_id, m.name AS member_name, a.created_at,
+                  a.call_note AS note
+        """,
+        (entry.note or None, action_id, uid, make_bill_id(congress, bill_type, number)),
+    )
+    if row is None:
+        raise HTTPException(404, "Call not found.")
+    return row
