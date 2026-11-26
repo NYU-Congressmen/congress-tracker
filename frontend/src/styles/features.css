@@ -298,8 +298,12 @@
   stroke: var(--seat-edge, none);
 }
 
+.composition-seat:is(.composition-dot--d, .composition-dot--r) {
+  stroke-width: 0.12;
+}
+
 .composition-dot--d {
-  --seat-color: var(--d);
+  --seat-color: var(--d-seat, var(--d));
   --seat-edge: var(--d-edge);
 }
 
@@ -308,7 +312,7 @@
 }
 
 .composition-dot--r {
-  --seat-color: var(--r);
+  --seat-color: var(--r-seat, var(--r));
   --seat-edge: var(--r-edge);
 }
 
