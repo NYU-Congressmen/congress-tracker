@@ -9,20 +9,16 @@ from openai import OpenAI, OpenAIError
 from psycopg import Connection
 from pydantic import Field, StringConstraints
 
-from app.ai.embeddings import (
-    MODEL,
-    OPENAI_BASE_URL,
-    embed_texts,
-    embedding_api_key,
-    save_custom_matches,
-)
+from app.ai.embeddings import MODEL, embed_texts, save_custom_matches
 from app.ai.service import cost_usd, log_call
 from app.auth import current_uid
+from app.config import settings
 from app.db import connect, fetch_all
 
 router = APIRouter(tags=["account"])
 
 FEATURE = "custom_topic_embedding"
+OPENAI_BASE_URL = "https://api.openai.com/v1"
 MAX_TOPICS = 8
 DAILY_REQUEST_LIMIT = 12
 Uid = Annotated[str, Depends(current_uid)]
@@ -35,6 +31,14 @@ def list_custom_topics(uid: Uid, response: Response) -> list[str]:
     response.headers["Cache-Control"] = "private, no-store"
     rows = fetch_all("SELECT name FROM custom_topics WHERE uid = %s ORDER BY topic_key", (uid,))
     return [row["name"] for row in rows]
+
+
+def embedding_api_key() -> str | None:
+    """Return the OpenAI key for topic vectors, using the model key when it is also OpenAI's."""
+    if settings.openai_embedding_api_key:
+        return settings.openai_embedding_api_key
+    model_base_url = (settings.llm_base_url or OPENAI_BASE_URL).rstrip("/")
+    return settings.llm_api_key if model_base_url == OPENAI_BASE_URL else None
 
 
 def add_topic_vectors(conn: Connection, uid: str, names: dict[str, str]) -> bool:
