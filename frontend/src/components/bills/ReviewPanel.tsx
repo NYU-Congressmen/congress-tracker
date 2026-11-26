@@ -3,11 +3,19 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { BillType } from '../../api/bills'
 import { getReview, saveStance, STANCE_LABELS, STANCES } from '../../api/reviews'
-import type { Review, Stance } from '../../api/reviews'
+import type { ModerationStatus, Review, Stance } from '../../api/reviews'
 import { useSession } from '../../auth/SessionContext'
 import { getAccountToken } from '../../auth/accountToken'
 import { useApi } from '../../hooks/useApi'
 import { timeAgo } from '../../lib/format'
+
+// Tell the author why a review with text is not yet on the public list.
+const MODERATION_NOTICES: Record<ModerationStatus, string | null> = {
+  pending: 'Moderation pending',
+  flagged: 'Held for review',
+  held: 'Hidden after review',
+  cleared: null,
+}
 
 interface ReviewPanelProps {
   congress: number
@@ -88,6 +96,9 @@ function AccountReview({ congress, type, number, user, onStanceSaved }: ReviewPa
             <div className="review">
               {review.story ? <p className="review__story">{review.story}</p> : null}
               {review.action_taken ? <p className="review__action"><strong>Action taken</strong>{' '}{review.action_taken}</p> : null}
+              {MODERATION_NOTICES[review.moderation_status] ? (
+                <p className="muted review__meta">{MODERATION_NOTICES[review.moderation_status]}</p>
+              ) : null}
               <p className="muted review__meta">Saved {timeAgo(review.updated_at) || 'recently'}</p>
             </div>
           ) : null}

@@ -4,6 +4,7 @@ import type { BillType } from './bills'
 // Keep these types in step with the models in backend/app/models.py
 
 export type Stance = 'support' | 'oppose' | 'unsure'
+export type ModerationStatus = 'pending' | 'flagged' | 'held' | 'cleared'
 
 export const STANCES: readonly Stance[] = ['support', 'oppose', 'unsure']
 
@@ -17,10 +18,12 @@ export interface BillResponses {
   label: string
   total: number
   counts: Record<Stance, number>
+  includes_sample: boolean
 }
 
+// Count stances on a bill; a sample account's token also counts the sample responses.
 export function getBillResponses(
-  congress: number, type: BillType, number: number, state?: string, district?: number | null,
+  congress: number, type: BillType, number: number, state?: string, district?: number | null, token?: string,
 ): Promise<BillResponses> {
   const query = new URLSearchParams()
   if (state) {
@@ -28,7 +31,8 @@ export function getBillResponses(
     if (district != null) query.set('district', String(district))
   }
   const filters = query.size ? `?${query}` : ''
-  return request<BillResponses>(`/api/bills/${congress}/${type}/${number}/responses${filters}`)
+  return request<BillResponses>(`/api/bills/${congress}/${type}/${number}/responses${filters}`,
+    token ? { headers: { Authorization: `Bearer ${token}` } } : undefined)
 }
 
 // Describe what a user writes when reviewing a bill.
@@ -46,6 +50,7 @@ export interface ReviewIn {
 // Describe a saved review of one bill by the signed-in user.
 export interface Review extends ReviewIn {
   bill_id: string
+  moderation_status: ModerationStatus
   created_at: string
   updated_at: string
 }

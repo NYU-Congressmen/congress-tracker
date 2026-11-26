@@ -82,3 +82,14 @@ test('shows the district representative’s position beside the full official ro
   expect(screen.getByRole('link', { name: 'Official roll call record' }).getAttribute('href')).toBe(official)
   expect(fetchMock).toHaveBeenCalledWith('/api/bills/119/hr/1/house-votes?bioguide_id=N000002', undefined)
 })
+
+test('labels counts that include sample accounts', async () => {
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+    if (url.includes('/house-votes')) return Response.json([])
+    if (url.includes('/members')) return Response.json({ data: [] })
+    return Response.json({ label, total: 3, counts: { support: 1, oppose: 2, unsure: 0 }, includes_sample: true })
+  }))
+  render(<BillStances bill={bill} />)
+
+  expect(await screen.findByText('Sample data')).toBeTruthy()
+})

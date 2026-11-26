@@ -108,7 +108,8 @@ def fetch_member_votes(
             raise httpx.RemoteProtocolError(
                 "House vote member pagination returned no new positions."
             )
-        if len(results) < PAGE_SIZE:
+        # Congress.gov currently ignores the limit and sends every member in one response.
+        if len(results) != PAGE_SIZE:
             return details, list(positions.values())
         offset += len(results)
 
