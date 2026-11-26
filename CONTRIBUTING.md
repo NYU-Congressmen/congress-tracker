@@ -97,6 +97,16 @@ uv run --directory backend python -m app.demo_seed
 
 ### Shared reviews and reports
 
+Saving a review with text sends the story and action taken to OpenAI's free Moderation endpoint (`omni-moderation-latest`) after the text is committed. Harassment, threatening harassment and threatening hate mark the review `flagged`, and other text marks it `cleared`. A review without text is cleared at once, and a review stays `pending` when `MODERATION_API_KEY` is absent or the provider fails. Only cleared reviews appear in the shared list, and the author keeps the original text with a status note on the bill page. Editing the text queues the new revision. An operator can list the queue, recheck a revision or record a decision for the revision they inspected.
+
+```bash
+uv run --directory backend python -m app.ai.moderation list
+uv run --directory backend python -m app.ai.moderation show REVIEW_ID
+uv run --directory backend python -m app.ai.moderation check REVIEW_ID REVISION
+uv run --directory backend python -m app.ai.moderation approve REVIEW_ID REVISION
+uv run --directory backend python -m app.ai.moderation hold REVIEW_ID REVISION
+```
+
 `GET /api/bills/{congress}/{type}/{number}/reviews` pages through the reviews whose authors set `share_publicly`, most recently edited first. That choice is separate from `consent_to_share`, which only includes a review in the Constituent Signal brief for the author's office, so agreeing to the brief never lists a review publicly. Each carries a `review_id` and the state and district its author saved, never a name or phone number. `PUT .../review/visibility` with `{"hidden": true}` lets the author hide their own review from that list and from response counts, and `{"hidden": false}` shows it again. Editing a hidden review keeps it hidden, and `GET .../review` reports `hidden`.
 
 Anyone can `POST /api/reviews/{review_id}/reports` with a `reason` (`spam`, `harassment`, `misinformation`, `personal_info` or `other`) and optional `details`. A review is withheld from the public list while it has unresolved reports from three or more distinct signed-in readers. Visitor reports are recorded for staff review. A database operator can list unresolved reports and dismiss one by ID. Dismissing keeps the report and removes it from the count.

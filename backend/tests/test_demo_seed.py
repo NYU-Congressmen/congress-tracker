@@ -46,6 +46,11 @@ def test_seed_is_repeatable_and_stays_out_of_public_counts(db):
     assert counted[0] == counted[1]
     assert counted[0][1] == 1
     assert counts["bills"] == 2 and calls == 3
+    with psycopg.connect(TEST_DATABASE_URL) as conn:
+        statuses = conn.execute(
+            "SELECT DISTINCT moderation_status FROM reviews WHERE uid <> 'real-reader'"
+        ).fetchall()
+    assert statuses == [("cleared",)]
 
     url = "/api/bills/119/s/3108/responses"
     public = client.get(url).json()

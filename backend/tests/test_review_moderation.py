@@ -34,6 +34,7 @@ def client(db):
         "INSERT INTO reviews (uid, bill_id, stance, story, share_publicly) "
         "VALUES ('author', '119-hr-1', 'oppose', 'My clinic closed.', true)"
     )
+    sql("UPDATE reviews SET moderation_status = 'cleared' WHERE uid = 'author'")
     sql(
         "INSERT INTO reviews (uid, bill_id, stance, story) "
         "VALUES ('private', '119-hr-1', 'support', 'Just for me.')"
@@ -83,8 +84,9 @@ def test_consent_to_the_office_brief_never_lists_a_review(client):
     assert client.get(REVIEW).json()["consent_to_share"] is False
 
 
-def test_author_hides_and_shows_their_review(client):
+def test_author_hides_and_shows_their_review(client, monkeypatch):
     sign_in("author")
+    monkeypatch.setattr("app.ai.moderation.check_text", lambda text: [])
 
     hidden = client.put(f"{REVIEW}/visibility", json={"hidden": True})
 

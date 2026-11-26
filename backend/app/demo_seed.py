@@ -276,6 +276,11 @@ def seed(conn, rng_seed: int = 119) -> dict[str, int]:
                 if bill_id in bills
             ],
         )
+    # The seeded stories are written for the demo, so they skip the moderation queue.
+    conn.execute(
+        "UPDATE reviews r SET moderation_status = 'cleared' FROM users u "
+        "WHERE u.uid = r.uid AND u.is_sample"
+    )
     return {
         "accounts": len(accounts) + 1,
         "bills": len(bills),

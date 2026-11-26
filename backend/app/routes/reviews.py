@@ -3,6 +3,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response
 from psycopg import Connection
 
+from app.ai.moderation import moderate_review
 from app.auth import current_uid, optional_uid
 from app.db import connect, fetch_all, fetch_one
 from app.models import BillType, ReportIn, Review, ReviewIn, ReviewPage, ReviewVisibility, Stance
@@ -16,7 +17,7 @@ Uid = Annotated[str, Depends(current_uid)]
 
 REVIEW_COLUMNS = (
     "bill_id, stance, story, action_taken, consent_to_share, share_publicly, created_at, "
-    "updated_at, hidden_at IS NOT NULL AS hidden"
+    "updated_at, hidden_at IS NOT NULL AS hidden, moderation_status"
 )
 
 # Reports from this many different signed-in people withhold a review until the team looks.
@@ -26,7 +27,7 @@ WITHHOLD_AFTER_REPORTS = 3
 # A review is shared when its author chose to list it publicly, has not hidden it and reports
 # have not withheld it. Consent to the office brief (consent_to_share) is a separate choice.
 SHARED_REVIEW_SQL = f"""
-    r.share_publicly AND r.hidden_at IS NULL
+    r.share_publicly AND r.hidden_at IS NULL AND r.moderation_status = 'cleared'
     AND (SELECT count(*) FROM review_reports rr
          WHERE rr.review_id = r.review_id
            AND rr.reporter_uid IS NOT NULL AND rr.dismissed_at IS NULL)
@@ -46,7 +47,7 @@ SAVE_REVIEW_SQL = f"""
         consent_to_share = EXCLUDED.consent_to_share,
         share_publicly = EXCLUDED.share_publicly,
         updated_at = now()
-    RETURNING {REVIEW_COLUMNS}
+    RETURNING {REVIEW_COLUMNS}, review_id, moderation_revision
 """
 
 
@@ -72,7 +73,13 @@ def save_review(
     with connect() as conn:
         check_review_target(conn, bill_id, uid)
         params = {**review.model_dump(), "uid": uid, "bill_id": bill_id}
-        return conn.execute(SAVE_REVIEW_SQL, params).fetchone()
+        saved = conn.execute(SAVE_REVIEW_SQL, params).fetchone()
+
+    # Commit the author's text before calling the provider and release the database connection.
+    status = moderate_review(saved)
+    if status is not None:
+        saved["moderation_status"] = status
+    return saved
 
 
 @router.put("/bills/{congress}/{bill_type}/{number}/review/stance", response_model=Review)
@@ -191,7 +198,8 @@ def report_review(
     """
     with connect() as conn:
         review = conn.execute(
-            "SELECT uid FROM reviews WHERE review_id = %s AND share_publicly AND hidden_at IS NULL",
+            "SELECT uid FROM reviews WHERE review_id = %s AND share_publicly "
+            "AND hidden_at IS NULL AND moderation_status = 'cleared'",
             (review_id,),
         ).fetchone()
         if review is None:
