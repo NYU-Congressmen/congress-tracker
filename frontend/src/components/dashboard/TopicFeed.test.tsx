@@ -108,4 +108,27 @@ describe('TopicFeed', () => {
     expect(await screen.findByText('Health care · rural broadband')).toBeTruthy()
     expect(screen.getByText('To expand hospital coverage')).toBeTruthy()
   })
+
+  test.each([
+    { custom: [], feedRequested: false },
+    { custom: ['rural broadband'], feedRequested: true },
+  ])('requests a feed without preset topics only for custom topics $custom', async ({ custom, feedRequested }) => {
+    const fetchMock = mockApi([
+      { match: '/api/account/custom-topics', body: custom },
+      { match: '/api/feed', body: FEED },
+      { match: '/api/issues', body: ISSUES },
+    ])
+    const user = { uid: 'reader', getIdToken: vi.fn().mockResolvedValue('verified-token') } as unknown as User
+    render(
+      <SessionContext.Provider value={{ user, loading: false, error: null, retry: () => {} }}>
+        <MemoryRouter>
+          <TopicFeed topicIds={[]} />
+        </MemoryRouter>
+      </SessionContext.Provider>,
+    )
+
+    if (feedRequested) expect(await screen.findByText('To expand hospital coverage')).toBeTruthy()
+    else expect(await screen.findByText('No topics chosen yet')).toBeTruthy()
+    expect(fetchMock.mock.calls.some((call) => String(call[0]).includes('/api/feed'))).toBe(feedRequested)
+  })
 })

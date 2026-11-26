@@ -103,7 +103,7 @@ export default function DashboardPage() {
 
   // The signed-in person's district and topics drive the personalized
   // panels, which sit between "At a glance" and "Latest activity".
-  const { profile } = useProfile()
+  const { profile, loading: profileLoading } = useProfile()
   const { user } = useSession()
   const district = profile?.district ?? null
   const topics = profile?.topics ?? []
@@ -261,7 +261,7 @@ export default function DashboardPage() {
               </Link>
             </section>
           )}
-          {user && !district ? (
+          {user && !district && !profileLoading ? (
             <section className="card panel--stack" aria-label="Topics you follow">
               <TopicFeed topicIds={topics} />
             </section>

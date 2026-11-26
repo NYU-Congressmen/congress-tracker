@@ -29,15 +29,16 @@ export function TopicFeed({ topicIds }: TopicFeedProps) {
     [topicIds.join(',')],
   )
 
-  // The feed reads a signed-in reader's custom topics itself, so it starts without waiting
-  // for their names.
+  // The feed reads a signed-in reader's custom topics itself, so with preset topics it starts
+  // without waiting for their names. With none, it waits to learn whether any custom topic exists.
+  const customOnly = topicIds.length === 0 && customTopics.length > 0
   const feed = useApi(
     async () => {
-      if (!user && topicIds.length === 0) return null
+      if (topicIds.length === 0 && !customOnly) return null
       const customToken = user ? await getAccountToken(user) : undefined
       return getFeed({ issueIds: topicIds, limit: FEED_SIZE, customToken })
     },
-    [topicIds.join(','), user],
+    [topicIds.join(','), user, customOnly],
   )
 
   const names = [...(issues ?? [])
