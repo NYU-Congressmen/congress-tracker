@@ -1105,6 +1105,7 @@ button.chip {
 
 .district-map__canvas {
   height: 30rem;
+  touch-action: none;
 }
 
 .district-map__svg {
@@ -1170,13 +1171,6 @@ button.chip {
   stroke: var(--card);
   stroke-width: 2;
   vector-effect: non-scaling-stroke;
-}
-
-.district-map__hint {
-  padding: 10px 14px 12px;
-  background: var(--card);
-  font-size: 13px;
-  color: var(--ink-3);
 }
 
 /* ----------------------------------------------------------- social */
