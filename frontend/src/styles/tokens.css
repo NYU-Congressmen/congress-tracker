@@ -112,6 +112,8 @@
     --d6-ring: transparent;
     --r-edge: #b37580;
     --d-edge: #777cb3;
+    --r-seat: #cf485b;
+    --d-seat: #5166e0;
     --i: #a3a8b2;
     --error-bg: #2a1614;
     --error-ink: #ffb4ab;
@@ -161,6 +163,8 @@
   --d6-ring: transparent;
   --r-edge: #b37580;
   --d-edge: #777cb3;
+  --r-seat: #cf485b;
+  --d-seat: #5166e0;
   --i: #a3a8b2;
   --error-bg: #2a1614;
   --error-ink: #ffb4ab;

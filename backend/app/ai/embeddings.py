@@ -15,6 +15,11 @@ MODEL = "text-embedding-3-small"
 DIMENSIONS = 1536
 BATCH_SIZE = 64
 MAX_SUMMARY_CHARS = 4_000
+# A minimum similarity of 0.28 filled ten results on all five topics in the bill pilot, so
+# bills farther than this from every followed topic are left out of the ranked feed.
+MAX_COSINE_DISTANCE = 0.72
+# A feed page shows 20 bills, so each custom topic keeps far more matches than one page needs.
+CUSTOM_MATCH_LIMIT = 200
 
 PENDING_ISSUES = """
     SELECT i.* FROM issue_embedding_inputs i LEFT JOIN issue_embeddings e USING (issue_id)
@@ -45,6 +50,38 @@ SAVE_BILL = """
     WHERE bill_embeddings.source_key <> EXCLUDED.source_key
 """
 
+# Rank every saved bill vector once per topic when it is saved or after new vectors arrive,
+# so feed requests read stored matches and skip the vector scan.
+SAVE_CUSTOM_MATCHES = """
+    INSERT INTO custom_topic_matches (uid, topic_key, bill_id, distance)
+    SELECT t.uid, t.topic_key, n.bill_id, n.distance
+    FROM custom_topics t
+    CROSS JOIN LATERAL (
+        SELECT e.bill_id, e.embedding <=> t.embedding AS distance
+        FROM bill_embeddings e
+        ORDER BY distance
+        LIMIT %(limit)s
+    ) n
+    WHERE n.distance <= %(max_distance)s
+      AND (%(uid)s::text IS NULL OR (t.uid = %(uid)s AND t.topic_key = ANY(%(keys)s)))
+    ON CONFLICT (uid, topic_key, bill_id) DO UPDATE SET distance = EXCLUDED.distance
+"""
+
+
+def save_custom_matches(conn, uid: str | None = None, keys: list[str] | None = None) -> None:
+    """Store the nearest bills for one account's new topics, or rebuild them for every topic."""
+    if uid is None:
+        conn.execute("DELETE FROM custom_topic_matches")
+    conn.execute(
+        SAVE_CUSTOM_MATCHES,
+        {
+            "uid": uid,
+            "keys": keys or [],
+            "limit": CUSTOM_MATCH_LIMIT,
+            "max_distance": MAX_COSINE_DISTANCE,
+        },
+    )
+
 
 def issue_input(name: str, keywords: list[str]) -> str:
     """Return the topic name and the subject terms that describe its scope."""
@@ -60,6 +97,20 @@ def bill_input(title: str, summary: str | None) -> str:
     return f"{title}\n\n{text}"
 
 
+def embed_texts(client: OpenAI, texts: list[str]) -> tuple[list[list[float]], int]:
+    """Return validated vectors in input order and the number of input tokens."""
+    response = client.embeddings.create(model=MODEL, dimensions=DIMENSIONS, input=texts)
+    vectors = sorted(response.data, key=lambda item: item.index)
+    if [item.index for item in vectors] != list(range(len(texts))) or any(
+        len(item.embedding) != DIMENSIONS
+        or not any(item.embedding)
+        or not all(map(isfinite, item.embedding))
+        for item in vectors
+    ):
+        raise OpenAIError("The embedding provider returned invalid vectors.")
+    return [item.embedding for item in vectors], response.usage.prompt_tokens
+
+
 def save_batch(
     client: OpenAI,
     sql: str,
@@ -69,17 +120,7 @@ def save_batch(
     started = monotonic()
     call = {"feature": "feed_embedding", "model": MODEL, "bill_id": None, "output_tokens": 0}
     try:
-        response = client.embeddings.create(
-            model=MODEL, dimensions=DIMENSIONS, input=[text for _, _, text in rows]
-        )
-        vectors = sorted(response.data, key=lambda item: item.index)
-        if [item.index for item in vectors] != list(range(len(rows))) or any(
-            len(item.embedding) != DIMENSIONS
-            or not any(item.embedding)
-            or not all(map(isfinite, item.embedding))
-            for item in vectors
-        ):
-            raise OpenAIError("The embedding provider returned invalid vectors.")
+        vectors, tokens = embed_texts(client, [text for _, _, text in rows])
     except OpenAIError as error:
         with connect() as conn:
             log_call(
@@ -95,11 +136,10 @@ def save_batch(
             )
         raise
 
-    tokens = response.usage.prompt_tokens
     elapsed = monotonic() - started
     params = [
-        (json.dumps(item.embedding, separators=(",", ":")), item_id, source_key)
-        for item, (item_id, source_key, _) in zip(vectors, rows, strict=True)
+        (json.dumps(vector, separators=(",", ":")), item_id, source_key)
+        for vector, (item_id, source_key, _) in zip(vectors, rows, strict=True)
     ]
     with connect() as conn, conn.cursor() as cursor:
         cursor.executemany(sql, params)
@@ -144,6 +184,10 @@ def backfill(client: OpenAI, limit_bills: int | None = None) -> tuple[int, int]:
         saved_bills += save_batch(client, SAVE_BILL, rows)
         last_id = batch[-1]["bill_id"]
         scanned_bills += len(batch)
+    # A previous run can save every vector and stop before refreshing its distances.
+    with connect() as conn:
+        conn.execute("REFRESH MATERIALIZED VIEW CONCURRENTLY feed_embedding_distances")
+        save_custom_matches(conn)
     return saved_issues, saved_bills
 
 

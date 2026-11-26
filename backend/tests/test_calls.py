@@ -49,5 +49,24 @@ def test_call_retries_and_account_isolation(db, monkeypatch):
         later.json()["action_id"],
         first.json()["action_id"],
     ]
+    note_path = f"{URL}/{later.json()['action_id']}/note"
+    call_path = f"{URL}/{later.json()['action_id']}"
     monkeypatch.setitem(app.dependency_overrides, current_uid, lambda: "caller-2")
     assert client.get(URL).json() == []
+    assert client.patch(note_path, json={"note": "Another account"}).status_code == 404
+    assert client.delete(call_path).status_code == 204
+
+    monkeypatch.setitem(app.dependency_overrides, current_uid, lambda: "caller-1")
+    assert client.get(URL).json()[0] == later.json()
+    assert client.patch(note_path, json={"note": "a" * 2_001}).status_code == 422
+    updated = client.patch(note_path, json={"note": "  Added after the call.  "})
+    assert updated.status_code == 200
+    assert updated.json() == {**later.json(), "note": "Added after the call."}
+    assert client.get(URL).json()[0] == updated.json()
+    assert client.patch(note_path, json={"note": None}).json() == later.json()
+    wrong_bill_path = call_path.replace("/hr/1/", "/hr/2/")
+    assert client.delete(wrong_bill_path).status_code == 204
+    assert client.get(URL).json()[0] == later.json()
+    assert client.delete(call_path).status_code == 204
+    assert client.delete(call_path).status_code == 204
+    assert client.get(URL).json() == [first.json()]

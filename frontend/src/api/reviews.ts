@@ -13,6 +13,24 @@ export const STANCE_LABELS: Record<Stance, string> = {
   unsure: 'Unsure',
 }
 
+export interface BillResponses {
+  label: string
+  total: number
+  counts: Record<Stance, number>
+}
+
+export function getBillResponses(
+  congress: number, type: BillType, number: number, state?: string, district?: number | null,
+): Promise<BillResponses> {
+  const query = new URLSearchParams()
+  if (state) {
+    query.set('state', state)
+    if (district != null) query.set('district', String(district))
+  }
+  const filters = query.size ? `?${query}` : ''
+  return request<BillResponses>(`/api/bills/${congress}/${type}/${number}/responses${filters}`)
+}
+
 // Describe what a user writes when reviewing a bill.
 export interface ReviewIn {
   stance: Stance
@@ -51,5 +69,15 @@ export function saveReview(
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(review),
+  })
+}
+
+export function saveStance(
+  congress: number, type: BillType, number: number, stance: Stance, token: string,
+): Promise<Review> {
+  return request<Review>(`/api/bills/${congress}/${type}/${number}/review/stance`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ stance }),
   })
 }

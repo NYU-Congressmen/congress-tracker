@@ -44,6 +44,7 @@ function SocialContent({ linkedBill }: { linkedBill: string | null }) {
   const [platform, setPlatform] = useState(PLATFORMS[0].id)
   const [handle, setHandle] = useState('')
   const [socialError, setSocialError] = useState<string | null>(null)
+  const [socialSaving, setSocialSaving] = useState(false)
 
   // Composer
   const [billQuery, setBillQuery] = useState('')
@@ -212,8 +213,23 @@ function SocialContent({ linkedBill }: { linkedBill: string | null }) {
     }
   }
 
-  function addSocial(event: FormEvent) {
+  async function saveSocials(next: SocialProfile[]) {
+    setSocialSaving(true)
+    try {
+      if (profile) await updateProfile({ socials: next })
+      setSocials(next)
+      return true
+    } catch {
+      setSocialError('Your social profiles could not be saved. Try again.')
+      return false
+    } finally {
+      setSocialSaving(false)
+    }
+  }
+
+  async function addSocial(event: FormEvent) {
     event.preventDefault()
+    if (socialSaving) return
     setSocialError(null)
     const value = handle.trim()
     if (!value) {
@@ -225,15 +241,13 @@ function SocialContent({ linkedBill }: { linkedBill: string | null }) {
       return
     }
     const next = [...socials, { platform, handle: value }]
-    setSocials(next)
-    setHandle('')
-    if (profile) updateProfile({ socials: next })
+    if (await saveSocials(next)) setHandle('')
   }
 
   function removeSocial(target: string) {
     const next = socials.filter((social) => social.platform !== target)
-    setSocials(next)
-    if (profile) updateProfile({ socials: next })
+    setSocialError(null)
+    void saveSocials(next)
   }
 
   return (
@@ -276,7 +290,7 @@ function SocialContent({ linkedBill }: { linkedBill: string | null }) {
                 <li key={social.platform} className="social-list__item">
                   <span className="social-list__platform">{platformName(social.platform)}</span>
                   <span className="social-list__handle">{social.handle}</span>
-                  <button type="button" className="btn btn--ghost btn--sm" onClick={() => removeSocial(social.platform)}>
+                  <button type="button" className="btn btn--ghost btn--sm" disabled={socialSaving} onClick={() => removeSocial(social.platform)}>
                     Remove
                   </button>
                 </li>
@@ -307,7 +321,7 @@ function SocialContent({ linkedBill }: { linkedBill: string | null }) {
                 onChange={(event) => setHandle(event.target.value)}
               />
             </label>
-            <button type="submit" className="btn btn--secondary">
+            <button type="submit" className="btn btn--secondary" disabled={socialSaving}>
               Add handle
             </button>
           </form>

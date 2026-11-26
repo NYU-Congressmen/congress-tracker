@@ -69,7 +69,7 @@ Routes that act for a user depend on `current_uid` in `backend/app/auth.py`. It 
 
 Structured model calls go through `ask` in `backend/app/ai/service.py`, which answers from the `ai_results` cache when it can and logs each real call in `ai_calls` with its tokens and cost. The cache key covers the feature, prompt version, model and exact messages, so changed input regenerates by itself. Bump a feature's prompt version when its prompt changes. A failed call is logged and raised, never cached.
 
-The embedding job uses `LLM_API_KEY` and `LLM_BASE_URL` for an endpoint that serves OpenAI `text-embedding-3-small`. It stores 1,536-dimensional vectors for the topic names and keywords and for bill titles with their latest CRS summary where available. Embedding batches log token counts and cost in `ai_calls`. The job runs after the embedding migration and can be rerun to fill new or changed inputs after a sync. The shared database needs the embedding migration before the first release of the semantic feed. Cloud Run reads saved vectors without a model key.
+The embedding job uses `LLM_API_KEY` and `LLM_BASE_URL` for an endpoint that serves OpenAI `text-embedding-3-small`. It stores 1,536-dimensional vectors for the topic names and keywords and for bill titles with their latest CRS summary where available. Embedding batches log token counts and cost in `ai_calls`. The job can be rerun to fill new or changed inputs after a sync, and each run ends by refreshing `feed_embedding_distances`, the stored distance between every bill and preset topic. The feed computes a distance on demand for a vector newer than that cache, so it reads saved vectors without a model key. Custom topics are embedded when a reader saves them, so hosted custom topics need `OPENAI_EMBEDDING_API_KEY` among Cloud Run's secrets.
 
 Code that talks to Congress.gov lives in `backend/app/sync/`. The list sync in `bills.py`, `members.py` and `summaries.py` fills the tables cheaply, and `cache.py` fetches a single bill's or member's details when an endpoint needs them, so new endpoints should read from the database and call the cache rather than Congress.gov directly. Tests that need a database use the `db` fixture in `backend/tests/conftest.py`, and [SETUP.md](SETUP.md#database-tests) explains how to run them locally.
 
@@ -89,6 +89,8 @@ These endpoints serve Pull's own features on top of the legislative data.
 
 `GET /api/bills/{congress}/{type}/{number}/responses` counts stances on a bill as `counts.support`, `counts.oppose` and `counts.unsure`, with their `total` and a `label` for the page to show. Every account is phone-verified, so these are people who chose to respond, not a sample of the public. `?state=NY` limits the counts to users whose saved district is in that state, and `&district=12` to one district. Only a Census address match saves a district on the account (`PUT /api/account/district`); picking one on the map or by number calls `DELETE /api/account/district`, so such users are counted only without a state filter. An at-large seat has no district number, so its constituents are counted with the state alone. Reviews their authors hid are left out.
 
+`PUT /api/bills/{congress}/{type}/{number}/review/stance` with `{"stance": "support"}` saves the signed-in reader's stance in one tap. It creates a review when none exists and keeps an existing review's text, visibility and brief consent.
+
 ### Shared reviews and reports
 
 `GET /api/bills/{congress}/{type}/{number}/reviews` pages through the reviews whose authors set `share_publicly`, most recently edited first. That choice is separate from `consent_to_share`, which only includes a review in the Constituent Signal brief for the author's office, so agreeing to the brief never lists a review publicly. Each carries a `review_id` and the state and district its author saved, never a name or phone number. `PUT .../review/visibility` with `{"hidden": true}` lets the author hide their own review from that list and from response counts, and `{"hidden": false}` shows it again. Editing a hidden review keeps it hidden, and `GET .../review` reports `hidden`.
@@ -102,7 +104,17 @@ uv run --directory backend python -m app.review_reports dismiss REPORT_ID
 
 ### House votes
 
-`GET /api/bills/{congress}/{type}/{number}/house-votes` lists a bill's House roll-call votes, oldest first. Each has its question, result, `totals` counting every member's position exactly as the Clerk recorded it (`Yea`, `Nay`, `Aye`, `No`, `Present` or `Not Voting`), and `positions` naming each member with their district when Pull has them stored. `?bioguide_id=` narrows `positions` to one member, so a page can put a representative's vote beside what Pull users said, while `totals` still counts everyone. The sync reads a followed bill's actions after the bill changes and fetches member positions until a full tally is stored. A repeated page leaves `positions_complete` false so the next sync can retry. Congress.gov's House vote data covers the 118th and 119th Congresses.
+`GET /api/bills/{congress}/{type}/{number}/house-votes` lists a bill's House roll-call votes, oldest first. Each has its question, result, `totals` counting every member's position exactly as the Clerk recorded it (`Yea`, `Nay`, `Aye`, `No`, `Present` or `Not Voting`), and `positions` naming each member with their district when Pull has them stored. `?bioguide_id=` narrows `positions` to one member, so a page can put a representative's vote beside what Pull users said, while `totals` still counts everyone. `?include_positions=false` returns the totals without any positions. The sync reads a followed bill's actions after the bill changes and fetches member positions until a full tally is stored. A repeated page leaves `positions_complete` false so the next sync can retry. Congress.gov's House vote data covers the 118th and 119th Congresses.
+
+### Accounts and custom topics
+
+`GET /api/account/profile` returns the signed-in account's profile name, district, topics and social handles. Until the first save it reports `saved` as false, with the address-matched district as the default. `PATCH /api/account/profile` merges the supplied fields into the saved profile. With `?initialize=true` it writes only when the account has no saved profile, which the browser uses once to import a profile from earlier builds.
+
+`GET /api/account/custom-topics` lists the reader's custom topics, and `PUT` replaces them with up to eight phrases. Only newly added phrases are sent to OpenAI for a vector, and each account can make 12 embedding requests a day. A failed provider call keeps the previous topics. `GET /api/feed?include_custom=true` with the reader's token ranks bills against those vectors alongside any `issue_id` topics.
+
+### Call log
+
+`GET /api/bills/{congress}/{type}/{number}/calls` lists the signed-in reader's calls about a bill. `PUT .../calls/{request_id}` records a call to one office, and a retry with the same request ID saves one entry. `PATCH .../calls/{action_id}/note` replaces or clears the note on a saved call, and `DELETE .../calls/{action_id}` removes it. Calls are private to their author.
 
 ### Share links
 

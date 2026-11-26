@@ -1,10 +1,11 @@
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response
+from psycopg import Connection
 
 from app.auth import current_uid, optional_uid
 from app.db import connect, fetch_all, fetch_one
-from app.models import BillType, ReportIn, Review, ReviewIn, ReviewPage, ReviewVisibility
+from app.models import BillType, ReportIn, Review, ReviewIn, ReviewPage, ReviewVisibility, Stance
 from app.sync.bills import make_bill_id
 
 router = APIRouter(tags=["reviews"])
@@ -48,6 +49,19 @@ SAVE_REVIEW_SQL = f"""
 """
 
 
+def check_review_target(conn: Connection, bill_id: str, uid: str) -> None:
+    """Check that the bill and signed-in account exist before writing a review."""
+    found = conn.execute(
+        "SELECT EXISTS (SELECT 1 FROM bills WHERE bill_id = %s) AS bill_found, "
+        "EXISTS (SELECT 1 FROM users WHERE uid = %s) AS user_found",
+        (bill_id, uid),
+    ).fetchone()
+    if not found["bill_found"]:
+        raise HTTPException(404, "Bill not found")
+    if not found["user_found"]:
+        raise HTTPException(403, "Finish signing up before reviewing a bill")
+
+
 @router.put("/bills/{congress}/{bill_type}/{number}/review", response_model=Review)
 def save_review(
     congress: int, bill_type: BillType, number: int, review: ReviewIn, uid: Uid
@@ -55,17 +69,35 @@ def save_review(
     """Create or replace the signed-in user's review of a bill and return it."""
     bill_id = make_bill_id(congress, bill_type, number)
     with connect() as conn:
-        found = conn.execute(
-            "SELECT EXISTS (SELECT 1 FROM bills WHERE bill_id = %s) AS bill_found, "
-            "EXISTS (SELECT 1 FROM users WHERE uid = %s) AS user_found",
-            (bill_id, uid),
-        ).fetchone()
-        if not found["bill_found"]:
-            raise HTTPException(404, "Bill not found")
-        if not found["user_found"]:
-            raise HTTPException(403, "Finish signing up before reviewing a bill")
+        check_review_target(conn, bill_id, uid)
         params = {**review.model_dump(), "uid": uid, "bill_id": bill_id}
         return conn.execute(SAVE_REVIEW_SQL, params).fetchone()
+
+
+@router.put("/bills/{congress}/{bill_type}/{number}/review/stance", response_model=Review)
+def save_stance(
+    congress: int,
+    bill_type: BillType,
+    number: int,
+    stance: Annotated[Stance, Body(embed=True)],
+    uid: Uid,
+) -> dict[str, Any]:
+    """Save the signed-in user's stance and return the review with its other fields intact."""
+    bill_id = make_bill_id(congress, bill_type, number)
+    with connect() as conn:
+        check_review_target(conn, bill_id, uid)
+        return conn.execute(
+            f"""
+            INSERT INTO reviews (uid, bill_id, stance)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (uid, bill_id) DO UPDATE SET
+                stance = EXCLUDED.stance,
+                updated_at = CASE WHEN EXCLUDED.stance <> reviews.stance THEN now()
+                                  ELSE reviews.updated_at END
+            RETURNING {REVIEW_COLUMNS}
+            """,
+            (uid, bill_id, stance),
+        ).fetchone()
 
 
 @router.get("/bills/{congress}/{bill_type}/{number}/review", response_model=Review)

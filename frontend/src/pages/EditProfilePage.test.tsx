@@ -5,8 +5,7 @@ import { afterEach, expect, test } from 'vitest'
 import { SessionContext } from '../auth/SessionContext'
 import { SiteHeader } from '../components/layout/SiteHeader'
 import { ProfileProvider } from '../profile/ProfileContext'
-import { createProfile, currentProfile } from '../profile/store'
-import { mockApi } from '../test/fetchMock'
+import { mockAccountProfile, mockApi } from '../test/fetchMock'
 import EditProfilePage from './EditProfilePage'
 import MembersPage from './MembersPage'
 
@@ -31,17 +30,16 @@ function renderEditor() {
 afterEach(() => localStorage.clear())
 
 test('saves topics and the profile name independently without reopening sign-in', async () => {
-  createProfile('maya', {
-    firebase_uid: user.uid,
-    district: { state: 'NY', district: 12, method: 'number' },
-    topics: [],
-    socials: [],
-  })
-  mockApi([{ match: '/api/issues', body: [{ issue_id: 1, name: 'Housing' }] }])
+  const account = mockAccountProfile({ username: 'maya', district: { state: 'NY', district: 12, method: 'number' } })
+  mockApi([
+    account.route,
+    { match: '/api/issues', body: [{ issue_id: 1, name: 'Housing' }] },
+    { match: '/api/account/custom-topics', body: [] },
+  ])
   renderEditor()
 
   expect(screen.queryByText('Phone verification')).toBeNull()
-  fireEvent.click(screen.getByRole('link', { name: 'Topics' }))
+  fireEvent.click(await screen.findByRole('link', { name: 'Topics' }))
   fireEvent.click(await screen.findByRole('button', { name: 'Housing' }))
   fireEvent.click(screen.getByRole('button', { name: 'Save topics' }))
   expect(await screen.findByRole('heading', { name: 'Profile saved' })).toBeTruthy()
@@ -62,9 +60,8 @@ test('saves topics and the profile name independently without reopening sign-in'
   fireEvent.click(screen.getByRole('button', { name: 'Save profile name' }))
 
   expect(await screen.findByRole('heading', { name: 'Profile saved' })).toBeTruthy()
-  expect(currentProfile()).toMatchObject({
+  expect(account.profile).toMatchObject({
     username: 'maya-civics',
-    firebase_uid: 'editor',
     district: { state: 'NY', district: 12 },
     topics: [1],
     socials: [{ platform: 'bluesky', handle: 'maya.bsky.social' }],
@@ -72,7 +69,7 @@ test('saves topics and the profile name independently without reopening sign-in'
 })
 
 test('saves a district on request and uses it for My representatives', async () => {
-  createProfile('maya', { firebase_uid: user.uid, district: null, topics: [], socials: [] })
+  const account = mockAccountProfile({}, false)
   const match = { state: 'NY', district: 12 }
   const member = { party: 'D', state: 'NY', image_url: null, is_current: true }
   const members = [
@@ -81,13 +78,16 @@ test('saves a district on request and uses it for My representatives', async () 
     { ...member, bioguide_id: 'X000003', name: 'Neighboring House Member', chamber: 'House', district: 13 },
   ]
   const fetchMock = mockApi([
+    account.route,
     { match: '/api/district-lookup', body: match },
     { match: '/api/account/district', body: match },
     { match: '/api/members', body: { total: members.length, data: members } },
   ])
   renderEditor()
 
-  fireEvent.change(screen.getByLabelText('Street address'), { target: { value: '350 Fifth Avenue, New York, NY' } })
+  expect(screen.getByRole('link', { name: 'Edit profile' }).getAttribute('href')).toBe('/profile')
+  expect(screen.queryByRole('link', { name: 'Set up profile' })).toBeNull()
+  fireEvent.change(await screen.findByLabelText('Street address'), { target: { value: '350 Fifth Avenue, New York, NY' } })
   fireEvent.click(screen.getByRole('button', { name: 'Find district' }))
   expect(await screen.findByText('New York · District 12')).toBeTruthy()
   expect(fetchMock).not.toHaveBeenCalledWith('/api/account/district', expect.objectContaining({ method: 'PUT' }))
@@ -95,7 +95,7 @@ test('saves a district on request and uses it for My representatives', async () 
 
   expect(await screen.findByRole('heading', { name: 'Profile saved' })).toBeTruthy()
   expect(fetchMock).toHaveBeenCalledWith('/api/account/district', expect.objectContaining({ method: 'PUT' }))
-  expect(currentProfile()?.district).toEqual({ ...match, method: 'address' })
+  expect(account.profile.district).toEqual({ ...match, method: 'address' })
 
   fireEvent.click(screen.getByRole('link', { name: 'Members' }))
   fireEvent.click(screen.getByRole('button', { name: 'My representatives' }))
@@ -106,13 +106,9 @@ test('saves a district on request and uses it for My representatives', async () 
 })
 
 test('forgets the account district when the reader picks one by number', async () => {
-  createProfile('maya', {
-    firebase_uid: user.uid,
-    district: { state: 'NY', district: 12, method: 'address' },
-    topics: [],
-    socials: [],
-  })
+  const account = mockAccountProfile({ username: 'maya', district: { state: 'NY', district: 12, method: 'address' } })
   const fetchMock = mockApi([
+    account.route,
     { match: '/api/account/district', body: null },
     { match: 'tigerWMS', body: { features: [] } },
   ])
@@ -125,5 +121,5 @@ test('forgets the account district when the reader picks one by number', async (
 
   expect(await screen.findByRole('heading', { name: 'Profile saved' })).toBeTruthy()
   expect(fetchMock).toHaveBeenCalledWith('/api/account/district', expect.objectContaining({ method: 'DELETE' }))
-  expect(currentProfile()?.district).toEqual({ state: 'DC', district: null, method: 'number' })
+  expect(account.profile.district).toEqual({ state: 'DC', district: null, method: 'number' })
 })

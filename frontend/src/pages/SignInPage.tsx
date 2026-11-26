@@ -7,8 +7,7 @@ import { PageBand } from '../components/layout/PageBand'
 export default function SignInPage() {
   const { user, loading } = useSession()
   const [params] = useSearchParams()
-  const returnToOnboarding = params.get('next') === 'onboarding'
-  const returnToProfile = params.get('next') === 'profile'
+  const returnToProfile = ['profile', 'onboarding'].includes(params.get('next') ?? '')
 
   useEffect(() => {
     const previousTitle = document.title
@@ -29,10 +28,10 @@ export default function SignInPage() {
             <div className="onboard-form">
               <p role="status">You’re signed in.</p>
               <Link
-                to={returnToOnboarding ? '/onboarding?step=district' : returnToProfile ? '/profile' : '/social'}
+                to={returnToProfile ? '/profile' : '/social'}
                 className="btn btn--primary"
               >
-                {returnToOnboarding ? 'Continue to your district' : returnToProfile ? 'Continue to your profile' : 'Go to discussions'}
+                {returnToProfile ? 'Edit profile' : 'Go to discussions'}
               </Link>
             </div>
           ) : <PhoneAuthForm />}

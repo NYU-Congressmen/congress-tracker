@@ -7,7 +7,7 @@ import { ProfileProvider } from '../profile/ProfileContext'
 import { createProfile, currentProfile, leaveProfile } from '../profile/store'
 import SocialPage from './SocialPage'
 import { listDiscussions, recordDiscussion } from '../social/drafts'
-import { mockApi } from '../test/fetchMock'
+import { mockAccountProfile, mockApi } from '../test/fetchMock'
 
 const BILL_PAGE = {
   total: 1,
@@ -80,7 +80,9 @@ describe('SocialPage', () => {
     createProfile('maya', { firebase_uid: 'reviewer', district: null, topics: [1], socials: [] })
     createProfile('sam', { firebase_uid: 'other-user', district: null, topics: [], socials: [] })
     leaveProfile()
+    const account = mockAccountProfile({}, false)
     mockApi([
+      account.route,
       {
         match: '/api/bills/119/hr/7/review',
         body: { stance: 'support', story: 'Saved account review.', consent_to_share: false },
@@ -105,7 +107,7 @@ describe('SocialPage', () => {
 
     rerender(view(user))
     expect(await screen.findByDisplayValue('Saved account review.')).toBeTruthy()
-    expect(currentProfile()?.username).toBe('maya')
+    expect(account.profile.username).toBe('maya')
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Save my stance' }).disabled).toBe(false)
   })
 

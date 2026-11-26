@@ -126,4 +126,49 @@ describe('DistrictMap selection', () => {
     fireEvent.wheel(svg, { deltaY: 4, clientX: 200, clientY: 150 })
     expect(width()).toBeCloseTo(initialWidth)
   })
+
+  test('zooms around two touch contacts without selecting a district', () => {
+    const onSelect = renderMap()
+    const svg = svgSurface()
+    const district = screen.getByRole('button', { name: 'District 1' })
+    const view = () => svg.getAttribute('viewBox')!.split(' ').map(Number)
+    const [initialX, , initialWidth] = view()
+    const first = { pointerId: 1, pointerType: 'touch', clientX: 150, clientY: 150 }
+    const second = { pointerId: 2, pointerType: 'touch', clientX: 250, clientY: 150 }
+
+    fireEvent.pointerDown(district, first)
+    fireEvent.pointerDown(svg, second)
+    fireEvent.pointerMove(svg, { ...first, clientX: 100 })
+    fireEvent.pointerMove(svg, { ...second, clientX: 300 })
+    const [zoomedX, , zoomedWidth] = view()
+    expect(zoomedWidth / initialWidth).toBeCloseTo(0.366)
+    expect(zoomedX + zoomedWidth / 2).toBeCloseTo(initialX + initialWidth / 2)
+
+    fireEvent.pointerMove(svg, first)
+    fireEvent.pointerMove(svg, second)
+    expect(view()[2]).toBeCloseTo(initialWidth)
+    fireEvent.pointerUp(svg, first)
+    fireEvent.pointerUp(svg, second)
+    expect(onSelect).not.toHaveBeenCalled()
+
+    fireEvent.pointerDown(district, first)
+    fireEvent.pointerUp(district, first)
+    expect(onSelect).toHaveBeenCalledWith(1)
+  })
+
+  test('handles Safari trackpad gestures independently of wheel scrolling', () => {
+    renderMap()
+    const svg = svgSurface()
+    const width = () => Number(svg.getAttribute('viewBox')?.split(' ')[2])
+    const initialWidth = width()
+    const gesture = (type: string, scale: number) =>
+      Object.assign(new MouseEvent(type, { bubbles: true, cancelable: true, clientX: 200, clientY: 150 }), { scale })
+
+    expect(fireEvent(svg, gesture('gesturestart', 1))).toBe(false)
+    fireEvent(svg, gesture('gesturechange', 1.5))
+    expect(width() / initialWidth).toBeCloseTo(0.556)
+    fireEvent(svg, gesture('gesturechange', 1))
+    expect(width()).toBeCloseTo(initialWidth)
+    fireEvent(svg, gesture('gestureend', 1))
+  })
 })
