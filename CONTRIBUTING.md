@@ -87,11 +87,25 @@ These endpoints serve Pull's own features on top of the legislative data.
 
 ### What people on Pull think
 
-`GET /api/bills/{congress}/{type}/{number}/responses` counts stances on a bill as `counts.support`, `counts.oppose` and `counts.unsure`, with their `total` and a `label` for the page to show. Every account is phone-verified, so these are people who chose to respond, not a sample of the public. `?state=NY` limits the counts to users whose saved district is in that state, and `&district=12` to one district. Only a Census address match saves a district on the account (`PUT /api/account/district`); picking one on the map or by number calls `DELETE /api/account/district`, so such users are counted only without a state filter. An at-large seat has no district number, so its constituents are counted with the state alone. Reviews their authors hid are left out.
+`GET /api/bills/{congress}/{type}/{number}/responses` counts stances on a bill as `counts.support`, `counts.oppose` and `counts.unsure`, with their `total` and a `label` for the page to show. Every account is phone-verified, so these are people who chose to respond, not a sample of the public. `?state=NY` limits the counts to users whose saved district is in that state, and `&district=12` to one district. Only a Census address match saves a district on the account (`PUT /api/account/district`); picking one on the map or by number calls `DELETE /api/account/district`, so such users are counted only without a state filter. An at-large seat has no district number, so its constituents are counted with the state alone. Reviews their authors hid are left out. Accounts with `users.is_sample` set hold demo activity, which the counts and the public review list include only for a viewer signed in with a sample account, and the counts report `includes_sample` when they do. The demo seed replaces the sample viewer for the Firebase test number and the sample constituents' activity, then fetches real roll calls and relationships for the seeded bills. It runs against a database only after the API serving it includes this filter.
+
+```bash
+uv run --directory backend python -m app.demo_seed
+```
 
 `PUT /api/bills/{congress}/{type}/{number}/review/stance` with `{"stance": "support"}` saves the signed-in reader's stance in one tap. It creates a review when none exists and keeps an existing review's text, visibility and brief consent.
 
 ### Shared reviews and reports
+
+Saving a review with text sends the story and action taken to OpenAI's free Moderation endpoint (`omni-moderation-latest`) after the text is committed. Harassment, threatening harassment and threatening hate mark the review `flagged`, and other text marks it `cleared`. A review without text is cleared at once, and a review stays `pending` when `MODERATION_API_KEY` is absent or the provider fails. Only cleared reviews appear in the shared list, and the author keeps the original text with a status note on the bill page. Editing the text queues the new revision. An operator can list the queue, recheck a revision or record a decision for the revision they inspected.
+
+```bash
+uv run --directory backend python -m app.ai.moderation list
+uv run --directory backend python -m app.ai.moderation show REVIEW_ID
+uv run --directory backend python -m app.ai.moderation check REVIEW_ID REVISION
+uv run --directory backend python -m app.ai.moderation approve REVIEW_ID REVISION
+uv run --directory backend python -m app.ai.moderation hold REVIEW_ID REVISION
+```
 
 `GET /api/bills/{congress}/{type}/{number}/reviews` pages through the reviews whose authors set `share_publicly`, most recently edited first. That choice is separate from `consent_to_share`, which only includes a review in the Constituent Signal brief for the author's office, so agreeing to the brief never lists a review publicly. Each carries a `review_id` and the state and district its author saved, never a name or phone number. `PUT .../review/visibility` with `{"hidden": true}` lets the author hide their own review from that list and from response counts, and `{"hidden": false}` shows it again. Editing a hidden review keeps it hidden, and `GET .../review` reports `hidden`.
 

@@ -228,6 +228,7 @@ class Review(ReviewIn):
     """Describe a saved review of one bill by the signed-in user."""
 
     bill_id: str
+    moderation_status: Literal["pending", "flagged", "held", "cleared"]
     created_at: datetime
     updated_at: datetime
     # A hidden review stays the author's own, out of shared lists and response counts
@@ -302,6 +303,8 @@ class BillResponses(BaseModel):
     district: int | None
     total: int
     counts: StanceCounts
+    # True when sample accounts are among the counted respondents
+    includes_sample: bool = False
 
 
 class ReviewVisibility(BaseModel):

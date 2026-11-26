@@ -11,7 +11,8 @@ MISSING_OBJECTS = """
         SELECT 'public.' || name AS name, to_regclass('public.' || name) IS NOT NULL AS present
         FROM unnest(ARRAY[
             'bill_embeddings', 'issue_embeddings', 'bill_embedding_inputs', 'issue_embedding_inputs',
-            'feed_embedding_distances', 'custom_topics', 'custom_topic_matches'
+            'feed_embedding_distances', 'custom_topics', 'custom_topic_matches',
+            'visible_reviews'
         ]) AS relations(name)
         UNION ALL
         SELECT 'public.' || expected.table_name || '.' || expected.column_name, EXISTS (
@@ -20,12 +21,16 @@ MISSING_OBJECTS = """
               AND col.table_name = expected.table_name
               AND col.column_name = expected.column_name
               AND col.data_type = expected.data_type
-              AND col.is_nullable = 'YES'
+              AND col.is_nullable = expected.is_nullable
         )
         FROM (
-            VALUES ('actions', 'request_id', 'uuid'), ('actions', 'call_note', 'text'),
-                   ('ai_calls', 'bill_id', 'text'), ('users', 'profile', 'jsonb')
-        ) AS expected(table_name, column_name, data_type)
+            VALUES ('actions', 'request_id', 'uuid', 'YES'), ('actions', 'call_note', 'text', 'YES'),
+                   ('ai_calls', 'bill_id', 'text', 'YES'), ('users', 'profile', 'jsonb', 'YES'),
+                   ('users', 'is_sample', 'boolean', 'NO'),
+                   ('reviews', 'moderation_status', 'text', 'NO'),
+                   ('reviews', 'moderation_revision', 'integer', 'NO'),
+                   ('reviews', 'moderation_flags', 'ARRAY', 'NO')
+        ) AS expected(table_name, column_name, data_type, is_nullable)
         UNION ALL
         SELECT 'public.actions retry constraint', EXISTS (
             SELECT 1 FROM pg_constraint
