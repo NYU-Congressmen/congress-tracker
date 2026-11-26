@@ -44,7 +44,6 @@ const BILL = {
   policy_area: 'Health',
   sponsor_id: 'P000614',
   sponsor: SPONSOR,
-  co_sponsors: [COSPONSOR],
   actions: [{ action_date: '2026-03-02', type: 'Referred', text: 'Referred to committee.' }],
   cache: { complete: true, stale: false, refreshed_at: null, refresh_failed: false, retry_after: null },
 }
@@ -71,6 +70,10 @@ function renderBill(user: User | null = null, routes: ApiRoute[] = []) {
     { match: '/api/bills/119/hr/7/explanation', body: EXPLANATION },
     { match: '/api/bills/119/hr/7/texts', body: [] },
     { match: '/api/bills/119/hr/7/review', body: { detail: 'not signed in' }, status: 404 },
+    { match: '/api/bills/119/hr/7/graph', body: {
+      cache: BILL.cache,
+      cosponsors: [{ ...COSPONSOR, name: 'Schumer, Chuck [D-NY]', withdrawn_date: null }],
+    } },
     { match: '/api/bills/119/hr/7/house-votes', body: [] },
     { match: '/api/bills/119/hr/7/responses', body: {
       label: 'Verified Pull users who responded', total: 0, counts: { support: 0, oppose: 0, unsure: 0 },
@@ -167,10 +170,24 @@ describe('BillDetailPage', () => {
     const sponsorPanel = await screen.findByRole('region', { name: 'Sponsor' })
     expect(within(sponsorPanel).getByText('Lowey, NY-13')).toBeTruthy()
     expect(within(sponsorPanel).getByRole('heading', { name: 'Co-sponsors' })).toBeTruthy()
-    expect(within(sponsorPanel).getByText('Schumer, Chuck')).toBeTruthy()
+    expect((await within(sponsorPanel).findByRole('link', { name: /Schumer, Chuck/ })).getAttribute('href'))
+      .toBe('/members/S001210')
+    expect(within(sponsorPanel).queryByText(/\[D-NY\]/)).toBeNull()
 
     // No standalone co-sponsors panel anywhere on the page.
     expect(screen.queryAllByRole('region', { name: 'Co-sponsors' })).toHaveLength(0)
+  })
+
+  test.each([true, false])('distinguishes empty cosponsors from incomplete data (%s)', async (complete) => {
+    renderBill(null, [{
+      match: '/api/bills/119/hr/7/graph',
+      body: { cosponsors: [], cache: { ...BILL.cache, complete, stale: !complete } },
+    }])
+    const sponsorPanel = await screen.findByRole('region', { name: 'Sponsor' })
+    const message = complete
+      ? 'Congress.gov lists no co-sponsors for this bill.'
+      : 'Co-sponsor data is unavailable.'
+    expect(await within(sponsorPanel).findByText(message)).toBeTruthy()
   })
 
   test('lays out sponsor and action history side by side, then the explanation, then the diffs', async () => {
