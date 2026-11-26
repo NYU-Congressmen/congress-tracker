@@ -15,6 +15,11 @@ MODEL = "text-embedding-3-small"
 DIMENSIONS = 1536
 BATCH_SIZE = 64
 MAX_SUMMARY_CHARS = 4_000
+# A minimum similarity of 0.28 filled ten results on all five topics in the bill pilot, so
+# bills farther than this from every followed topic are left out of the ranked feed.
+MAX_COSINE_DISTANCE = 0.72
+# A feed page shows 20 bills, so each custom topic keeps far more matches than one page needs.
+CUSTOM_MATCH_LIMIT = 200
 
 PENDING_ISSUES = """
     SELECT i.* FROM issue_embedding_inputs i LEFT JOIN issue_embeddings e USING (issue_id)
@@ -44,6 +49,38 @@ SAVE_BILL = """
     SET embedding = EXCLUDED.embedding, source_key = EXCLUDED.source_key
     WHERE bill_embeddings.source_key <> EXCLUDED.source_key
 """
+
+# Rank every saved bill vector once per topic when it is saved or after new vectors arrive,
+# so feed requests read stored matches and skip the vector scan.
+SAVE_CUSTOM_MATCHES = """
+    INSERT INTO custom_topic_matches (uid, topic_key, bill_id, distance)
+    SELECT t.uid, t.topic_key, n.bill_id, n.distance
+    FROM custom_topics t
+    CROSS JOIN LATERAL (
+        SELECT e.bill_id, e.embedding <=> t.embedding AS distance
+        FROM bill_embeddings e
+        ORDER BY distance
+        LIMIT %(limit)s
+    ) n
+    WHERE n.distance <= %(max_distance)s
+      AND (%(uid)s::text IS NULL OR (t.uid = %(uid)s AND t.topic_key = ANY(%(keys)s)))
+    ON CONFLICT (uid, topic_key, bill_id) DO UPDATE SET distance = EXCLUDED.distance
+"""
+
+
+def save_custom_matches(conn, uid: str | None = None, keys: list[str] | None = None) -> None:
+    """Store the nearest bills for one account's new topics, or rebuild them for every topic."""
+    if uid is None:
+        conn.execute("DELETE FROM custom_topic_matches")
+    conn.execute(
+        SAVE_CUSTOM_MATCHES,
+        {
+            "uid": uid,
+            "keys": keys or [],
+            "limit": CUSTOM_MATCH_LIMIT,
+            "max_distance": MAX_COSINE_DISTANCE,
+        },
+    )
 
 
 def issue_input(name: str, keywords: list[str]) -> str:
@@ -150,6 +187,7 @@ def backfill(client: OpenAI, limit_bills: int | None = None) -> tuple[int, int]:
     # A previous run can save every vector and stop before refreshing its distances.
     with connect() as conn:
         conn.execute("REFRESH MATERIALIZED VIEW CONCURRENTLY feed_embedding_distances")
+        save_custom_matches(conn)
     return saved_issues, saved_bills
 
 

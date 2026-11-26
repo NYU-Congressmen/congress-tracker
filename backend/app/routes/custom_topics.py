@@ -9,7 +9,7 @@ from openai import OpenAI, OpenAIError
 from psycopg import Connection
 from pydantic import Field, StringConstraints
 
-from app.ai.embeddings import MODEL, embed_texts
+from app.ai.embeddings import MODEL, embed_texts, save_custom_matches
 from app.ai.service import cost_usd, log_call
 from app.auth import current_uid
 from app.config import settings
@@ -89,6 +89,7 @@ def add_topic_vectors(conn: Connection, uid: str, names: dict[str, str]) -> bool
             for (topic, name), vector in zip(names.items(), vectors, strict=True)
         ],
     )
+    save_custom_matches(conn, uid, list(names))
     return True
 
 

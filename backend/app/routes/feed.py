@@ -3,14 +3,12 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Header, HTTPException, Query, Response
 
+from app.ai.embeddings import MAX_COSINE_DISTANCE
 from app.auth import current_phone_identity
 from app.db import fetch_all, fetch_one
 from app.models import BillPage, Issue
 
 router = APIRouter(tags=["feed"])
-
-# A minimum similarity of 0.28 filled ten results on all five topics in the bill pilot.
-MAX_COSINE_DISTANCE = 0.72
 
 # Bills ranked by meaning come first. Bills with no current vector (new since the last
 # embedding run, or changed since) are matched by keyword after them, so the feed never
@@ -35,10 +33,9 @@ FEED = """
           AND d.bill_source_key = c.source_key AND d.issue_source_key = s.source_key
         WHERE (SELECT count(*) FROM selected) = %(issue_count)s
         UNION ALL
-        SELECT e.bill_id, e.embedding <=> t.embedding
-        FROM custom_topics t
-        CROSS JOIN current_vectors c JOIN bill_embeddings e USING (bill_id)
-        WHERE t.uid = %(custom_uid)s
+        SELECT m.bill_id, m.distance
+        FROM custom_topic_matches m JOIN current_vectors USING (bill_id)
+        WHERE m.uid = %(custom_uid)s
     ), ranked AS (
         SELECT bill_id, 0 AS tier, min(distance) AS distance
         FROM distances GROUP BY bill_id

@@ -11,7 +11,7 @@ MISSING_OBJECTS = """
         SELECT 'public.' || name AS name, to_regclass('public.' || name) IS NOT NULL AS present
         FROM unnest(ARRAY[
             'bill_embeddings', 'issue_embeddings', 'bill_embedding_inputs', 'issue_embedding_inputs',
-            'feed_embedding_distances', 'custom_topics'
+            'feed_embedding_distances', 'custom_topics', 'custom_topic_matches'
         ]) AS relations(name)
         UNION ALL
         SELECT 'public.' || expected.table_name || '.' || expected.column_name, EXISTS (
