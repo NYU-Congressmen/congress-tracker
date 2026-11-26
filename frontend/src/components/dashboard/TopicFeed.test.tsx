@@ -1,6 +1,8 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import type { User } from '@firebase/auth'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, test, vi } from 'vitest'
+import { SessionContext } from '../../auth/SessionContext'
 import { TopicFeed } from './TopicFeed'
 import { mockApi } from '../../test/fetchMock'
 
@@ -74,5 +76,36 @@ describe('TopicFeed', () => {
     const url = decodeURIComponent(String(feedCalls[feedCalls.length - 1]?.[0]))
     expect(url).toContain('issue_id=1')
     expect(url).toContain('issue_id=2')
+  })
+
+  test('requests a signed-in feed alongside the custom topic names', async () => {
+    let releaseTopics = () => {}
+    const topicsHeld = new Promise<void>((resolve) => { releaseTopics = resolve })
+    const fetchMock = mockApi([
+      { match: '/api/feed', body: FEED },
+      { match: '/api/issues', body: ISSUES },
+    ])
+    const routed = fetchMock.getMockImplementation()!
+    fetchMock.mockImplementation(async (input, init) => {
+      if (String(input).includes('/api/account/custom-topics')) {
+        await topicsHeld
+        return Response.json(['rural broadband'])
+      }
+      return routed(input, init)
+    })
+    const user = { uid: 'reader', getIdToken: vi.fn().mockResolvedValue('verified-token') } as unknown as User
+    render(
+      <SessionContext.Provider value={{ user, loading: false, error: null, retry: () => {} }}>
+        <MemoryRouter>
+          <TopicFeed topicIds={[1]} />
+        </MemoryRouter>
+      </SessionContext.Provider>,
+    )
+
+    // The feed request goes out while the custom topic names are still loading.
+    await waitFor(() => expect(fetchMock.mock.calls.some((call) => String(call[0]).includes('include_custom=true'))).toBe(true))
+    releaseTopics()
+    expect(await screen.findByText('Health care · rural broadband')).toBeTruthy()
+    expect(screen.getByText('To expand hospital coverage')).toBeTruthy()
   })
 })
