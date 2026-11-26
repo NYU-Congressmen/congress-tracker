@@ -73,8 +73,10 @@ test('shows the district representative’s position beside the full official ro
   render(<BillStances bill={{ ...bill, number: 1 }} />)
 
   expect(await screen.findByText('Roll call 190')).toBeTruthy()
-  expect(screen.getByText('Aye 218 · No 214')).toBeTruthy()
-  expect(screen.getByText('Jerrold Nadler ·').parentElement?.textContent).toContain('No')
+  const totals = within(screen.getByLabelText('House vote totals'))
+  expect(totals.getByText('Aye').nextElementSibling?.textContent).toBe('218')
+  expect(totals.getByText('No').nextElementSibling?.textContent).toBe('214')
+  expect(screen.getByText('Jerrold Nadler').parentElement?.textContent).toContain('No')
   expect(screen.getByRole('link', { name: 'Official roll call record' }).getAttribute('href')).toBe(official)
   expect(fetchMock).toHaveBeenCalledWith('/api/bills/119/hr/1/house-votes?bioguide_id=N000002', undefined)
 })

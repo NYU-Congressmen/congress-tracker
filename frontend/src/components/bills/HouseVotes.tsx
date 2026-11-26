@@ -35,7 +35,7 @@ export function HouseVotes({ bill, district }: { bill: BillDetail; district: Dis
   const trustedSource = source && /^https:\/\/(clerk\.house\.gov|(?:www\.)?congress\.gov)\//i.test(source)
 
   return (
-    <div className="bill-stances__outcome">
+    <div className="house-votes">
       <h3>House roll calls</h3>
       {loading ? <LoadingState message="Loading House votes…" /> : error ? (
         <ErrorState title="House votes could not be loaded" message={error.message} onRetry={refetch} />
@@ -53,16 +53,31 @@ export function HouseVotes({ bill, district }: { bill: BillDetail; district: Dis
               </select>
             </label>
           ) : null}
-          <p><strong>Roll call {vote.roll_number}</strong>{vote.vote_date ? ` · ${formatDate(vote.vote_date)}` : ''}</p>
-          {vote.question ? <p>{vote.question}</p> : null}
-          {vote.result ? <p>House result <strong>{vote.result}</strong></p> : null}
+          <div className="bill-stances__heading">
+            <div className="house-votes__record">
+              <strong>Roll call {vote.roll_number}</strong>
+              {vote.vote_date ? <time className="muted" dateTime={vote.vote_date}>{formatDate(vote.vote_date)}</time> : null}
+            </div>
+            {vote.result ? <strong className="house-votes__result">{vote.result}</strong> : null}
+          </div>
+          {vote.question ? <p className="muted">{vote.question}</p> : null}
           {Object.entries(vote.totals).length > 0 ? (
-            <p>{Object.entries(vote.totals).map(([label, count]) => `${label} ${count}`).join(' · ')}</p>
+            <dl className="house-votes__totals" aria-label="House vote totals">
+              {Object.entries(vote.totals).map(([label, count]) => (
+                <div key={label}>
+                  <dt>{label}</dt>
+                  <dd>{count.toLocaleString('en-US')}</dd>
+                </div>
+              ))}
+            </dl>
           ) : null}
           {representative ? (
-            <p>{representative.name} · {position ? <strong>{position.position}</strong> : (
-              vote.positions_complete ? 'No position on file' : 'Member positions pending'
-            )}</p>
+            <p className="house-votes__member">
+              <span>{representative.name}</span>
+              {position ? <strong>{position.position}</strong> : (
+                <span className="muted">{vote.positions_complete ? 'No position on file' : 'Member positions pending'}</span>
+              )}
+            </p>
           ) : null}
           {trustedSource ? <a href={source} target="_blank" rel="noreferrer">Official roll call record</a> : null}
         </>

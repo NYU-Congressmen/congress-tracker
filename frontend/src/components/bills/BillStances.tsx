@@ -2,13 +2,13 @@ import { useState } from 'react'
 import type { BillDetail } from '../../api/bills'
 import { getBillResponses, STANCE_LABELS, STANCES } from '../../api/reviews'
 import { useApi } from '../../hooks/useApi'
-import { STATUS_LABELS } from '../../lib/constants'
 import { districtHeading } from '../../lib/districts'
 import { billUrl, formatDate } from '../../lib/format'
 import { useProfile } from '../../profile/ProfileContext'
 import type { DistrictSelection } from '../../profile/types'
 import { ErrorState } from '../ui/ErrorState'
 import { LoadingState } from '../ui/LoadingState'
+import { StatusBadge } from '../ui/StatusBadge'
 import { HouseVotes } from './HouseVotes'
 
 const percent = new Intl.NumberFormat('en-US', { style: 'percent', maximumFractionDigits: 1 })
@@ -21,26 +21,35 @@ export function BillStances({ bill, revision = 0 }: { bill: BillDetail; revision
   return (
     <section className="panel panel--stack" aria-labelledby="bill-stances">
       <h2 id="bill-stances">Stances and bill outcome</h2>
-      {district ? (
-        <label className="field bill-stances__scope">
-          <span className="field__label">Response area</span>
-          <select className="field__control" value={showAll ? 'all' : 'district'}
-            onChange={(event) => setShowAll(event.target.value === 'all')}>
-            <option value="district">{districtHeading(district.state, district.district)}</option>
-            <option value="all">All respondents</option>
-          </select>
-        </label>
-      ) : null}
-      <StanceCounts key={scope ? `stances-${scope.state}-${scope.district}` : 'stances-all'}
-        bill={bill} scope={scope} revision={revision} />
-      <div className="bill-stances__outcome">
-        <h3>Official bill stage</h3>
-        <p><strong>{STATUS_LABELS[bill.status]}</strong></p>
-        {bill.latest_action_date ? <p className="muted">Latest action {formatDate(bill.latest_action_date)}</p> : null}
-        <a href={billUrl(bill.congress, bill.type, bill.number)} target="_blank" rel="noreferrer">Bill record on Congress.gov</a>
+      <div className="bill-stances__layout">
+        <div className="bill-stances__card">
+          <h3>Pull responses</h3>
+          {district ? (
+            <label className="field bill-stances__scope">
+              <span className="field__label">Response area</span>
+              <select className="field__control" value={showAll ? 'all' : 'district'}
+                onChange={(event) => setShowAll(event.target.value === 'all')}>
+                <option value="district">{districtHeading(district.state, district.district)}</option>
+                <option value="all">All respondents</option>
+              </select>
+            </label>
+          ) : null}
+          <StanceCounts key={scope ? `stances-${scope.state}-${scope.district}` : 'stances-all'}
+            bill={bill} scope={scope} revision={revision} />
+        </div>
+        <div className="bill-stances__card">
+          <div className="bill-stances__stage">
+            <div className="bill-stances__heading">
+              <h3>Official bill stage</h3>
+              <StatusBadge status={bill.status} />
+            </div>
+            {bill.latest_action_date ? <p className="muted">Latest action {formatDate(bill.latest_action_date)}</p> : null}
+            <a href={billUrl(bill.congress, bill.type, bill.number)} target="_blank" rel="noreferrer">Bill record on Congress.gov</a>
+          </div>
+          <HouseVotes key={district ? `votes-${district.state}-${district.district}` : 'votes-all'}
+            bill={bill} district={district} />
+        </div>
       </div>
-      <HouseVotes key={district ? `votes-${district.state}-${district.district}` : 'votes-all'}
-        bill={bill} district={district} />
     </section>
   )
 }
