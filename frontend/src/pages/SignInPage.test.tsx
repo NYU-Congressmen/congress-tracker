@@ -49,7 +49,12 @@ test('uses one profile menu and returns to the signed-out header after sign-out'
     }),
   }
   vi.mocked(loadFirebaseAuth).mockResolvedValue(auth as unknown as Awaited<ReturnType<typeof loadFirebaseAuth>>)
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 204 })))
+  vi.stubGlobal('fetch', vi.fn(async (path: string) => path === '/api/account/profile'
+    ? Response.json({
+      username: 'maya', district: null, topics: [], socials: [], saved: true,
+      created_at: '2026-11-01T00:00:00Z', updated_at: '2026-11-01T00:00:00Z',
+    })
+    : new Response(null, { status: 204 })))
 
   render(
     <MemoryRouter>
@@ -69,7 +74,8 @@ test('uses one profile menu and returns to the signed-out header after sign-out'
   fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
   expect(await screen.findByRole('link', { name: 'Sign in' })).toBeTruthy()
   expect(screen.queryByLabelText('maya profile options')).toBeNull()
-  expect(localStorage.getItem('pull:accounts')).toContain('maya')
+  // The account holds the profile, so the linked browser copy is gone.
+  expect(localStorage.getItem('pull:accounts')).not.toContain('maya')
 })
 
 test('shows a Pull message for a phone request rejected by Firebase', async () => {

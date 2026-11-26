@@ -1,9 +1,9 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { User } from '@firebase/auth'
 import { getAccountProfile, saveAccountProfile } from '../api/account'
 import { useSession } from '../auth/SessionContext'
-import { ProfileError, currentProfile, profileForUser, selectProfile as storeSelectProfile, leaveProfile as storeLeaveProfile, updateProfile as storeUpdateProfile } from './store'
+import { ProfileError, currentProfile, forgetAccountProfiles, importablePreferences, legacyProfileFor, selectProfile as storeSelectProfile, leaveProfile as storeLeaveProfile, updateProfile as storeUpdateProfile } from './store'
 import type { ProfileChanges } from './store'
 import type { Profile } from './types'
 
@@ -50,9 +50,10 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const saves = useRef(0)
   const activeOwner = useRef<User | null>(null)
   if (!uid && account) setAccount(null)
-  const legacy = useMemo(() => uid ? profileForUser(uid) : null, [uid])
   const loaded = uid && account?.uid === uid ? account : null
-  const profile = uid ? loaded?.profile ?? legacy : local?.firebase_uid ? null : local
+  // A signed-in reader sees only the account's profile, so a failed load or import cannot
+  // pass off a browser copy as saved.
+  const profile = uid ? loaded?.profile ?? null : local?.firebase_uid ? null : local
 
   useEffect(() => {
     activeOwner.current = user
@@ -63,8 +64,16 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     async function restore(owner: NonNullable<typeof user>) {
       try {
         let saved = await getAccountProfile(owner)
+        const legacy = legacyProfileFor(owner.uid)
+        let imported: Profile | null = null
+        // Copy a browser profile from earlier builds once, into an account that has none.
         if (!saved.saved && legacy && active) {
-          saved = await saveAccountProfile(owner, legacy, true)
+          saved = await saveAccountProfile(owner, importablePreferences(legacy), true)
+          imported = legacy
+        }
+        if (saved.saved) {
+          forgetAccountProfiles(owner.uid, imported)
+          if (active) setLocal(currentProfile())
         }
         if (active && savedBeforeLoad === saves.current) {
           setAccount({ uid: owner.uid, profile: { ...saved, firebase_uid: owner.uid }, error: null })
@@ -81,7 +90,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       active = false
       activeOwner.current = null
     }
-  }, [user, legacy, attempt])
+  }, [user, attempt])
 
   const reload = useCallback(() => {
     setAccount(null)

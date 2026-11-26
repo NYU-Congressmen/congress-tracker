@@ -126,6 +126,54 @@ export function profileForUser(uid: string): Profile | null {
     .sort((left, right) => (right.updated_at ?? '').localeCompare(left.updated_at ?? ''))[0] ?? null
 }
 
+// Return the browser profile to copy into a new account: the one linked to it, else the one in use.
+export function legacyProfileFor(uid: string): Profile | null {
+  const linked = profileForUser(uid)
+  if (linked) return linked
+  const active = currentProfile()
+  return active && !active.firebase_uid ? active : null
+}
+
+const NAME_PATTERN = /^[a-zA-Z0-9_.-]{3,80}$/
+const SOCIAL_LIMIT = 20
+const TOPIC_LIMIT = 100
+
+// Convert a browser profile into fields the account API accepts, dropping any it would reject.
+export function importablePreferences(profile: Profile): ProfileChanges {
+  const preferences: ProfileChanges = {}
+  const name = String(profile.username ?? '').trim().replace(/[^a-zA-Z0-9_.-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80)
+  if (NAME_PATTERN.test(name)) preferences.username = name
+
+  const district = profile.district
+  if (district && /^[A-Z]{2}$/.test(district.state)
+    && (district.district === null || (Number.isInteger(district.district) && district.district >= 1 && district.district <= 99))
+    && ['address', 'map', 'number'].includes(district.method)) {
+    preferences.district = { state: district.state, district: district.district, method: district.method }
+  }
+
+  if (Array.isArray(profile.topics)) {
+    preferences.topics = [...new Set(profile.topics.filter((id) => Number.isInteger(id) && id > 0))].slice(0, TOPIC_LIMIT)
+  }
+  if (Array.isArray(profile.socials)) {
+    preferences.socials = profile.socials
+      .filter((social) => typeof social?.platform === 'string' && typeof social.handle === 'string')
+      .map((social) => ({ platform: social.platform, handle: social.handle.trim() }))
+      .filter((social) => social.platform.length >= 1 && social.platform.length <= 32 && social.handle.length >= 1 && social.handle.length <= 512)
+      .slice(0, SOCIAL_LIMIT)
+  }
+  return preferences
+}
+
+// Delete browser copies that the account now holds, so the two cannot drift apart.
+export function forgetAccountProfiles(uid: string, imported?: Profile | null): void {
+  const accounts = readAccounts()
+  const kept = Object.fromEntries(Object.entries(accounts).filter(([name, profile]) =>
+    profile.firebase_uid !== uid && name !== imported?.username))
+  if (Object.keys(kept).length !== Object.keys(accounts).length) writeAccounts(kept)
+  const active = localStorage.getItem(SESSION_KEY)
+  if (active && !Object.hasOwn(kept, active)) localStorage.removeItem(SESSION_KEY)
+}
+
 // Activate a restored profile if browser storage still links it to the signed-in account.
 export function activateRestoredProfile(username: string, uid: string): void {
   if (localStorage.getItem(SESSION_KEY) === username) return
