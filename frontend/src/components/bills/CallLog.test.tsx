@@ -15,6 +15,7 @@ test('logs the phone link, retries the same entry and adds a note later', async 
   const writes: { url: string; body: unknown }[] = []
   const entry = { action_id: 1, bioguide_id: 'R000001', member_name: 'District office',
     created_at: '2026-11-25T12:00:00Z', note: null as string | null }
+  let deleted = false
   const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
     if (init?.method === 'PUT') {
       writes.push({ url, body: init.body })
@@ -25,6 +26,10 @@ test('logs the phone link, retries the same entry and adds a note later', async 
       entry.note = JSON.parse(String(init.body)).note
       return Response.json(entry)
     }
+    if (init?.method === 'DELETE') {
+      deleted = true
+      return new Response(null, { status: 204 })
+    }
     if (url.includes('/members')) {
       return Response.json({
         data: [
@@ -33,7 +38,7 @@ test('logs the phone link, retries the same entry and adds a note later', async 
         ],
       })
     }
-    return Response.json(writes.length > 1 ? [entry] : [])
+    return Response.json(writes.length > 1 && !deleted ? [entry] : [])
   })
   vi.stubGlobal('fetch', fetchMock)
   const user = { uid: 'fixture', getIdToken: vi.fn().mockResolvedValue('test-token') } as unknown as User
@@ -72,4 +77,12 @@ test('logs the phone link, retries the same entry and adds a note later', async 
     method: 'PATCH',
     body: JSON.stringify({ note: 'Asked about the bill.' }),
   }))
+
+  fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Keep call' }))
+  expect(deleted).toBe(false)
+  fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Delete call' }))
+  expect(await screen.findByText('No calls logged for this bill.')).toBeTruthy()
+  expect(screen.queryByText('Asked about the bill.')).toBeNull()
 })

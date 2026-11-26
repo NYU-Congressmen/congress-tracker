@@ -10,6 +10,7 @@ from app.sync.bills import make_bill_id
 
 router = APIRouter(tags=["calls"])
 Uid = Annotated[str, Depends(current_uid)]
+ActionId = Annotated[int, Path(gt=0, le=2_147_483_647)]
 CALL_PATH = "/bills/{congress}/{bill_type}/{number}/calls"
 
 
@@ -71,7 +72,7 @@ def update_call_note(
     congress: int,
     bill_type: BillType,
     number: int,
-    action_id: Annotated[int, Path(gt=0, le=2_147_483_647)],
+    action_id: ActionId,
     entry: CallNoteIn,
     uid: Uid,
 ) -> dict[str, Any]:
@@ -91,3 +92,18 @@ def update_call_note(
     if row is None:
         raise HTTPException(404, "Call not found.")
     return row
+
+
+@router.delete(CALL_PATH + "/{action_id}", status_code=204)
+def delete_call(
+    congress: int, bill_type: BillType, number: int, action_id: ActionId, uid: Uid
+) -> None:
+    """Delete the caller's saved call about the bill."""
+    with connect() as conn:
+        conn.execute(
+            """
+            DELETE FROM actions
+            WHERE action_id = %s AND uid = %s AND bill_id = %s AND action_type = 'call'
+            """,
+            (action_id, uid, make_bill_id(congress, bill_type, number)),
+        )

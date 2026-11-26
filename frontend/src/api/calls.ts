@@ -36,3 +36,11 @@ export function updateCallNote(
     body: JSON.stringify({ note }),
   })
 }
+
+// Delete one call from the signed-in account's log.
+export function deleteCall(congress: number, type: BillType, number: number, actionId: number, token: string): Promise<void> {
+  return request<void>(`/api/bills/${congress}/${type}/${number}/calls/${actionId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  })
+}

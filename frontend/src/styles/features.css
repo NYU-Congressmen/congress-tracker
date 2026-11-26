@@ -1427,7 +1427,8 @@ button.chip {
 }
 
 .call-log__entry-heading,
-.call-log__entry-office {
+.call-log__entry-office,
+.call-log__row-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -1449,6 +1450,26 @@ button.chip {
   background: transparent;
   font-family: inherit;
   cursor: pointer;
+}
+
+.call-log__history .call-log__delete {
+  color: var(--ink-3);
+}
+
+.call-log__delete-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+
+.call-log__delete:hover,
+.call-log__confirm-delete {
+  color: var(--error-ink);
 }
 
 .call-log__note-input {

@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 import type { User } from '@firebase/auth'
 import { Link } from 'react-router-dom'
 import type { BillType } from '../../api/bills'
-import { listCalls, saveCall, updateCallNote, type CallEntry } from '../../api/calls'
+import { deleteCall, listCalls, saveCall, updateCallNote, type CallEntry } from '../../api/calls'
 import { ApiError } from '../../api/client'
 import { listMembers } from '../../api/members'
 import { useSession } from '../../auth/SessionContext'
@@ -84,6 +84,11 @@ function AccountCalls({ user, congress, type, number }: CallLogProps & { user: U
     calls.refetch()
   }
 
+  async function removeCall(actionId: number) {
+    await deleteCall(congress, type, number, actionId, await getAccountToken(user))
+    calls.refetch()
+  }
+
   return (
     <>
       {profileLoading || (state && members.loading && !members.data) ? (
@@ -94,7 +99,7 @@ function AccountCalls({ user, congress, type, number }: CallLogProps & { user: U
         <ErrorState title="Offices could not be loaded" message={members.error.message} onRetry={members.refetch} />
       ) : offices.length ? (
         <>
-          <p className="muted">Opening a phone number adds it to your private call log.</p>
+          <p className="muted">Opening a phone number saves an entry in your private call log.</p>
           <ul className="call-log__offices" aria-label="Your congressional offices">
             {offices.map((member) => {
               const phone = member.office_phone?.replace(/[^\d+]/g, '')
@@ -126,7 +131,7 @@ function AccountCalls({ user, congress, type, number }: CallLogProps & { user: U
           <ErrorState title="Calls could not be loaded" message={calls.error.message} onRetry={calls.refetch} />
         ) : calls.data?.length ? (
           <ul className="call-log__entries" aria-label="Recent calls">
-            {calls.data.map((call) => <SavedCall key={call.action_id} call={call} onSave={saveNote} />)}
+            {calls.data.map((call) => <SavedCall key={call.action_id} call={call} onSave={saveNote} onDelete={removeCall} />)}
           </ul>
         ) : calls.loading ? <LoadingState message="Loading calls…" /> : <p className="muted">No calls logged for this bill.</p>}
       </section>
@@ -134,12 +139,14 @@ function AccountCalls({ user, congress, type, number }: CallLogProps & { user: U
   )
 }
 
-// Show a saved call and edit its note in place.
-function SavedCall({ call, onSave }: {
+// Show a saved call with controls for its note and removal.
+function SavedCall({ call, onSave, onDelete }: {
   call: CallEntry
   onSave: (actionId: number, text: string | null) => Promise<void>
+  onDelete: (actionId: number) => Promise<void>
 }) {
   const [draft, setDraft] = useState<string | null>(null)
+  const [confirming, setConfirming] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -158,18 +165,36 @@ function SavedCall({ call, onSave }: {
     }
   }
 
+  async function remove() {
+    if (saving) return
+    setSaving(true)
+    setError(null)
+    try {
+      await onDelete(call.action_id)
+    } catch (cause) {
+      setError(cause instanceof ApiError ? cause.message : 'The call could not be deleted.')
+      setSaving(false)
+    }
+  }
+
   return (
     <li>
       <div className="call-log__entry-heading">
         <div className="call-log__entry-office">
           <span>{call.member_name}</span>
-          {draft === null ? (
-            <button type="button" className="link-more" onClick={() => {
-              setError(null)
-              setDraft(call.note ?? '')
-            }}>
-              {call.note ? 'Edit note' : 'Add note'}
-            </button>
+          {draft === null && !confirming ? (
+            <div className="call-log__row-actions">
+              <button type="button" className="link-more" onClick={() => {
+                setError(null)
+                setDraft(call.note ?? '')
+              }}>
+                {call.note ? 'Edit note' : 'Add note'}
+              </button>
+              <button type="button" className="link-more call-log__delete" onClick={() => {
+                setError(null)
+                setConfirming(true)
+              }}>Delete</button>
+            </div>
           ) : null}
         </div>
         <time className="muted" dateTime={call.created_at}>{formatDateTime(call.created_at)}</time>
@@ -194,6 +219,21 @@ function SavedCall({ call, onSave }: {
           </div>
         </form>
       )}
+      {confirming ? (
+        <div className="call-log__delete-confirm" role="group" aria-label="Delete this call?">
+          <p>Delete this call?</p>
+          <div className="call-log__edit-actions">
+            <button type="button" className="btn btn--ghost btn--sm" disabled={saving} onClick={() => {
+              setError(null)
+              setConfirming(false)
+            }} autoFocus>Keep call</button>
+            <button type="button" className="btn btn--secondary btn--sm call-log__confirm-delete"
+              disabled={saving} onClick={() => void remove()}>
+              {saving ? 'Deleting…' : 'Delete call'}
+            </button>
+          </div>
+        </div>
+      ) : null}
       {error ? <p role="alert" className="form-error">{error}</p> : null}
     </li>
   )
