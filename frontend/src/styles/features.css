@@ -1428,7 +1428,7 @@ button.chip {
 
 .call-log__entry-heading,
 .call-log__entry-office,
-.call-log__row-actions {
+.call-log__entry-meta {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -1439,8 +1439,14 @@ button.chip {
   justify-content: space-between;
 }
 
-.call-log__entry-heading time,
-.call-log__entry-office button {
+.call-log__entry-meta {
+  flex-wrap: nowrap;
+  align-items: center;
+  margin-inline-start: auto;
+}
+
+.call-log__entry-meta time,
+.call-log__entry-heading button {
   font-size: 0.875rem;
 }
 

@@ -183,21 +183,23 @@ function SavedCall({ call, onSave, onDelete }: {
         <div className="call-log__entry-office">
           <span>{call.member_name}</span>
           {draft === null && !confirming ? (
-            <div className="call-log__row-actions">
-              <button type="button" className="link-more" onClick={() => {
-                setError(null)
-                setDraft(call.note ?? '')
-              }}>
-                {call.note ? 'Edit note' : 'Add note'}
-              </button>
-              <button type="button" className="link-more call-log__delete" onClick={() => {
-                setError(null)
-                setConfirming(true)
-              }}>Delete</button>
-            </div>
+            <button type="button" className="link-more" onClick={() => {
+              setError(null)
+              setDraft(call.note ?? '')
+            }}>
+              {call.note ? 'Edit note' : 'Add note'}
+            </button>
           ) : null}
         </div>
-        <time className="muted" dateTime={call.created_at}>{formatDateTime(call.created_at)}</time>
+        <div className="call-log__entry-meta">
+          <time className="muted" dateTime={call.created_at}>{formatDateTime(call.created_at)}</time>
+          {draft === null && !confirming ? (
+            <button type="button" className="link-more call-log__delete" onClick={() => {
+              setError(null)
+              setConfirming(true)
+            }}>Delete</button>
+          ) : null}
+        </div>
       </div>
       {draft === null ? (
         call.note ? <p className="call-log__entry-note muted">{call.note}</p> : null
