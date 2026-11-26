@@ -4,6 +4,7 @@ from contextlib import nullcontext
 import psycopg
 from fastapi.testclient import TestClient
 from firebase_admin import auth
+from openai import OpenAIError
 
 from app.ai.embeddings import DIMENSIONS, SAVE_BILL
 from app.config import settings
@@ -65,3 +66,38 @@ def test_custom_topic_is_private_reused_on_retry_and_ranks_saved_bills(db, monke
     ] == ["119-hr-123"]
     assert client.put(path, json=[], headers=reader).json() == []
     assert client.get("/api/feed?include_custom=true", headers=reader).json()["data"] == []
+
+
+def test_failed_custom_topic_embedding_keeps_saved_topics_and_logs_the_call(db, monkeypatch):
+    monkeypatch.setattr(settings, "firebase_project_id", "test-pull")
+    monkeypatch.setattr(settings, "openai_embedding_api_key", "test-key")
+    monkeypatch.setattr(
+        auth,
+        "verify_id_token",
+        lambda token, **kwargs: {
+            "uid": token,
+            "phone_number": "+16505550101",
+            "firebase": {"sign_in_provider": "phone"},
+        },
+    )
+    monkeypatch.setattr(custom_topics, "OpenAI", lambda **opts: nullcontext(None))
+    vector = [1.0] + [0.0] * (DIMENSIONS - 1)
+    monkeypatch.setattr(custom_topics, "embed_texts", lambda client, texts: ([vector], 3))
+    reader = {"Authorization": "Bearer reader"}
+    path = "/api/account/custom-topics"
+    assert client.put("/api/account", headers=reader).status_code == 204
+    assert client.put(path, json=["Rural broadband"], headers=reader).status_code == 200
+
+    def fail(client, texts):
+        raise OpenAIError("provider down")
+
+    monkeypatch.setattr(custom_topics, "embed_texts", fail)
+    response = client.put(path, json=["Water rights"], headers=reader)
+
+    assert response.status_code == 503
+    assert client.get(path, headers=reader).json() == ["Rural broadband"]
+    with psycopg.connect(TEST_DATABASE_URL) as conn:
+        logged = conn.execute(
+            "SELECT succeeded, error FROM ai_calls WHERE uid = 'reader' ORDER BY created_at"
+        ).fetchall()
+    assert logged == [(True, None), (False, "OpenAIError")]

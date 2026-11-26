@@ -6,6 +6,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 from openai import OpenAI, OpenAIError
+from psycopg import Connection
 from pydantic import Field, StringConstraints
 
 from app.ai.embeddings import MODEL, embed_texts
@@ -17,6 +18,7 @@ from app.db import connect, fetch_all
 router = APIRouter(tags=["account"])
 
 FEATURE = "custom_topic_embedding"
+OPENAI_BASE_URL = "https://api.openai.com/v1"
 MAX_TOPICS = 8
 DAILY_REQUEST_LIMIT = 12
 Uid = Annotated[str, Depends(current_uid)]
@@ -31,6 +33,65 @@ def list_custom_topics(uid: Uid, response: Response) -> list[str]:
     return [row["name"] for row in rows]
 
 
+def embedding_api_key() -> str | None:
+    """Return the OpenAI key for topic vectors, using the model key when it is also OpenAI's."""
+    if settings.openai_embedding_api_key:
+        return settings.openai_embedding_api_key
+    model_base_url = (settings.llm_base_url or OPENAI_BASE_URL).rstrip("/")
+    return settings.llm_api_key if model_base_url == OPENAI_BASE_URL else None
+
+
+def add_topic_vectors(conn: Connection, uid: str, names: dict[str, str]) -> bool:
+    """Embed and store new topics keyed by their folded names and return whether it succeeded.
+
+    Every provider call is logged in ai_calls, which also enforces the daily limit.
+    """
+    key = embedding_api_key()
+    if not key:
+        raise HTTPException(503, "Custom topics are unavailable right now.")
+    recent = conn.execute(
+        "SELECT count(*) AS n FROM ai_calls WHERE uid = %s AND feature = %s "
+        "AND created_at >= now() - interval '1 day'",
+        (uid, FEATURE),
+    ).fetchone()
+    if recent["n"] >= DAILY_REQUEST_LIMIT:
+        raise HTTPException(429, "You’ve reached the daily limit for adding custom topics.")
+
+    started = monotonic()
+    vectors, tokens, failure = None, 0, None
+    try:
+        with OpenAI(api_key=key, base_url=OPENAI_BASE_URL, timeout=7, max_retries=0) as client:
+            vectors, tokens = embed_texts(client, list(names.values()))
+    except OpenAIError as error:
+        failure = type(error).__name__
+    log_call(
+        conn,
+        {
+            "uid": uid,
+            "feature": FEATURE,
+            "bill_id": None,
+            "model": MODEL,
+            "input_tokens": tokens,
+            "output_tokens": 0,
+            "cost": cost_usd(MODEL, tokens, 0) if failure is None else None,
+            "seconds": monotonic() - started,
+            "succeeded": failure is None,
+            "error": failure,
+        },
+    )
+    if vectors is None:
+        return False
+    conn.cursor().executemany(
+        "INSERT INTO custom_topics (uid, topic_key, name, embedding) "
+        "VALUES (%s, %s, %s, %s::vector)",
+        [
+            (uid, topic, name, json.dumps(vector))
+            for (topic, name), vector in zip(names.items(), vectors, strict=True)
+        ],
+    )
+    return True
+
+
 @router.put("/account/custom-topics", response_model=list[str])
 def save_custom_topics(
     names: Annotated[list[TopicName], Field(max_length=MAX_TOPICS)], uid: Uid, response: Response
@@ -41,7 +102,6 @@ def save_custom_topics(
     if any("\x00" in name for name in cleaned):
         raise HTTPException(422, "Choose a topic with ordinary text.")
     topics = {name.casefold(): name for name in cleaned}
-    failed = False
     with connect() as conn:
         # Serialize edits for this account so retries see already saved vectors.
         if (
@@ -55,72 +115,10 @@ def save_custom_topics(
                 "SELECT topic_key, name FROM custom_topics WHERE uid = %s", (uid,)
             )
         }
-        new_keys = sorted(topics.keys() - existing.keys())
-        if new_keys:
-            key = settings.openai_embedding_api_key
-            if (
-                not key
-                and (settings.llm_base_url or "https://api.openai.com/v1").rstrip("/")
-                == "https://api.openai.com/v1"
-            ):
-                key = settings.llm_api_key
-            if not key:
-                raise HTTPException(503, "Custom topics are unavailable right now.")
-            recent = conn.execute(
-                "SELECT count(*) AS n FROM ai_calls WHERE uid = %s AND feature = %s "
-                "AND created_at >= now() - interval '1 day'",
-                (uid, FEATURE),
-            ).fetchone()
-            if recent["n"] >= DAILY_REQUEST_LIMIT:
-                raise HTTPException(429, "You’ve reached the daily limit for adding custom topics.")
-
-            started = monotonic()
-            call = {
-                "uid": uid,
-                "feature": FEATURE,
-                "bill_id": None,
-                "model": MODEL,
-                "output_tokens": 0,
-            }
-            try:
-                with OpenAI(
-                    api_key=key, base_url="https://api.openai.com/v1", timeout=7, max_retries=0
-                ) as client:
-                    vectors, tokens = embed_texts(client, [topics[topic] for topic in new_keys])
-            except OpenAIError as error:
-                failed = True
-                log_call(
-                    conn,
-                    {
-                        **call,
-                        "input_tokens": 0,
-                        "cost": None,
-                        "seconds": monotonic() - started,
-                        "succeeded": False,
-                        "error": type(error).__name__,
-                    },
-                )
-            else:
-                conn.cursor().executemany(
-                    "INSERT INTO custom_topics (uid, topic_key, name, embedding) "
-                    "VALUES (%s, %s, %s, %s::vector)",
-                    [
-                        (uid, topic, topics[topic], json.dumps(vector))
-                        for topic, vector in zip(new_keys, vectors, strict=True)
-                    ],
-                )
-                log_call(
-                    conn,
-                    {
-                        **call,
-                        "input_tokens": tokens,
-                        "cost": cost_usd(MODEL, tokens, 0),
-                        "seconds": monotonic() - started,
-                        "succeeded": True,
-                        "error": None,
-                    },
-                )
-        if not failed:
+        added = {topic: topics[topic] for topic in sorted(topics.keys() - existing.keys())}
+        # A failed provider call keeps the previous topics and commits only its log entry.
+        saved = not added or add_topic_vectors(conn, uid, added)
+        if saved:
             conn.execute(
                 "DELETE FROM custom_topics WHERE uid = %s AND NOT (topic_key = ANY(%s))",
                 (uid, list(topics)),
@@ -133,6 +131,6 @@ def save_custom_topics(
                     if topics[topic] != existing[topic]
                 ],
             )
-    if failed:
+    if not saved:
         raise HTTPException(503, "Custom topics could not be saved. Try again.")
     return [topics[topic] for topic in sorted(topics)]
