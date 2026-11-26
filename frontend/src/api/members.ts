@@ -49,9 +49,17 @@ function memberQuery(filters: MemberFilters): string {
   return query ? `/api/members?${query}` : '/api/members'
 }
 
+// Bill panels that load together ask for the same state's members, so they share one request.
+const pendingLists = new Map<string, Promise<MemberList>>()
+
 // List current members of Congress, optionally filtered by state, party and chamber.
 export function listMembers(filters: MemberFilters = {}): Promise<MemberList> {
-  return request<MemberList>(memberQuery(filters))
+  const path = memberQuery(filters)
+  const pending = pendingLists.get(path)
+  if (pending) return pending
+  const next = request<MemberList>(path).finally(() => pendingLists.delete(path))
+  pendingLists.set(path, next)
+  return next
 }
 
 // Return one member with their current-Congress sponsored bills, refreshed daily.
