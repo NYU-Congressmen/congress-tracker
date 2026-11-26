@@ -49,6 +49,8 @@ test('logs the phone link, retries the same entry and adds a note later', async 
   const phone = await screen.findByRole('link', { name: 'Call District office' })
   expect(phone.getAttribute('href')).toBe('tel:2025550101')
   expect(screen.queryByRole('link', { name: 'Call Other district office' })).toBeNull()
+  expect(screen.queryByLabelText('Office called')).toBeNull()
+  expect(screen.getByRole('region', { name: 'Call log' })).toBeTruthy()
   expect(writes).toHaveLength(0)
 
   expect(screen.queryByRole('button', { name: 'I called District office' })).toBeNull()
@@ -56,7 +58,8 @@ test('logs the phone link, retries the same entry and adds a note later', async 
   fireEvent.click(phone)
   expect((await screen.findByRole('alert')).textContent).toContain('Try again.')
   fireEvent.click(screen.getByRole('button', { name: 'Retry save' }))
-  expect(await screen.findByText('Call logged.')).toBeTruthy()
+  expect(await screen.findByRole('button', { name: 'Add note' })).toBeTruthy()
+  expect(screen.queryByText('Call logged.')).toBeNull()
   expect(writes).toHaveLength(2)
   expect(writes[0]).toEqual(writes[1])
   expect(writes[1].body).toBe(JSON.stringify({ bioguide_id: 'R000001' }))

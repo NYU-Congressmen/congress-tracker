@@ -1376,17 +1376,24 @@ button.chip {
 
 .call-log__offices {
   display: grid;
-  gap: 8px;
   margin: 0;
   padding: 0;
   list-style: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
 }
 
 .call-log__offices li {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 16px;
+  gap: 4px 16px;
+  padding: 10px 14px;
+}
+
+.call-log__offices li + li {
+  border-top: 1px solid var(--line);
 }
 
 .call-log__offices li > span {
@@ -1394,56 +1401,16 @@ button.chip {
   font-weight: 600;
 }
 
-.call-log__other > summary {
-  cursor: pointer;
-}
-
-.call-log__other[open] > summary {
-  margin-bottom: 12px;
-}
-
-.call-log__fields {
+.call-log__history {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
-  align-items: end;
-  gap: 16px;
-  border: 0;
-  padding: 0;
-  margin: 0;
-  min-inline-size: 0;
-}
-
-.call-log__note {
-  grid-column: 1 / -1;
-  grid-row: 2;
-}
-
-.call-log__note-input {
-  padding: 10px 12px;
-  resize: vertical;
-  line-height: 1.5;
-}
-
-.call-log__submit {
-  grid-column: 3;
-  grid-row: 1;
-}
-
-@media (max-width: 640px) {
-  .call-log__fields {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .call-log__note,
-  .call-log__submit {
-    grid-column: auto;
-    grid-row: auto;
-  }
+  gap: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
 }
 
 .call-log__entries {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   list-style: none;
   padding: 0;
   margin: 0;
@@ -1452,15 +1419,42 @@ button.chip {
 .call-log__entries > li {
   display: grid;
   gap: 8px;
+}
+
+.call-log__entries > li + li {
   border-top: 1px solid var(--line);
-  padding-top: 12px;
+  padding-top: 10px;
+}
+
+.call-log__entry-heading,
+.call-log__entry-office {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
 }
 
 .call-log__entry-heading {
-  display: flex;
-  flex-wrap: wrap;
   justify-content: space-between;
-  gap: 0.5rem 1rem;
+}
+
+.call-log__entry-heading time,
+.call-log__entry-office button {
+  font-size: 0.875rem;
+}
+
+.call-log__history button.link-more {
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.call-log__note-input {
+  padding: 10px 12px;
+  resize: vertical;
+  line-height: 1.5;
 }
 
 .call-log__entry-note {
