@@ -1450,6 +1450,29 @@ button.chip {
   font-size: 0.875rem;
 }
 
+@media (max-width: 640px) {
+  .call-log__entry-heading,
+  .call-log__entry-office,
+  .call-log__entry-meta {
+    display: grid;
+  }
+
+  .call-log__entry-heading {
+    justify-content: stretch;
+  }
+
+  .call-log__entry-office,
+  .call-log__entry-meta {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: baseline;
+    margin-inline-start: 0;
+  }
+
+  .call-log__entry-heading button {
+    justify-self: end;
+  }
+}
+
 .call-log__history button.link-more {
   padding: 4px 0;
   border: 0;
