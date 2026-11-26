@@ -38,7 +38,7 @@ test('suggests related topics and saves selections from the cloud and search', a
   expect(screen.getByRole('button', { name: 'Health care', pressed: true })).toBeTruthy()
   expect(screen.getByRole('button', { name: 'Immigration', pressed: true })).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'Continue to social profiles' }))
-  expect(save).toHaveBeenCalledWith([11, 21, 30])
+  expect(save).toHaveBeenCalledWith([11, 21, 30], [])
 })
 
 test('prioritizes early-career topics and keeps saved choices available during search', async () => {
@@ -67,5 +67,24 @@ test('prioritizes early-career topics and keeps saved choices available during s
   expect(screen.queryByRole('group', { name: 'Selected topics outside the results' })).toBeNull()
   fireEvent.click(within(screen.getByRole('group', { name: 'Search results' })).getByRole('button', { name: 'Climate and energy' }))
   fireEvent.click(screen.getByRole('button', { name: 'Continue to social profiles' }))
-  expect(save).toHaveBeenCalledWith([1])
+  expect(save).toHaveBeenCalledWith([1], [])
+})
+
+test('adds an unmatched phrase only after the second Enter', async () => {
+  mockApi([{ match: '/api/issues', body: [{ issue_id: 1, name: 'Housing' }] }])
+  const save = vi.fn()
+  render(<TopicsStep initial={[1]} onDone={save} />)
+  const search = await screen.findByLabelText('Search topics')
+
+  fireEvent.change(search, { target: { value: 'Semiconductor chips' } })
+  fireEvent.keyDown(search, { key: 'Enter' })
+  expect(screen.getByText('Press Enter again to add “Semiconductor chips”.')).toBeTruthy()
+  expect(screen.queryByRole('button', { name: 'Semiconductor chips' })).toBeNull()
+  fireEvent.keyDown(search, { key: 'Enter', repeat: true })
+  expect(screen.queryByRole('button', { name: 'Semiconductor chips' })).toBeNull()
+
+  fireEvent.keyDown(search, { key: 'Enter' })
+  expect(screen.getByRole('button', { name: 'Semiconductor chips', pressed: true })).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Continue to social profiles' }))
+  expect(save).toHaveBeenCalledWith([1], ['Semiconductor chips'])
 })

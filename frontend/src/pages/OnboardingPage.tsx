@@ -7,6 +7,8 @@ import { TopicsStep } from '../components/onboarding/TopicsStep'
 import { PageBand } from '../components/layout/PageBand'
 import { StepActions } from '../components/onboarding/StepActions'
 import { clearAccountDistrict, replacesAccountDistrict, saveAccountDistrict } from '../api/account'
+import { saveCustomTopics } from '../api/feed'
+import { getAccountToken } from '../auth/accountToken'
 import { useSession } from '../auth/SessionContext'
 import { useProfile } from '../profile/ProfileContext'
 import type { DistrictSelection, SocialProfile } from '../profile/types'
@@ -35,6 +37,7 @@ export default function OnboardingPage() {
   const [district, setDistrict] = useState<DistrictSelection | null>(profile?.district ?? null)
   const [addressToSave, setAddressToSave] = useState<string>()
   const [topics, setTopics] = useState<number[]>(profile?.topics ?? [])
+  const [customTopics, setCustomTopics] = useState<string[]>([])
   const [socials, setSocials] = useState<SocialProfile[]>(profile?.socials ?? [])
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -58,6 +61,7 @@ export default function OnboardingPage() {
         setAddressToSave(undefined)
       }
       if (replacesAccountDistrict(verifiedDistrict)) await clearAccountDistrict(user)
+      if (customTopics.length) await saveCustomTopics(await getAccountToken(user), customTopics)
       const details = { firebase_uid: user.uid, district: verifiedDistrict, topics, socials }
       if (profile?.username === username) updateProfile(details)
       else createProfile(username, details)
@@ -68,7 +72,7 @@ export default function OnboardingPage() {
     } finally {
       setSaving(false)
     }
-  }, [addressToSave, createProfile, district, loading, profile, restartRequired, socials, topics, updateProfile, user, username])
+  }, [addressToSave, createProfile, customTopics, district, loading, profile, restartRequired, socials, topics, updateProfile, user, username])
 
   useEffect(() => {
     if (step !== 'verify') return
@@ -95,6 +99,7 @@ export default function OnboardingPage() {
     setDistrict(profile?.district ?? null)
     setAddressToSave(undefined)
     setTopics(profile?.topics ?? [])
+    setCustomTopics([])
     setSocials(profile?.socials ?? [])
     setDistrictFirst(false)
     setCodeFailures(0)
@@ -159,6 +164,7 @@ export default function OnboardingPage() {
                     setAddressToSave(undefined)
                   }
                   setTopics([])
+                  setCustomTopics([])
                   setSocials([])
                 }
                 setStep(afterProfile)
@@ -174,6 +180,7 @@ export default function OnboardingPage() {
                       setAddressToSave(undefined)
                     }
                     setTopics(saved.topics)
+                    setCustomTopics([])
                     setSocials(saved.socials)
                   }
                   setStep(afterProfile)
@@ -203,9 +210,11 @@ export default function OnboardingPage() {
           {step === 'topics' ? (
             <TopicsStep
               initial={topics}
+              initialCustom={customTopics}
               onBack={goBack}
-              onDone={(nextTopics) => {
+              onDone={(nextTopics, nextCustom) => {
                 setTopics(nextTopics)
+                setCustomTopics(nextCustom)
                 setStep('social')
               }}
             />

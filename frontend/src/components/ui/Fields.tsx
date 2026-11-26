@@ -1,4 +1,5 @@
 import type { SelectOption } from '../../lib/constants'
+import type { KeyboardEventHandler } from 'react'
 
 interface TextFieldProps {
   id: string
@@ -8,10 +9,12 @@ interface TextFieldProps {
   type?: 'text' | 'search' | 'date'
   placeholder?: string
   className?: string
+  onKeyDown?: KeyboardEventHandler<HTMLInputElement>
+  describedBy?: string
 }
 
 // Labeled text, search or date input used by the filter forms.
-export function TextField({ id, label, value, onChange, type = 'text', placeholder, className }: TextFieldProps) {
+export function TextField({ id, label, value, onChange, type = 'text', placeholder, className, onKeyDown, describedBy }: TextFieldProps) {
   const classes = `field${className ? ` ${className}` : ''}`
   return (
     <label className={classes} htmlFor={id}>
@@ -23,6 +26,8 @@ export function TextField({ id, label, value, onChange, type = 'text', placehold
         value={value}
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
+        onKeyDown={onKeyDown}
+        aria-describedby={describedBy}
       />
     </label>
   )

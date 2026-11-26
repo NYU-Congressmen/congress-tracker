@@ -60,6 +60,20 @@ def bill_input(title: str, summary: str | None) -> str:
     return f"{title}\n\n{text}"
 
 
+def embed_texts(client: OpenAI, texts: list[str]) -> tuple[list[list[float]], int]:
+    """Return validated vectors in input order and the number of input tokens."""
+    response = client.embeddings.create(model=MODEL, dimensions=DIMENSIONS, input=texts)
+    vectors = sorted(response.data, key=lambda item: item.index)
+    if [item.index for item in vectors] != list(range(len(texts))) or any(
+        len(item.embedding) != DIMENSIONS
+        or not any(item.embedding)
+        or not all(map(isfinite, item.embedding))
+        for item in vectors
+    ):
+        raise OpenAIError("The embedding provider returned invalid vectors.")
+    return [item.embedding for item in vectors], response.usage.prompt_tokens
+
+
 def save_batch(
     client: OpenAI,
     sql: str,
@@ -69,17 +83,7 @@ def save_batch(
     started = monotonic()
     call = {"feature": "feed_embedding", "model": MODEL, "bill_id": None, "output_tokens": 0}
     try:
-        response = client.embeddings.create(
-            model=MODEL, dimensions=DIMENSIONS, input=[text for _, _, text in rows]
-        )
-        vectors = sorted(response.data, key=lambda item: item.index)
-        if [item.index for item in vectors] != list(range(len(rows))) or any(
-            len(item.embedding) != DIMENSIONS
-            or not any(item.embedding)
-            or not all(map(isfinite, item.embedding))
-            for item in vectors
-        ):
-            raise OpenAIError("The embedding provider returned invalid vectors.")
+        vectors, tokens = embed_texts(client, [text for _, _, text in rows])
     except OpenAIError as error:
         with connect() as conn:
             log_call(
@@ -95,11 +99,10 @@ def save_batch(
             )
         raise
 
-    tokens = response.usage.prompt_tokens
     elapsed = monotonic() - started
     params = [
-        (json.dumps(item.embedding, separators=(",", ":")), item_id, source_key)
-        for item, (item_id, source_key, _) in zip(vectors, rows, strict=True)
+        (json.dumps(vector, separators=(",", ":")), item_id, source_key)
+        for vector, (item_id, source_key, _) in zip(vectors, rows, strict=True)
     ]
     with connect() as conn, conn.cursor() as cursor:
         cursor.executemany(sql, params)

@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useSession } from '../../auth/SessionContext'
-import { getFeed, listIssues } from '../../api/feed'
+import { getAccountToken } from '../../auth/accountToken'
+import { getFeed, listCustomTopics, listIssues } from '../../api/feed'
 import type { BillSummary } from '../../api/bills'
 import { useApi } from '../../hooks/useApi'
 import { BillListItem } from '../bills/BillListItem'
@@ -18,31 +19,43 @@ interface TopicFeedProps {
 // Show bills on followed topics and link to the profile settings.
 export function TopicFeed({ topicIds }: TopicFeedProps) {
   const { user } = useSession()
+  const custom = useApi(async () => user
+    ? { uid: user.uid, topics: await listCustomTopics(await getAccountToken(user)) }
+    : null, [user])
+  const customTopics = user && custom.data?.uid === user.uid ? custom.data.topics : []
+  const hasTopics = topicIds.length > 0 || customTopics.length > 0
   const { data: issues, loading: issuesLoading } = useApi(
     () => (topicIds.length > 0 ? listIssues() : Promise.resolve(null)),
     [topicIds.join(',')],
   )
 
   const feed = useApi(
-    () => (topicIds.length > 0 ? getFeed({ issueIds: topicIds, limit: FEED_SIZE }) : Promise.resolve(null)),
-    [topicIds.join(',')],
+    async () => {
+      if (!hasTopics || (user && custom.loading)) return null
+      const customToken = user && customTopics.length ? await getAccountToken(user) : undefined
+      return getFeed({ issueIds: topicIds, limit: FEED_SIZE, customToken })
+    },
+    [topicIds.join(','), user, custom.loading, customTopics.length],
   )
 
-  const names = (issues ?? [])
+  const names = [...(issues ?? [])
     .filter((issue) => topicIds.includes(issue.issue_id))
-    .map((issue) => issue.name)
-    .join(' · ')
+    .map((issue) => issue.name), ...customTopics].join(' · ')
 
   return (
     <>
       <div className="panel__heading-row">
         <h2>Topics you follow</h2>
         <Link to={user ? '/profile?section=topics' : '/onboarding'} className="link-more">
-          {topicIds.length > 0 ? 'Change topics' : 'Choose topics'}
+          {hasTopics ? 'Change topics' : 'Choose topics'}
         </Link>
       </div>
 
-      {topicIds.length === 0 ? (
+      {user && custom.loading ? (
+        <LoadingState message="Loading your topics…" />
+      ) : user && custom.error ? (
+        <ErrorState title="Your topics could not be loaded" message={custom.error.message} onRetry={custom.refetch} />
+      ) : !hasTopics ? (
         <EmptyState
           title="No topics chosen yet"
           hint="Choose topics to see related bills."

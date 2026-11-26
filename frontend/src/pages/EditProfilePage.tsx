@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react'
 import { Navigate, useSearchParams } from 'react-router-dom'
 import { clearAccountDistrict, replacesAccountDistrict, saveAccountDistrict } from '../api/account'
+import { saveCustomTopics } from '../api/feed'
+import { getAccountToken } from '../auth/accountToken'
 import { useSession } from '../auth/SessionContext'
 import { PageBand } from '../components/layout/PageBand'
 import { AccountStep } from '../components/onboarding/AccountStep'
@@ -29,7 +31,7 @@ export default function EditProfilePage() {
   if (!loading && !user) return <Navigate to="/sign-in?next=profile" replace />
   if (!loading && !profile) return <Navigate to="/onboarding" replace />
 
-  async function save(changes: ProfileChanges, address?: string) {
+  async function save(changes: ProfileChanges, address?: string, customTopics?: string[]) {
     if (!user || pending.current) return
     pending.current = true
     setError(null)
@@ -39,6 +41,7 @@ export default function EditProfilePage() {
         ? { ...await saveAccountDistrict(user, address), method: 'address' }
         : changes.district
       if (replacesAccountDistrict(district)) await clearAccountDistrict(user)
+      if (customTopics) await saveCustomTopics(await getAccountToken(user), customTopics)
       updateProfile({ ...changes, district, firebase_uid: user.uid })
       setParams({ section: 'saved' }, { replace: true })
     } catch (cause) {
@@ -72,7 +75,8 @@ export default function EditProfilePage() {
                 />
               ) : null}
               {section === 'topics' ? (
-                <TopicsStep initial={profile.topics} nextLabel="Save topics" onDone={(topics) => void save({ topics })} />
+                <TopicsStep initial={profile.topics} loadSavedCustom nextLabel="Save topics"
+                  onDone={(topics, custom) => void save({ topics }, undefined, custom)} />
               ) : null}
               {section === 'social' ? (
                 <SocialStep

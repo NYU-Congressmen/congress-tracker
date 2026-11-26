@@ -51,6 +51,7 @@ Each teammate keeps their own `.env` at the repo root, and `.env.example` is the
 | `CONGRESS_API_KEY` | Now | Authenticates requests to Congress.gov |
 | `DATABASE_URL` | To see real data | Connection string for the team's Supabase database. Ask the teammate who manages it to send it privately, and never paste it into the repo or a group chat |
 | `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL` | Once the AI service is added | Your own free Gemini key from <https://aistudio.google.com/apikey>, with the endpoint and model from `.env.example`. The AI service calls the model through OpenAI's SDK, so another provider needs only different values here |
+| `OPENAI_EMBEDDING_API_KEY` | Custom topics | An OpenAI API key for matching custom topics against the existing bill vectors. Pull can also use `LLM_API_KEY` when that key points to OpenAI. |
 | `PUBLIC_SITE_URL` | To test share links locally | The address share links point to. It defaults to `https://congress-pull.web.app`, and `http://localhost:5173` keeps local links on the Vite dev server |
 | `BLUESKY_HANDLE`, `BLUESKY_APP_PASSWORD` | Only where the sync runs | Pull's own Bluesky account and an app password made in its settings, which the sync uses to find posts carrying share links. Never use the account's real password |
 | `FIREBASE_PROJECT_ID` | For phone sign-in | Identifies the Firebase project whose tokens the API accepts |

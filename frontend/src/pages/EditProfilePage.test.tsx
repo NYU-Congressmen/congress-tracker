@@ -37,7 +37,10 @@ test('saves topics and the profile name independently without reopening sign-in'
     topics: [],
     socials: [],
   })
-  mockApi([{ match: '/api/issues', body: [{ issue_id: 1, name: 'Housing' }] }])
+  mockApi([
+    { match: '/api/issues', body: [{ issue_id: 1, name: 'Housing' }] },
+    { match: '/api/account/custom-topics', body: [] },
+  ])
   renderEditor()
 
   expect(screen.queryByText('Phone verification')).toBeNull()

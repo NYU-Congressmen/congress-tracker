@@ -261,6 +261,11 @@ export default function DashboardPage() {
               </Link>
             </section>
           )}
+          {user && !district ? (
+            <section className="card panel--stack" aria-label="Topics you follow">
+              <TopicFeed topicIds={topics} />
+            </section>
+          ) : null}
         </div>
       )}
     </div>
