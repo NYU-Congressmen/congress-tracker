@@ -24,7 +24,7 @@ MISSING_OBJECTS = """
         )
         FROM (
             VALUES ('actions', 'request_id', 'uuid'), ('actions', 'call_note', 'text'),
-                   ('ai_calls', 'bill_id', 'text')
+                   ('ai_calls', 'bill_id', 'text'), ('users', 'profile', 'jsonb')
         ) AS expected(table_name, column_name, data_type)
         UNION ALL
         SELECT 'public.actions retry constraint', EXISTS (

@@ -18,7 +18,7 @@ import { PROFILE_SECTIONS, type ProfileSection, type DistrictSelection } from '.
 // Save one section of the verified reader's profile at a time.
 export default function EditProfilePage() {
   const { user, loading } = useSession()
-  const { profile, updateProfile } = useProfile()
+  const { profile, updateProfile, loading: profileLoading, error: profileError, reload } = useProfile()
   const [params, setParams] = useSearchParams()
   const [error, setError] = useState<{ section: string; message: string } | null>(null)
   const [saving, setSaving] = useState(false)
@@ -29,7 +29,6 @@ export default function EditProfilePage() {
     : 'district'
 
   if (!loading && !user) return <Navigate to="/sign-in?next=profile" replace />
-  if (!loading && !profile) return <Navigate to="/onboarding" replace />
 
   async function save(changes: ProfileChanges, address?: string, customTopics?: string[]) {
     if (!user || pending.current) return
@@ -42,7 +41,7 @@ export default function EditProfilePage() {
         : changes.district
       if (replacesAccountDistrict(district)) await clearAccountDistrict(user)
       if (customTopics) await saveCustomTopics(await getAccountToken(user), customTopics)
-      updateProfile({ ...changes, district, firebase_uid: user.uid })
+      await updateProfile({ ...changes, district })
       setParams({ section: 'saved' }, { replace: true })
     } catch (cause) {
       setError({ section, message: cause instanceof Error ? cause.message : 'Your changes could not be saved. Try again.' })
@@ -60,7 +59,12 @@ export default function EditProfilePage() {
       </PageBand>
       <div className="container page-body onboard">
         <div className="panel onboard__panel">
-          {loading || !profile ? <p role="status">Checking your account…</p> : (
+          {profileError && !profile ? (
+            <div className="onboard-form">
+              <p className="form-error" role="alert">{profileError}</p>
+              <button type="button" className="btn btn--secondary" onClick={reload}>Try again</button>
+            </div>
+          ) : loading || profileLoading || !profile ? <p role="status">Loading your profile…</p> : (
             <>
               {section === 'name' ? (
                 <AccountStep initialName={profile.username} next="save" onCreate={(username) => void save({ username })} />

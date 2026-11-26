@@ -58,6 +58,7 @@ export function listSelectableUsernames(uid?: string): string[] {
 export function usernameError(username: string): string | null {
   const name = username.trim()
   if (name.length < 3) return 'Choose a username with at least 3 characters.'
+  if (name.length > 80) return 'Choose a username with 80 characters or fewer.'
   if (!/^[a-zA-Z0-9_.-]+$/.test(name)) {
     return 'Usernames can use letters, numbers, dots, dashes and underscores.'
   }

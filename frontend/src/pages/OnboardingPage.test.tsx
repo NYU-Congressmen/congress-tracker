@@ -6,7 +6,7 @@ import OnboardingPage from './OnboardingPage'
 import { SessionContext } from '../auth/SessionContext'
 import { ProfileProvider } from '../profile/ProfileContext'
 import { createProfile, leaveProfile } from '../profile/store'
-import { mockApi } from '../test/fetchMock'
+import { mockAccountProfile, mockApi } from '../test/fetchMock'
 
 const ISSUES = [
   { issue_id: 1, name: 'Health care' },
@@ -82,7 +82,9 @@ describe('OnboardingPage', () => {
   })
 
   test.each([0, 1, 3])('handles %i failed saves after phone verification', async (failedSaves) => {
+    const account = mockAccountProfile({}, false)
     const fetchMock = mockApi([
+      account.route,
       { match: '/api/district-lookup', body: { state: 'NY', district: 12 } },
       { match: '/api/account/district', body: { state: 'NY', district: 12 } },
       { match: '/api/issues', body: ISSUES },
@@ -123,9 +125,15 @@ describe('OnboardingPage', () => {
     expect(localStorage.getItem('pull:accounts')).toBeNull()
     expect(fetchMock.mock.calls.some(([url]) => url === '/api/account/district')).toBe(false)
 
-    for (let failure = 0; failure < failedSaves; failure += 1) {
-      fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ detail: 'District lookup is unavailable.' }), { status: 502 }))
-    }
+    const respond = fetchMock.getMockImplementation()!
+    let failuresRemaining = failedSaves
+    fetchMock.mockImplementation(async (url, init) => {
+      if (url === '/api/account/district' && failuresRemaining > 0) {
+        failuresRemaining -= 1
+        return new Response(JSON.stringify({ detail: 'District lookup is unavailable.' }), { status: 502 })
+      }
+      return respond(url, init)
+    })
     signIn()
     for (let failure = 0; failure < Math.min(failedSaves, 2); failure += 1) {
       expect((await screen.findByRole('alert')).textContent).toBe('District lookup is unavailable.')
@@ -146,12 +154,14 @@ describe('OnboardingPage', () => {
       headers: expect.objectContaining({ Authorization: 'Bearer test-token' }),
       body: JSON.stringify({ address }),
     }))
-    expect(localStorage.getItem('pull:accounts')).not.toContain(address)
+    expect(JSON.stringify(account.profile)).not.toContain(address)
     expect(fetchMock.mock.calls.filter(([url]) => url === '/api/account/district')).toHaveLength(failedSaves + 1)
   })
 
-  test('saves a local profile with a district, topic and social handle', async () => {
+  test('saves an account profile with a district, topic and social handle', async () => {
+    const account = mockAccountProfile({}, false)
     const fetchMock = mockApi([
+      account.route,
       { match: '/api/issues', body: ISSUES },
       { match: '/api/account/district', body: null },
     ])
@@ -186,15 +196,12 @@ describe('OnboardingPage', () => {
 
     expect(await screen.findByRole('heading', { name: 'Profile saved' })).toBeTruthy()
 
-    const accounts = JSON.parse(localStorage.getItem('pull:accounts') ?? '{}')
-    expect(accounts['civics-maya']).toMatchObject({
+    expect(account.profile).toMatchObject({
       username: 'civics-maya',
-      firebase_uid: 'test-account',
       district: { state: 'DC', district: null, method: 'number' },
       topics: [1],
       socials: [{ platform: 'bluesky', handle: 'maya.bsky.social' }],
     })
-    expect(localStorage.getItem('pull:session')).toBe('civics-maya')
     // A district picked by number replaces any address match saved on the account
     expect(fetchMock).toHaveBeenCalledWith('/api/account/district', expect.objectContaining({ method: 'DELETE' }))
   })

@@ -28,6 +28,42 @@ class AccountDistrict(BaseModel):
     district: int | None
 
 
+class ProfileDistrict(AccountDistrict):
+    """Describe the location shown in the account's profile."""
+
+    state: Annotated[str, StringConstraints(pattern=r"^[A-Z]{2}$")]
+    district: Annotated[int | None, Field(ge=1, le=99)]
+    method: Literal["address", "map", "number"]
+
+
+class ProfileSocial(BaseModel):
+    """Describe a saved social handle."""
+
+    platform: Annotated[str, StringConstraints(min_length=1, max_length=32)]
+    handle: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=512)]
+
+
+class ProfilePreferences(BaseModel):
+    """Describe editable preferences for a verified account."""
+
+    username: Annotated[
+        str, StringConstraints(strip_whitespace=True, pattern=r"^[a-zA-Z0-9_.-]{3,80}$")
+    ] = "Profile"
+    district: ProfileDistrict | None = None
+    topics: Annotated[list[Annotated[int, Field(gt=0)]], Field(max_length=100)] = Field(
+        default_factory=list
+    )
+    socials: Annotated[list[ProfileSocial], Field(max_length=20)] = Field(default_factory=list)
+
+
+class AccountProfile(ProfilePreferences):
+    """Describe a verified account's profile and whether preferences have been saved."""
+
+    saved: bool
+    created_at: datetime
+    updated_at: datetime
+
+
 # Far beyond any real post, while keeping huge pastes out of the database and the AI brief
 MAX_REVIEW_TEXT = 20_000
 

@@ -2,13 +2,61 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 from psycopg.errors import UniqueViolation
+from psycopg.types.json import Jsonb
 
 from app.auth import PhoneIdentity, current_phone_identity, current_uid
 from app.db import connect, fetch_one
 from app.geocoding import district_for_address
-from app.models import AccountDistrict, DistrictAddress
+from app.models import AccountDistrict, AccountProfile, DistrictAddress, ProfilePreferences
 
 router = APIRouter(tags=["account"])
+
+# Use the existing verified district when an account first opens its profile.
+PROFILE_DEFAULT = """
+    jsonb_build_object('district', CASE WHEN state IS NOT NULL THEN
+        jsonb_build_object('state', state, 'district', NULLIF(district, 0), 'method', 'address')
+    END)
+"""
+
+PROFILE_COLUMNS = f"""
+    COALESCE(profile, {PROFILE_DEFAULT}) AS preferences, profile IS NOT NULL AS saved,
+    created_at, COALESCE((profile->>'updated_at')::timestamptz, created_at) AS updated_at
+"""
+
+
+def profile_response(row: dict | None) -> AccountProfile:
+    """Return the signed-in account's editable profile."""
+    if row is None:
+        raise HTTPException(403, "Finish signing in before opening your profile.")
+    return AccountProfile.model_validate({**row["preferences"], **row})
+
+
+@router.get("/account/profile", response_model=AccountProfile)
+def get_profile(uid: Annotated[str, Depends(current_uid)]) -> AccountProfile:
+    """Return the caller's profile, with defaults for the first edit."""
+    return profile_response(
+        fetch_one(f"SELECT {PROFILE_COLUMNS} FROM users WHERE uid = %s", (uid,))
+    )
+
+
+@router.patch("/account/profile", response_model=AccountProfile)
+def save_profile(
+    patch: ProfilePreferences, uid: Annotated[str, Depends(current_uid)], initialize: bool = False
+) -> AccountProfile:
+    """Save the supplied preferences or import a first browser profile."""
+    row = fetch_one(
+        f"""
+        UPDATE users
+        SET profile = CASE WHEN %s AND profile IS NOT NULL THEN profile
+            ELSE COALESCE(profile, {PROFILE_DEFAULT}) || %s::jsonb
+                || jsonb_build_object('updated_at', now())
+            END
+        WHERE uid = %s
+        RETURNING {PROFILE_COLUMNS}
+        """,
+        (initialize, Jsonb(patch.model_dump(mode="json", exclude_unset=True)), uid),
+    )
+    return profile_response(row)
 
 
 @router.post("/district-lookup", response_model=AccountDistrict)

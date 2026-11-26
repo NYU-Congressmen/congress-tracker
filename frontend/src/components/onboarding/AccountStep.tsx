@@ -35,8 +35,7 @@ export function AccountStep({ initialName, next, onBack, onCreate, onSelect }: A
   function create(event: FormEvent) {
     event.preventDefault()
     const problem = usernameError(username)
-    const unchangedName = editing && username.trim().toLowerCase() === initialName.toLowerCase()
-    if (problem || (!unchangedName && isUsernameTaken(username))) {
+    if (problem || (!user && !editing && isUsernameTaken(username))) {
       setError(problem ?? 'That name is already used by a profile on this device.')
       setSuggestion(problem ? null : suggestProfileName(username.trim(), listUsernames()))
       return
@@ -48,8 +47,7 @@ export function AccountStep({ initialName, next, onBack, onCreate, onSelect }: A
     <div className="onboard-account">
       <form className="onboard-form" onSubmit={create}>
         <div className="onboard-account__intro">
-          <h2>{editing ? 'Browser profile' : 'New profile'}</h2>
-          <p className="muted">Save your district, topics and social handles on this browser.</p>
+          <h2>{editing ? 'Profile name' : 'New profile'}</h2>
         </div>
         <TextField id="onboard-username" label="Profile name" value={username} onChange={(value) => {
           setUsername(value)
@@ -73,7 +71,7 @@ export function AccountStep({ initialName, next, onBack, onCreate, onSelect }: A
           </button>
         </StepActions>
       </form>
-      {onSelect && names.length > 0 ? (
+      {!user && onSelect && names.length > 0 ? (
         <form className="onboard-form" onSubmit={(event) => {
           event.preventDefault()
           if (selected) onSelect(selected)

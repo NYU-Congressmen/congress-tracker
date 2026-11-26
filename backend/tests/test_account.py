@@ -119,6 +119,32 @@ def test_verified_account_can_save_its_review(db, verify_token):
     assert rows == [("verified-user", "+16505550101")]
 
 
+def test_verified_account_has_one_profile_and_import_cannot_replace_it(db, verify_token):
+    headers = {"Authorization": "Bearer test-phone-session"}
+    path = "/api/account/profile"
+    assert client.put("/api/account", headers=headers).status_code == 204
+    with psycopg.connect(TEST_DATABASE_URL) as conn:
+        conn.execute("UPDATE users SET state = 'NY', district = 12")
+
+    assert client.get(path).status_code == 401
+    assert client.patch(path, json={"username": "intruder"}).status_code == 401
+    first = client.get(path, headers=headers).json()
+    assert first["username"] == "Profile"
+    assert first["district"] == {"state": "NY", "district": 12, "method": "address"}
+    assert first["saved"] is False
+
+    saved = client.patch(path, json={"username": "civics-maya"}, headers=headers).json()
+    assert saved["saved"] is True
+    assert saved["district"] == first["district"]
+    import_path = f"{path}?initialize=true"
+    imported = client.patch(import_path, json={"username": "old-copy"}, headers=headers)
+    assert imported.json() == saved
+    latest = client.patch(path, json={"topics": [2]}, headers=headers).json()
+    assert latest["username"] == "civics-maya"
+    assert latest["topics"] == [2]
+    assert client.get(path, headers=headers).json() == latest
+
+
 def test_guest_district_lookup_returns_the_district_without_an_account(monkeypatch):
     def census_get(url, *, params, timeout):
         assert params["address"] == "100 Example Street, Example City"

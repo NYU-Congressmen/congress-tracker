@@ -8,7 +8,7 @@ Pull is a web app for understanding and following U.S. legislation. We treat bil
 
 ## Status
 
-Onboarding uses Census address matching for the 119th Congress and also offers district selection by map or number. Firebase phone verification completes account setup, and Pull saves the address match as a state and district. Choosing a district on the map or by number later clears that saved match, so the account never keeps a district the profile no longer shows. The topic picker starts with five choices and adds related topics as readers make selections. The dashboard uses the topics saved in the browser, and My representatives uses the selected district. Phone sign-in restores the profile used by that account in the same browser. Signed-in readers can edit their profile name, district, topics or social handles in any order, and they can reopen their saved bill reviews. The dashboard also shows a seating chart for the House, Senate and Joint session. Bill pages show legislative actions and let readers open a published version directly or compare two versions. The comparison shows a saved summary above passages labeled Added and Removed, with controls for Changes, Context and Full text. Signed-in readers can generate a missing summary when a model is configured. Member profiles show sponsored bills and office contact details, with the room, building and mailing locality on separate lines when available.
+Onboarding uses Census address matching for the 119th Congress and also offers district selection by map or number. Firebase phone verification completes account setup, and Pull saves the address match as a state and district. Choosing a district on the map or by number later clears that saved match, so the account never keeps a district the profile no longer shows. The topic picker starts with five choices and adds related topics as readers make selections. The dashboard uses the topics saved on the account, and My representatives uses the selected district. Each verified account has one profile with an editable name, district, topics and social handles. Phone sign-in loads that profile and its saved bill reviews across browsers. The dashboard also shows a seating chart for the House, Senate and Joint session. Bill pages show legislative actions and let readers open a published version directly or compare two versions. The comparison shows a saved summary above passages labeled Added and Removed, with controls for Changes, Context and Full text. Signed-in readers can generate a missing summary when a model is configured. Member profiles show sponsored bills and office contact details, with the room, building and mailing locality on separate lines when available.
 
 The Social page saves stance drafts in the browser. Signed-in readers can save one review per bill and make separate choices about publishing it on Pull and including it in the Constituent Signal brief. The bill page opens the review form on Social, and the save confirmation links back to the bill. The bill page also has a private call log with optional notes. The Explanation panel shows saved explanations with Summary, Limits, Status and Next steps, or the official summary by itself when available. The public deployment serves stored legislative data from Supabase.
 
@@ -53,7 +53,7 @@ Bill status is a simplified interpretation of observed action text, using the fu
 
 | Part | Technology | State |
 |---|---|---|
-| Frontend | React 19, TypeScript, Vite | Dashboard, search, detail pages, browser profiles, phone sign-in and stance drafts |
+| Frontend | React 19, TypeScript, Vite | Dashboard, search, detail pages, account profiles, phone sign-in and stance drafts |
 | Backend API | FastAPI on Python 3.13 | Bills, members, text comparisons, topics, feed, explanations, accounts and reviews |
 | Sync job | Python, sharing code with the API | Manual list sync through `npm run sync` and on-demand caching |
 | Database | PostgreSQL on Supabase, Alembic, pgvector | Legislative data, user and review tables, tracking and brief tables, AI cache and call log |
@@ -83,7 +83,7 @@ congress-tracker/
 │       ├── auth/            Firebase client and verified account session
 │       ├── components/      Layout, bill, member and shared UI components
 │       ├── pages/           Dashboard, onboarding, sign-in, bill, member and social pages
-│       ├── profile/         Browser profiles and district and topic selections
+│       ├── profile/         Account profiles and browser profile import
 │       └── App.tsx          Browser routes and shared layout
 ├── scripts/                 Setup, branch updates, deployment and smoke checks
 ├── .githooks/               Blocks direct pushes to main and develop

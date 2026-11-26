@@ -1071,14 +1071,6 @@ a.onboard-steps__item[aria-disabled] {
   gap: 10px;
 }
 
-.onboard-signout {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  margin-top: 18px;
-}
-
 .topics__chips {
   display: flex;
   flex-wrap: wrap;

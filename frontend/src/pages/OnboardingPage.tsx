@@ -23,7 +23,7 @@ type SetupStep = keyof typeof STEP_LABELS
 
 // Set up the local profile and dashboard preferences.
 export default function OnboardingPage() {
-  const { profile, createProfile, selectProfile, leaveProfile, updateProfile } = useProfile()
+  const { profile, selectProfile, leaveProfile, updateProfile } = useProfile()
   const { user, loading } = useSession()
   const [params] = useSearchParams()
   const navigate = useNavigate()
@@ -46,7 +46,7 @@ export default function OnboardingPage() {
   const saveAttempted = useRef(false)
   const restartRequired = codeFailures >= MAX_FAILED_ATTEMPTS || saveFailures >= MAX_FAILED_ATTEMPTS
 
-  // Save the browser profile after the API registers the verified Firebase user.
+  // Save the profile after the API registers the verified Firebase user.
   const saveProfile = useCallback(async () => {
     if (!user || loading || restartRequired || saveAttempted.current) return
     saveAttempted.current = true
@@ -62,9 +62,7 @@ export default function OnboardingPage() {
       }
       if (replacesAccountDistrict(verifiedDistrict)) await clearAccountDistrict(user)
       if (customTopics.length) await saveCustomTopics(await getAccountToken(user), customTopics)
-      const details = { firebase_uid: user.uid, district: verifiedDistrict, topics, socials }
-      if (profile?.username === username) updateProfile(details)
-      else createProfile(username, details)
+      await updateProfile({ username, district: verifiedDistrict, topics, socials })
       setStep('done')
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Something went wrong while saving your profile.')
@@ -72,7 +70,7 @@ export default function OnboardingPage() {
     } finally {
       setSaving(false)
     }
-  }, [addressToSave, createProfile, customTopics, district, loading, profile, restartRequired, socials, topics, updateProfile, user, username])
+  }, [addressToSave, customTopics, district, loading, restartRequired, socials, topics, updateProfile, user, username])
 
   useEffect(() => {
     if (step !== 'verify') return
@@ -279,21 +277,6 @@ export default function OnboardingPage() {
 
         </div>
 
-        {profile && user && step !== 'verify' ? (
-          <div className="onboard-signout">
-            <span className="muted">Active profile is {profile.username}.</span>
-            <button
-              type="button"
-              className="btn btn--ghost btn--sm"
-              onClick={() => {
-                leaveProfile()
-                setStep('account')
-              }}
-            >
-              Switch profile
-            </button>
-          </div>
-        ) : null}
       </div>
     </div>
   )
