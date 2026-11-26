@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import type { BillDetail } from '../../api/bills'
 import { getBillResponses, STANCE_LABELS, STANCES } from '../../api/reviews'
+import { getAccountToken } from '../../auth/accountToken'
+import { useSession } from '../../auth/SessionContext'
 import { useApi } from '../../hooks/useApi'
 import { districtHeading, stateName } from '../../lib/districts'
 import { billUrl, formatDate } from '../../lib/format'
@@ -56,9 +58,11 @@ export function BillStances({ bill, revision = 0 }: { bill: BillDetail; revision
 
 function StanceCounts({ bill, scope, revision }: { bill: BillDetail; scope: DistrictSelection | null; revision: number }) {
   const { congress, type, number } = bill
+  const { user } = useSession()
   const { data, error, loading, refetch } = useApi(
-    () => getBillResponses(congress, type, number, scope?.state, scope?.district),
-    [congress, type, number, scope?.state, scope?.district, revision],
+    async () => getBillResponses(congress, type, number, scope?.state, scope?.district,
+      user ? await getAccountToken(user) : undefined),
+    [congress, type, number, scope?.state, scope?.district, revision, user],
   )
   if (loading) return <LoadingState message="Loading stances…" />
   if (error) return <ErrorState title="Stances could not be loaded" message={error.message} onRetry={refetch} />
@@ -72,7 +76,10 @@ function StanceCounts({ bill, scope, revision }: { bill: BillDetail; scope: Dist
 
   return (
     <>
-      <p className="muted">{data.label} · {data.total.toLocaleString('en-US')}</p>
+      <p className="muted">
+        {data.label} · {data.total.toLocaleString('en-US')}
+        {data.includes_sample ? <span className="bill-stances__sample">Sample data</span> : null}
+      </p>
       <ul className="bill-stances__counts">
         {STANCES.map((stance) => {
           const count = data.counts[stance]

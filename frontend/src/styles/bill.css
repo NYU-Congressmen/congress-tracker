@@ -418,6 +418,18 @@
   width: min(100%, 18rem);
 }
 
+.bill-stances__sample {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border: 1px solid var(--ink-2);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
 .bill-stances__counts {
   display: grid;
   gap: 16px;

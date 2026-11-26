@@ -302,6 +302,8 @@ class BillResponses(BaseModel):
     district: int | None
     total: int
     counts: StanceCounts
+    # True when sample accounts are among the counted respondents
+    includes_sample: bool = False
 
 
 class ReviewVisibility(BaseModel):

@@ -6,6 +6,7 @@ from psycopg import Connection
 from app.auth import current_uid, optional_uid
 from app.db import connect, fetch_all, fetch_one
 from app.models import BillType, ReportIn, Review, ReviewIn, ReviewPage, ReviewVisibility, Stance
+from app.sample_data import EXCLUDE_SAMPLE_REVIEWS_SQL, sees_sample_data
 from app.sync.bills import make_bill_id
 
 router = APIRouter(tags=["reviews"])
@@ -145,6 +146,7 @@ def list_shared_reviews(
     number: int,
     page: Annotated[int, Query(ge=1)] = 1,
     limit: Annotated[int, Query(ge=1, le=50)] = 20,
+    viewer: Annotated[str | None, Depends(optional_uid)] = None,
 ) -> dict[str, Any]:
     """Return the reviews of a bill that their authors shared, most recently edited first.
 
@@ -155,6 +157,8 @@ def list_shared_reviews(
     if fetch_one("SELECT 1 FROM bills WHERE bill_id = %s", (bill_id,)) is None:
         raise HTTPException(404, "Bill not found")
     where = f"r.bill_id = %(bill_id)s AND {SHARED_REVIEW_SQL}"
+    if not sees_sample_data(viewer):
+        where += f" AND {EXCLUDE_SAMPLE_REVIEWS_SQL}"
     params = {"bill_id": bill_id}
     total = fetch_one(f"SELECT count(*) AS n FROM reviews r WHERE {where}", params)["n"]
     reviews = fetch_all(

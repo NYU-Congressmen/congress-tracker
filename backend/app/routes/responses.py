@@ -1,9 +1,11 @@
 from typing import Annotated, Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
+from app.auth import optional_uid
 from app.db import fetch_all, fetch_one
 from app.models import BillResponses, BillType
+from app.sample_data import EXCLUDE_SAMPLE_REVIEWS_SQL, sees_sample_data
 from app.sync.bills import make_bill_id
 
 router = APIRouter(tags=["reviews"])
@@ -16,14 +18,17 @@ def count_responses(
     congress: int,
     bill_type: BillType,
     number: int,
+    response: Response,
     state: Annotated[str | None, Query(pattern="^[A-Za-z]{2}$")] = None,
     district: Annotated[int | None, Query(ge=0)] = None,
+    viewer: Annotated[str | None, Depends(optional_uid)] = None,
 ) -> dict[str, Any]:
     """Count verified users' stances on a bill, optionally only those in one state or district.
 
     Every account is phone-verified, so these are counts of people who chose to respond, not a
     sample of the public. Reviews their authors hid are left out. An at-large seat has no
-    district number, so its constituents are counted with the state filter alone.
+    district number, so its constituents are counted with the state filter alone. Sample
+    accounts are counted only for a viewer signed in with a sample account.
     """
     if district is not None and state is None:
         raise HTTPException(422, "Filter by state as well as district.")
@@ -32,6 +37,11 @@ def count_responses(
         raise HTTPException(404, "Bill not found")
 
     where = "r.bill_id = %(bill_id)s AND r.hidden_at IS NULL"
+    show_sample = sees_sample_data(viewer)
+    if show_sample:
+        response.headers["Cache-Control"] = "private, no-store"
+    else:
+        where += f" AND {EXCLUDE_SAMPLE_REVIEWS_SQL}"
     params: dict[str, Any] = {"bill_id": bill_id}
     if state is not None:
         state = state.upper()
@@ -42,7 +52,7 @@ def count_responses(
         params["district"] = district
     rows = fetch_all(
         f"""
-        SELECT r.stance, count(*) AS n
+        SELECT r.stance, count(*) AS n, bool_or(u.is_sample) AS sample
         FROM reviews r JOIN users u ON u.uid = r.uid
         WHERE {where}
         GROUP BY r.stance
@@ -59,4 +69,5 @@ def count_responses(
         "district": district,
         "total": sum(counts.values()),
         "counts": counts,
+        "includes_sample": any(row["sample"] for row in rows),
     }
