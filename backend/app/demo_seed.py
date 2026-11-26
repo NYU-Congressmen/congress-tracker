@@ -2,6 +2,8 @@
 
 Every seeded account has users.is_sample set, so its stances and reviews appear only to a viewer
 signed in with a sample account. Rerunning replaces the previous seed with the same records.
+The filter lives in the API, so the seed runs against a database only after the API serving it
+includes the is_sample filter, or the sample activity appears in public totals.
 
     uv run --directory backend python -m app.demo_seed
 """
