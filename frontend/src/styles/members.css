@@ -52,8 +52,7 @@
 }
 
 .avatar--lg {
-  width: 96px;
-  height: 96px;
+  --avatar-size: 96px;
   font-size: 32px;
 }
 
@@ -107,7 +106,7 @@
 
 .office div {
   display: grid;
-  gap: 2px;
+  gap: 8px;
   padding: 14px 0;
   border-top: 1px solid var(--line);
 }
@@ -126,6 +125,10 @@
 .office dd {
   margin: 0;
   font-size: 15.5px;
+}
+
+.office__address span {
+  display: block;
 }
 
 .office__phone a {
@@ -148,8 +151,7 @@
     padding: 24px 20px;
   }
   .avatar--lg {
-    width: 72px;
-    height: 72px;
+    --avatar-size: 72px;
     font-size: 24px;
   }
 }

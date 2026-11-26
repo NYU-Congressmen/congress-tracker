@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ApiError } from '../api/client'
 import { getBill, searchBills } from '../api/bills'
 import type { BillSummary } from '../api/bills'
-import { saveReview, STANCES, STANCE_LABELS } from '../api/reviews'
+import { getReview, saveReview, STANCES, STANCE_LABELS } from '../api/reviews'
+import { useSession } from '../auth/SessionContext'
+import { getAccountToken } from '../auth/accountToken'
 import { PLATFORMS, platformName } from '../profile/platforms'
 import type { SocialProfile } from '../profile/types'
 import { useProfile } from '../profile/ProfileContext'
@@ -26,53 +28,112 @@ interface SelectedBill extends BillSummary {
 // moving now that are worth weighing in on.
 export default function SocialPage() {
   const { profile } = useProfile()
-  return <SocialContent key={profile?.username ?? ''} />
+  const { user } = useSession()
+  const [params] = useSearchParams()
+  const linkedBill = params.get('bill')
+  return <SocialContent key={JSON.stringify([profile?.username, user?.uid, linkedBill])} linkedBill={linkedBill} />
 }
 
-function SocialContent() {
+function SocialContent({ linkedBill }: { linkedBill: string | null }) {
   const { profile, updateProfile } = useProfile()
-  const username = profile?.username ?? null
-  const [params] = useSearchParams()
+  const { user, loading: sessionLoading } = useSession()
+  const discussionOwner = user ? `firebase:${user.uid}` : profile?.username ?? null
 
   // Saved social handles
   const [socials, setSocials] = useState<SocialProfile[]>(profile?.socials ?? [])
   const [platform, setPlatform] = useState(PLATFORMS[0].id)
   const [handle, setHandle] = useState('')
   const [socialError, setSocialError] = useState<string | null>(null)
+  const [socialSaving, setSocialSaving] = useState(false)
 
   // Composer
   const [billQuery, setBillQuery] = useState('')
   const [billResults, setBillResults] = useState<BillSummary[] | null>(null)
   const [searching, setSearching] = useState(false)
   const [selected, setSelected] = useState<SelectedBill | null>(null)
+  const selectedBillPath = selected ? `/bills/${selected.congress}/${selected.type}/${selected.number}` : null
   const [stance, setStance] = useState<string>('')
   const [story, setStory] = useState('')
   const [actionTaken, setActionTaken] = useState('')
+  const [consentToShare, setConsentToShare] = useState(false)
+  const [sharePublicly, setSharePublicly] = useState(false)
+  const [loadingReview, setLoadingReview] = useState(false)
+  const [reviewError, setReviewError] = useState(false)
+  const reviewLoad = useRef(0)
+  const billPicked = useRef(false)
   const [submitting, setSubmitting] = useState(false)
+  const reviewBlocked = sessionLoading || loadingReview || reviewError || submitting
   const [submitNotice, setSubmitNotice] = useState<{ kind: 'ok' | 'draft' | 'error'; text: string } | null>(null)
 
   // Local discussion records, newest first
-  const [records, setRecords] = useState(() => listDiscussions(username))
+  const [records, setRecords] = useState(() => listDiscussions(discussionOwner))
 
-  // Preselect a bill when the reader arrives from a bill page's "your stance" link.
-  const preselect = params.get('bill')
-  const preselectMatch = preselect ? /^(\d+)-([a-z]+)-(\d+)$/.exec(preselect) : null
+  // Resolve the bill reference sent by the stance link.
+  const preselectMatch = linkedBill ? /^(\d+)-([a-z]+)-(\d+)$/.exec(linkedBill) : null
   const { data: preselected, loading: preselecting } = useApi(
     () =>
       preselectMatch
         ? getBill(Number(preselectMatch[1]), preselectMatch[2] as SelectedBill['type'], Number(preselectMatch[3]))
         : Promise.resolve(null),
-    [preselect],
+    [linkedBill],
   )
 
   // The bills moving right now, offered as discussion starters.
   const { data: moving } = useApi(() => searchBills({ limit: 6 }), [])
 
-  function pickBill(bill: BillSummary) {
+  const loadReview = useCallback(async (bill: BillSummary) => {
+    setReviewError(false)
+    if (!user) return
+    const load = ++reviewLoad.current
+    setLoadingReview(true)
+    try {
+      const review = await getReview(bill.congress, bill.type, bill.number, await getAccountToken(user))
+      if (load !== reviewLoad.current) return
+      setStance(review.stance)
+      setStory(review.story ?? '')
+      setActionTaken(review.action_taken ?? '')
+      setConsentToShare(review.consent_to_share)
+      setSharePublicly(review.share_publicly ?? false)
+    } catch (error) {
+      if (load === reviewLoad.current && !(error instanceof ApiError && error.status === 404)) {
+        setReviewError(true)
+      }
+    } finally {
+      if (load === reviewLoad.current) setLoadingReview(false)
+    }
+  }, [user])
+
+  const pickBill = useCallback((bill: BillSummary) => {
+    // Keep text drafted before the first bill choice. A saved review can replace it.
+    if (billPicked.current) {
+      setStance('')
+      setStory('')
+      setActionTaken('')
+      setConsentToShare(false)
+      setSharePublicly(false)
+    }
+    billPicked.current = true
     setSelected(bill)
     setBillResults(null)
     setBillQuery('')
     setSubmitNotice(null)
+    void loadReview(bill)
+  }, [loadReview])
+
+  useEffect(() => {
+    if (!preselected) return
+    let active = true
+    queueMicrotask(() => {
+      if (active && !billPicked.current) pickBill(preselected)
+    })
+    return () => { active = false }
+  }, [preselected, pickBill])
+
+  function changeBill() {
+    reviewLoad.current += 1
+    setLoadingReview(false)
+    setReviewError(false)
+    setSelected(null)
   }
 
   async function findBills(event: FormEvent) {
@@ -95,6 +156,7 @@ function SocialContent() {
 
   async function submitDiscussion(event: FormEvent) {
     event.preventDefault()
+    if (reviewBlocked) return
     setSubmitNotice(null)
     if (!selected) {
       setSubmitNotice({ kind: 'error', text: 'Find the bill you want to weigh in on first.' })
@@ -105,60 +167,69 @@ function SocialContent() {
       return
     }
     setSubmitting(true)
+    const review = {
+      stance: stance as (typeof STANCES)[number],
+      story: story.trim() ? story : null,
+      action_taken: actionTaken.trim() ? actionTaken : null,
+      consent_to_share: Boolean(user && consentToShare),
+      share_publicly: Boolean(user && sharePublicly),
+    }
+    let saved = false
+    let notice: NonNullable<typeof submitNotice> = { kind: 'draft', text: 'Draft saved in this browser.' }
     try {
-      await saveReview(selected.congress, selected.type, selected.number, {
-        stance: stance as (typeof STANCES)[number],
-        story: story.trim() || null,
-        action_taken: actionTaken.trim() || null,
-        consent_to_share: false,
-      })
-      recordDiscussion(username, {
-        bill: {
-          congress: selected.congress,
-          type: selected.type,
-          number: selected.number,
-          title: selected.title,
-        },
-        stance: stance as (typeof STANCES)[number],
-        story: story.trim() || null,
-        action_taken: actionTaken.trim() || null,
-        consent: false,
-        saved: true,
-        at: new Date().toISOString(),
-      })
-      setRecords(listDiscussions(username))
-      setStory('')
-      setActionTaken('')
-      setSubmitNotice({ kind: 'ok', text: 'Your review is saved. That is how your stance shows on the bill page.' })
+      if (user) {
+        const token = await getAccountToken(user)
+        await saveReview(selected.congress, selected.type, selected.number, review, token)
+        saved = true
+        notice = { kind: 'ok', text: 'Your review is saved.' }
+      }
     } catch (cause) {
       const isAuth = cause instanceof ApiError && cause.status === 401
-      recordDiscussion(username, {
-        bill: {
-          congress: selected.congress,
-          type: selected.type,
-          number: selected.number,
-          title: selected.title,
-        },
-        stance: stance as (typeof STANCES)[number],
-        story: story.trim() || null,
-        action_taken: actionTaken.trim() || null,
-        consent: false,
-        saved: false,
-        at: new Date().toISOString(),
-      })
-      setRecords(listDiscussions(username))
-      setSubmitNotice(
-        isAuth
-          ? { kind: 'draft', text: 'Draft saved in this browser.' }
-          : { kind: 'error', text: cause instanceof Error ? cause.message : 'The review could not be saved right now.' },
-      )
+      if (!isAuth) {
+        notice = { kind: 'error', text: cause instanceof ApiError ? cause.message : 'The review could not be saved right now.' }
+      }
     } finally {
+      try {
+        recordDiscussion(discussionOwner, {
+          bill: {
+            congress: selected.congress,
+            type: selected.type,
+            number: selected.number,
+            title: selected.title,
+          },
+          stance: review.stance,
+          story: review.story,
+          action_taken: review.action_taken,
+          consent: saved && review.consent_to_share,
+          saved,
+          at: new Date().toISOString(),
+        })
+        setRecords(listDiscussions(discussionOwner))
+      } catch {
+        if (!saved) notice = { kind: 'error', text: 'This browser could not save your draft.' }
+      }
+      setSubmitNotice(notice)
       setSubmitting(false)
     }
   }
 
-  function addSocial(event: FormEvent) {
+  async function saveSocials(next: SocialProfile[]) {
+    setSocialSaving(true)
+    try {
+      if (profile) await updateProfile({ socials: next })
+      setSocials(next)
+      return true
+    } catch {
+      setSocialError('Your social profiles could not be saved. Try again.')
+      return false
+    } finally {
+      setSocialSaving(false)
+    }
+  }
+
+  async function addSocial(event: FormEvent) {
     event.preventDefault()
+    if (socialSaving) return
     setSocialError(null)
     const value = handle.trim()
     if (!value) {
@@ -170,15 +241,13 @@ function SocialContent() {
       return
     }
     const next = [...socials, { platform, handle: value }]
-    setSocials(next)
-    setHandle('')
-    if (profile) updateProfile({ socials: next })
+    if (await saveSocials(next)) setHandle('')
   }
 
   function removeSocial(target: string) {
     const next = socials.filter((social) => social.platform !== target)
-    setSocials(next)
-    if (profile) updateProfile({ socials: next })
+    setSocialError(null)
+    void saveSocials(next)
   }
 
   return (
@@ -188,8 +257,7 @@ function SocialContent() {
           Social
         </h1>
         <p className="page-lede">
-          Where the discussion about current policy happens: say where you stand on a bill, tell the story behind it,
-          and follow what is moving.
+          Save your stance on a bill and the experience behind it.
         </p>
       </PageBand>
 
@@ -197,17 +265,19 @@ function SocialContent() {
 
         {!profile ? (
           <div className="social__prompt panel">
-            <h2>Join the discussion</h2>
-            <p className="muted">
-              Save your discussion drafts with a profile in this browser.
-            </p>
+            <div>
+              <h2>Browser profile</h2>
+              <p className="muted">
+                Save your discussion drafts with a profile in this browser.
+              </p>
+            </div>
             <Link to="/onboarding" className="btn btn--primary">
               Set up my profile
             </Link>
           </div>
         ) : null}
 
-        <section className="panel" aria-label="Your social profiles">
+        <section className="panel panel--stack" aria-label="Your social profiles">
           <div className="panel__heading-row">
             <h2>Your social profiles</h2>
             <span className="panel__count">
@@ -220,7 +290,7 @@ function SocialContent() {
                 <li key={social.platform} className="social-list__item">
                   <span className="social-list__platform">{platformName(social.platform)}</span>
                   <span className="social-list__handle">{social.handle}</span>
-                  <button type="button" className="btn btn--ghost btn--sm" onClick={() => removeSocial(social.platform)}>
+                  <button type="button" className="btn btn--ghost btn--sm" disabled={socialSaving} onClick={() => removeSocial(social.platform)}>
                     Remove
                   </button>
                 </li>
@@ -251,7 +321,7 @@ function SocialContent() {
                 onChange={(event) => setHandle(event.target.value)}
               />
             </label>
-            <button type="submit" className="btn btn--secondary">
+            <button type="submit" className="btn btn--secondary" disabled={socialSaving}>
               Add handle
             </button>
           </form>
@@ -262,19 +332,20 @@ function SocialContent() {
           ) : null}
         </section>
 
-        <section className="panel" aria-label="Start a discussion">
-          <h2>Start a discussion</h2>
+        <section id="bill-review" className="panel panel--stack" aria-labelledby="bill-review-title">
+          <h2 id="bill-review-title">Bill review</h2>
+          {!user ? <p className="muted"><Link to="/sign-in">Sign in</Link> to save your review to your account.</p> : null}
 
-          {selected ? (
+          {selected && selectedBillPath ? (
             <div className="social-bill">
               <Link
-                to={`/bills/${selected.congress}/${selected.type}/${selected.number}`}
+                to={selectedBillPath}
                 className="social-bill__link"
               >
                 <span className="social-bill__id">{billNumber(selected.type, selected.number)}</span>
                 <span className="social-bill__title">{selected.title}</span>
               </Link>
-              <button type="button" className="btn btn--ghost btn--sm" onClick={() => setSelected(null)}>
+              <button type="button" className="btn btn--ghost btn--sm" onClick={changeBill} disabled={submitting}>
                 Change bill
               </button>
             </div>
@@ -293,11 +364,9 @@ function SocialContent() {
                   {searching ? 'Searching…' : 'Search bills'}
                 </button>
               </form>
-              {preselecting ? <LoadingState message="Loading the bill…" /> : null}
-              {preselected ? (
-                <button type="button" className="btn btn--ghost btn--sm social-bill-suggest" onClick={() => pickBill(preselected)}>
-                  Use “{billNumber(preselected.type, preselected.number)}”
-                </button>
+              {linkedBill && preselecting ? <LoadingState message="Loading the bill…" /> : null}
+              {linkedBill && !preselecting && !preselected ? (
+                <p className="muted">The linked bill could not be loaded. Search for it by title or number.</p>
               ) : null}
               {billResults ? (
                 billResults.length > 0 ? (
@@ -318,9 +387,18 @@ function SocialContent() {
             </>
           )}
 
+          {sessionLoading ? <LoadingState message="Checking sign-in…" /> : null}
+          {loadingReview ? <LoadingState message="Loading your saved review…" /> : null}
+          {reviewError && selected ? (
+            <p className="form-error" role="alert">
+              Your saved review could not be loaded.{' '}
+              <button type="button" className="btn btn--ghost btn--sm" onClick={() => void loadReview(selected)}>Retry</button>
+            </p>
+          ) : null}
+
           <form className="social-composer" onSubmit={submitDiscussion}>
-            <fieldset className="social-stance">
-              <legend>Where do you stand?</legend>
+            <fieldset className="social-stance" disabled={reviewBlocked}>
+              <legend>Your stance</legend>
               {STANCES.map((option) => (
                 <label key={option} className={`social-stance__option${stance === option ? ' is-selected' : ''}`}>
                   <input
@@ -340,36 +418,63 @@ function SocialContent() {
               <textarea
                 className="field__control social-composer__textarea"
                 value={story}
+                disabled={reviewBlocked}
                 maxLength={20000}
-                placeholder="What does this bill mean to you?"
                 onChange={(event) => setStory(event.target.value)}
               />
             </label>
 
             <label className="field">
-              <span className="field__label">What have you done about it? (optional)</span>
+              <span className="field__label">Action taken (optional)</span>
               <textarea
                 className="field__control social-composer__textarea"
                 value={actionTaken}
+                disabled={reviewBlocked}
                 maxLength={20000}
-                placeholder="Called your representative, attended a hearing, organized a neighbor…"
                 onChange={(event) => setActionTaken(event.target.value)}
               />
             </label>
 
-            <button type="submit" className="btn btn--primary btn--lg" disabled={submitting}>
+            {user && selected ? (
+              <label className="review-consent">
+                <input
+                  type="checkbox"
+                  checked={consentToShare}
+                  disabled={reviewBlocked}
+                  onChange={(event) => setConsentToShare(event.target.checked)}
+                />
+                <span>Include this review in the Constituent Signal brief for my representative’s office.</span>
+              </label>
+            ) : null}
+
+            {user && selected ? (
+              <label className="review-consent">
+                <input
+                  type="checkbox"
+                  checked={sharePublicly}
+                  disabled={reviewBlocked}
+                  onChange={(event) => setSharePublicly(event.target.checked)}
+                />
+                <span>Publish my stance, story, action taken and district on Pull.</span>
+              </label>
+            ) : null}
+
+            <button type="submit" className="btn btn--primary btn--lg" disabled={reviewBlocked}>
               {submitting ? 'Saving…' : 'Save my stance'}
             </button>
           </form>
 
           {submitNotice ? (
-            <p className={`social-notice social-notice--${submitNotice.kind}`} role="status">
-              {submitNotice.text}
-            </p>
+            <div className={`social-notice social-notice--${submitNotice.kind}`}>
+              <p role="status">{submitNotice.text}</p>
+              {submitNotice.kind === 'ok' && selectedBillPath ? (
+                <Link to={selectedBillPath}>Back to bill</Link>
+              ) : null}
+            </div>
           ) : null}
         </section>
 
-        <section className="panel" aria-label="Your discussions">
+        <section className="panel panel--stack" aria-label="Your discussions">
           <div className="panel__heading-row">
             <h2>Your discussions</h2>
             <span className="panel__count">{records.length > 0 ? `${records.length} so far` : ''}</span>
@@ -395,13 +500,13 @@ function SocialContent() {
               ))}
             </ul>
           ) : (
-            <p className="muted">No discussions yet. Pick a bill above and say where you stand.</p>
+            <p className="muted">No saved reviews or drafts.</p>
           )}
         </section>
 
-        <section className="panel" aria-label="Bills moving now">
+        <section className="panel panel--stack" aria-label="Recent bill activity">
           <div className="panel__heading-row">
-            <h2>What is moving</h2>
+            <h2>Recent bill activity</h2>
             <Link to="/bills" className="link-more">
               All bills
             </Link>

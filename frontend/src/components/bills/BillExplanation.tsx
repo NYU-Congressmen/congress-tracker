@@ -48,7 +48,7 @@ function SourceTag({ official }: { official: boolean }) {
   )
 }
 
-// Show a bill's explanation in four labeled parts, loading separately from the rest of the page.
+// Show the bill's summary and any saved explanation sections.
 export function BillExplanation({ congress, type, number, title }: BillExplanationProps) {
   const [expanded, setExpanded] = useState(false)
   const { data, loading, error, refetch } = useApi(
@@ -58,7 +58,7 @@ export function BillExplanation({ congress, type, number, title }: BillExplanati
 
   if (loading) {
     return (
-      <section className="panel" aria-label="Explanation">
+      <section className="panel panel--stack" aria-label="Explanation">
         <h2>Explanation</h2>
         <LoadingState message="Loading the explanation…" />
       </section>
@@ -66,10 +66,10 @@ export function BillExplanation({ congress, type, number, title }: BillExplanati
   }
   if (error || !data) {
     return (
-      <section className="panel" aria-label="Explanation">
+      <section className="panel panel--stack" aria-label="Explanation">
         <h2>Explanation</h2>
         <ErrorState
-          title="The explanation could not be loaded"
+          title={error?.status === 404 ? 'Explanation unavailable' : 'The explanation could not be loaded'}
           message={error?.message}
           onRetry={error?.status === 404 ? undefined : refetch}
         />
@@ -89,14 +89,14 @@ export function BillExplanation({ congress, type, number, title }: BillExplanati
   }
   if (data.from_stored) notes.push('Showing the last saved version.')
 
-  const aiParts: [string, string][] = [
+  const aiParts: [string, string | null][] = [
     ['Limits', data.does_not],
     ['Status', data.stands],
     ['Next steps', data.decides],
   ]
 
   return (
-    <section className="panel" aria-label="Explanation">
+    <section className="panel panel--stack" aria-label="Explanation">
       <h2>Explanation</h2>
       {notes.length > 0 ? <p className="explain-note">{notes.join(' ')}</p> : null}
       <div className="explain-grid">
@@ -114,7 +114,7 @@ export function BillExplanation({ congress, type, number, title }: BillExplanati
             </button>
           ) : null}
         </article>
-        {aiParts.map(([heading, body]) => (
+        {aiParts.map(([heading, body]) => body === null ? null : (
           <article className="explain-part" key={heading}>
             <div className="explain-part__head">
               <h3>{heading}</h3>

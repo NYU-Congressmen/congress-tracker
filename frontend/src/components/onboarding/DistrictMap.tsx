@@ -15,6 +15,30 @@ interface DistrictMapProps {
 }
 
 type View = [number, number, number, number]
+type Point = [number, number]
+type PointerPosition = { clientX: number; clientY: number }
+
+const MIN_VIEW_WIDTH = 0.02
+const WHEEL_SENSITIVITY = 0.003
+const PINCH_SENSITIVITY = 1.45
+
+// Describe the two contacts in screen coordinates.
+function pinchBetween(first: PointerPosition, second: PointerPosition) {
+  return {
+    distance: Math.max(1, Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY)),
+    midpoint: {
+      clientX: (first.clientX + second.clientX) / 2,
+      clientY: (first.clientY + second.clientY) / 2,
+    },
+  }
+}
+
+// Scale the view around the anchor and place it under the current gesture position.
+function scaleView([x, y, w, h]: View, factor: number, maxWidth: number, anchor: Point, position = anchor): View {
+  const nextWidth = Math.min(Math.max(w * factor, MIN_VIEW_WIDTH), maxWidth)
+  const scale = nextWidth / w
+  return [anchor[0] - (position[0] - x) * scale, anchor[1] - (position[1] - y) * scale, nextWidth, h * scale]
+}
 
 // Read the district number a feature carries, whatever the property name is.
 function districtOf(feature: GeoFeature): number | null {
@@ -92,8 +116,7 @@ function geometryFor(feature: GeoFeature, project: (lng: number, lat: number) =>
   return data
 }
 
-// The state's districts as an SVG: drag to pan, the wheel or a double-click
-// to zoom, and click a district to pick it.
+// Show the state's districts on a pannable, zoomable map.
 //
 // Coordinates are equirectangular with north up: latitude is flipped (SVG y
 // grows downward, latitude grows upward) and longitude is scaled by the
@@ -119,51 +142,46 @@ export function DistrictMap({ features, state, selected, onSelect }: DistrictMap
   }, [bounds, kx])
 
   const initial = useMemo<View>(() => {
-    const [bx, by, bw, bh] = fullBounds
+    // Open on the main Hawaiian islands. Zooming out still shows the full district.
+    const [bx, by, bw, bh] = state === 'HI' ? [-161 * kx, -22.7, 6.5 * kx, 4.2] : fullBounds
     const padX = bw * 0.06
     const padY = bh * 0.06
     return [bx - padX, by - padY, bw + padX * 2, bh + padY * 2]
-  }, [fullBounds])
+  }, [fullBounds, kx, state])
 
   const [view, setView] = useState<View>(initial)
   const dragging = useRef<{ startX: number; startY: number; origin: [number, number]; moved: boolean } | null>(null)
+  const pointers = useRef(new Map<number, PointerPosition>())
+  const pinch = useRef<{ view: View; distance: number; anchor: Point } | null>(null)
+  const trackpadPinch = useRef<{ view: View; anchor: Point } | null>(null)
   // The district under the pointer at press time. Pointer capture retargets
   // the release (and the derived click) to the svg, so selection is decided
   // here on pointer-up instead of in a click handler on the path.
   const pressedDistrict = useRef<number | null>(null)
   const surface = useRef<SVGSVGElement | null>(null)
 
-  const MIN_ZOOM = 0.02
-  const MAX_ZOOM = fullBounds[2] * 1.05
+  const maxWidth = Math.max(initial[2], fullBounds[2] * 1.12)
 
   const zoomAt = useCallback(
-    (factor: number, point: [number, number] | null) => {
-      setView(([x, y, w, h]) => {
-        const nextWidth = Math.min(Math.max(w * factor, MIN_ZOOM), MAX_ZOOM)
-        const scale = nextWidth / w
-        const nextHeight = h * scale
-        const anchor = point ?? [x + w / 2, y + h / 2]
-        return [
-          anchor[0] - (anchor[0] - x) * scale,
-          anchor[1] - (anchor[1] - y) * scale,
-          nextWidth,
-          nextHeight,
-        ]
+    (factor: number, point: Point | null) => {
+      setView((current) => {
+        const [x, y, w, h] = current
+        return scaleView(current, factor, maxWidth, point ?? [x + w / 2, y + h / 2])
       })
     },
-    [MAX_ZOOM],
+    [maxWidth],
   )
 
   // Convert a pointer position to map coordinates, so the zoom stays under the cursor.
   const pointFromEvent = useCallback(
-    (event: { clientX: number; clientY: number }): [number, number] | null => {
+    (event: PointerPosition, box: View = view): Point | null => {
       const svg = surface.current
-      if (!svg) return null
+      if (!svg || !Number.isFinite(event.clientX) || !Number.isFinite(event.clientY)) return null
       const rect = svg.getBoundingClientRect()
       if (rect.width === 0 || rect.height === 0) return null
       // The viewBox keeps the map's aspect ratio centered, so map the visible
       // box proportionally inside the element.
-      const [x, y, w, h] = view
+      const [x, y, w, h] = box
       const aspect = w / h
       const elementAspect = rect.width / rect.height
       let mapWidth = w
@@ -190,40 +208,102 @@ export function DistrictMap({ features, state, selected, onSelect }: DistrictMap
     if (!svg) return
     const onWheel = (event: WheelEvent) => {
       event.preventDefault()
-      zoomAt(event.deltaY > 0 ? 1.25 : 0.8, pointFromEvent(event))
+      if (trackpadPinch.current) return
+      const units = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? svg.clientHeight : 1
+      const delta = Math.max(-80, Math.min(80, event.deltaY * units))
+      const sensitivity = event.ctrlKey ? WHEEL_SENSITIVITY * PINCH_SENSITIVITY : WHEEL_SENSITIVITY
+      if (delta) zoomAt(Math.exp(delta * sensitivity), pointFromEvent(event))
     }
     svg.addEventListener('wheel', onWheel, { passive: false })
     return () => svg.removeEventListener('wheel', onWheel)
   }, [zoomAt, pointFromEvent])
 
+  useEffect(() => {
+    const svg = surface.current
+    if (!svg) return
+
+    // Safari can report a trackpad pinch as a gesture without touch pointers.
+    const start = (event: Event) => {
+      if (pointers.current.size) return
+      event.preventDefault()
+      const [x, y, w, h] = view
+      const anchor = pointFromEvent(event as MouseEvent) ?? [x + w / 2, y + h / 2]
+      trackpadPinch.current = { view, anchor }
+    }
+    const change = (event: Event) => {
+      const gesture = trackpadPinch.current
+      if (!gesture || pointers.current.size) return
+      event.preventDefault()
+      const { scale } = event as Event & { scale: number }
+      if (scale > 0) setView(scaleView(gesture.view, scale ** -PINCH_SENSITIVITY, maxWidth, gesture.anchor))
+    }
+    const end = () => { trackpadPinch.current = null }
+    svg.addEventListener('gesturestart', start, { passive: false })
+    svg.addEventListener('gesturechange', change, { passive: false })
+    svg.addEventListener('gestureend', end)
+    return () => {
+      svg.removeEventListener('gesturestart', start)
+      svg.removeEventListener('gesturechange', change)
+      svg.removeEventListener('gestureend', end)
+    }
+  }, [view, maxWidth, pointFromEvent])
+
   const onPointerDown = (event: React.PointerEvent<SVGSVGElement>) => {
-    if (event.button !== 0) return
+    const active = pointers.current
+    if (event.button !== 0 || active.size >= 2 || (active.size && event.pointerType !== 'touch')) return
+    active.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY })
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+
+    if (active.size === 2) {
+      const [first, second] = active.values()
+      const { distance, midpoint } = pinchBetween(first, second)
+      const anchor = pointFromEvent(midpoint)
+      pinch.current = anchor ? { view, distance, anchor } : null
+      // A second contact turns the press into a gesture and clears the pending selection.
+      dragging.current = null
+      pressedDistrict.current = null
+      return
+    }
+
     const target = event.target as Element | null | undefined
     const holder = target?.closest?.('[data-district]') ?? null
     pressedDistrict.current = holder ? Number(holder.getAttribute('data-district')) : null
-    // Keep the capture: it makes panning reliable when the pointer leaves
-    // the map mid-drag. (It also retargets the release to the svg, which is
-    // why selection is handled on pointer-up above.)
-    event.currentTarget.setPointerCapture?.(event.pointerId)
     dragging.current = { startX: event.clientX, startY: event.clientY, origin: [view[0], view[1]], moved: false }
   }
 
   const onPointerMove = (event: React.PointerEvent<SVGSVGElement>) => {
+    const active = pointers.current
+    if (!active.has(event.pointerId)) return
+    active.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY })
+    const gesture = pinch.current
+    if (gesture && active.size === 2) {
+      const [first, second] = active.values()
+      const { distance, midpoint } = pinchBetween(first, second)
+      const position = pointFromEvent(midpoint, gesture.view)
+      if (position) {
+        const factor = (gesture.distance / distance) ** PINCH_SENSITIVITY
+        setView(scaleView(gesture.view, factor, maxWidth, gesture.anchor, position))
+      }
+      return
+    }
+
     const drag = dragging.current
     if (!drag) return
     const svg = surface.current
     if (!svg) return
     const rect = svg.getBoundingClientRect()
-    if (rect.width === 0) return
-    const dx = ((event.clientX - drag.startX) / rect.width) * view[2]
-    const dy = ((event.clientY - drag.startY) / rect.height) * view[3]
-    if (Math.abs(event.clientX - drag.startX) + Math.abs(event.clientY - drag.startY) > 5) {
-      drag.moved = true
-    }
-    setView([drag.origin[0] - dx, drag.origin[1] - dy, view[2], view[3]])
+    if (rect.width === 0 || rect.height === 0) return
+    const dx = event.clientX - drag.startX
+    const dy = event.clientY - drag.startY
+    if (!drag.moved && Math.hypot(dx, dy) <= 5) return
+    drag.moved = true
+    const unitsPerPixel = Math.max(view[2] / rect.width, view[3] / rect.height)
+    setView([drag.origin[0] - dx * unitsPerPixel, drag.origin[1] - dy * unitsPerPixel, view[2], view[3]])
   }
 
   const onPointerUp = (event: React.PointerEvent<SVGSVGElement>) => {
+    if (!pointers.current.delete(event.pointerId)) return
+    pinch.current = null
     const moved = dragging.current?.moved ?? false
     dragging.current = null
     const district = pressedDistrict.current
@@ -252,14 +332,15 @@ export function DistrictMap({ features, state, selected, onSelect }: DistrictMap
           viewBox={`${x} ${y} ${w} ${view[3]}`}
           preserveAspectRatio="xMidYMid meet"
           role="group"
-          aria-label="District map. Drag to pan, scroll or double-click to zoom, click a district to select it."
+          aria-label="District map. Drag to pan, pinch or scroll to zoom, and tap a district to choose it."
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
+          onLostPointerCapture={onPointerUp}
           onDoubleClick={(event) => {
             event.preventDefault()
-            zoomAt(0.6, pointFromEvent(event))
+            zoomAt(0.85, pointFromEvent(event))
           }}
         >
           {features.features.map((feature, index) => {
@@ -314,9 +395,6 @@ export function DistrictMap({ features, state, selected, onSelect }: DistrictMap
           })}
         </svg>
       </div>
-      <p className="district-map__hint">
-        Drag to pan · scroll or double-click to zoom · click a district to choose it
-      </p>
     </div>
   )
 }

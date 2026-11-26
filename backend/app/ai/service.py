@@ -15,7 +15,7 @@ from app.db import connect
 LLM_TIMEOUT = 60.0
 
 # Dollars per million input and output tokens. Models not listed log their tokens with no cost.
-PRICES = {"gpt-6-luna": (0.10, 0.50)}
+PRICES = {"gpt-6-luna": (0.10, 0.50), "text-embedding-3-small": (0.02, 0.0)}
 
 # Reasoning effort per model. At none, gpt-6-luna answers in 2 to 4 seconds instead of 5 to 15, and
 # with the bill's stage given it explained bills at five stages as accurately as at its default.
@@ -30,9 +30,15 @@ SAVE_RESULT_SQL = """
 
 LOG_CALL_SQL = """
     INSERT INTO ai_calls (feature, bill_id, model, input_tokens, output_tokens, cost_usd, seconds,
-                          succeeded, error)
+                          succeeded, error, uid)
     VALUES (%(feature)s, %(bill_id)s, %(model)s, %(input_tokens)s, %(output_tokens)s, %(cost)s,
-            %(seconds)s, %(succeeded)s, %(error)s)
+            %(seconds)s, %(succeeded)s, %(error)s, %(uid)s)
+"""
+
+FINISH_CALL_SQL = """
+    UPDATE ai_calls SET input_tokens = %(input_tokens)s, output_tokens = %(output_tokens)s,
+        cost_usd = %(cost)s, seconds = %(seconds)s, succeeded = %(succeeded)s, error = %(error)s
+    WHERE call_id = %(reservation_id)s
 """
 
 
@@ -75,9 +81,12 @@ def cache_key(feature: str, prompt_version: str, model: str, messages: list[dict
     return hashlib.sha256(payload.encode()).hexdigest()
 
 
-def log_call(conn, call: dict) -> None:
-    """Add one real model call to the log."""
-    conn.execute(LOG_CALL_SQL, call)
+def log_call(conn, call: dict, reservation_id: int | None = None) -> None:
+    """Record a model call or finalize its reserved log entry."""
+    if reservation_id is None:
+        conn.execute(LOG_CALL_SQL, {"uid": None, **call})
+    else:
+        conn.execute(FINISH_CALL_SQL, {**call, "reservation_id": reservation_id})
 
 
 def ask[Result: BaseModel](
@@ -87,10 +96,13 @@ def ask[Result: BaseModel](
     messages: list[dict],
     schema: type[Result],
     client: OpenAI | None = None,
+    *,
+    reservation_id: int | None = None,
 ) -> AiAnswer[Result]:
     """Return a structured answer from the cache, or from the model when it is not cached.
 
     A failed call is logged and raised, and never cached, so the next request tries again.
+    A reserved entry already identifies the reader and counts toward their quota.
     """
     model = settings.llm_model
     if not model:
@@ -100,6 +112,8 @@ def ask[Result: BaseModel](
         row = conn.execute(
             "UPDATE ai_results SET hits = hits + 1 WHERE cache_key = %s RETURNING result", (key,)
         ).fetchone()
+        if row is not None and reservation_id is not None:
+            conn.execute("DELETE FROM ai_calls WHERE call_id = %s", (reservation_id,))
     if row is not None:
         return AiAnswer(schema.model_validate(row["result"]), cached=True, model=model)
 
@@ -126,6 +140,7 @@ def ask[Result: BaseModel](
                     "succeeded": False,
                     "error": type(error).__name__,
                 },
+                reservation_id,
             )
         raise
 
@@ -157,5 +172,6 @@ def ask[Result: BaseModel](
                 "succeeded": True,
                 "error": None,
             },
+            reservation_id,
         )
     return AiAnswer(value, False, model, input_tokens, output_tokens, cost)

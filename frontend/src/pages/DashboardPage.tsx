@@ -16,6 +16,7 @@ import { billNumber, billTypeShort, formatShortDate } from '../lib/format'
 import { loadStageCounts, totalOf } from '../lib/stageCounts'
 import { countByChamber } from '../lib/stats'
 import { useProfile } from '../profile/ProfileContext'
+import { useSession } from '../auth/SessionContext'
 
 // Keyword shortcuts under the search box. They run an ordinary title search.
 const TOPICS: { label: string; q: string }[] = [
@@ -102,7 +103,8 @@ export default function DashboardPage() {
 
   // The signed-in person's district and topics drive the personalized
   // panels, which sit between "At a glance" and "Latest activity".
-  const { profile } = useProfile()
+  const { profile, loading: profileLoading } = useProfile()
+  const { user } = useSession()
   const district = profile?.district ?? null
   const topics = profile?.topics ?? []
 
@@ -112,7 +114,7 @@ export default function DashboardPage() {
         <div className="home__hero">
           <div className="home__intro">
             <h1 id="home-title" className="home__title">
-              What's Congress up to?
+              Congress in progress
             </h1>
             <p className="home__lede">
               {total !== null ? `${total.toLocaleString()} bills` : 'Every bill'} in the {CONGRESS_NUMBER}th Congress,
@@ -126,7 +128,7 @@ export default function DashboardPage() {
               <input
                 id="home-search"
                 type="search"
-                placeholder="Search a bill or topic, like student loans"
+                placeholder="Bill title or number"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
               />
@@ -134,8 +136,7 @@ export default function DashboardPage() {
                 Search
               </button>
             </form>
-            <ul className="home__topics" aria-label="Try a topic">
-              <li aria-hidden="true">Try</li>
+            <ul className="home__topics" aria-label="Suggested topics">
               {TOPICS.map((topic) => (
                 <li key={topic.q}>
                   <Link to={`/bills?q=${encodeURIComponent(topic.q)}`} className="chip">
@@ -157,9 +158,7 @@ export default function DashboardPage() {
                 </span>
                 <div className="state__body">
                   <h3>Live data unavailable</h3>
-                  <p>
-                    {latestError.message} Start the backend with <code>npm run dev</code> to see bills and members.
-                  </p>
+                  <p>Bill updates could not be loaded.</p>
                 </div>
                 <button type="button" className="btn btn--secondary" onClick={refetch}>
                   Try again
@@ -180,14 +179,13 @@ export default function DashboardPage() {
               </>
             ) : (
               <EmptyState
-                title="No bills in the database yet"
-                hint="Run the list sync with `npm run sync` to fill the database, or check the About page for API status."
+                title="No bills available"
               />
             )}
           </section>
         </div>
 
-        <ul className="home__key" aria-label="What the dot colors mean">
+        <ul className="home__key" aria-label="Bill stages by dot color">
           {DOT_KEY.map((item) => (
             <li key={item.token}>
               <i style={{ background: `var(${item.token})` }} aria-hidden="true" />
@@ -202,7 +200,7 @@ export default function DashboardPage() {
           <div className="home__grid">
             <section className="card" aria-labelledby="stages-title">
               <div className="card__head">
-                <h2 id="stages-title">Where bills are at</h2>
+                <h2 id="stages-title">Stage</h2>
                 <Link to="/bills" className="more">
                   See all bills
                 </Link>
@@ -228,13 +226,14 @@ export default function DashboardPage() {
             </section>
 
             <section className="card" aria-labelledby="chambers-title">
-              <div className="card__head">
-                <h2 id="chambers-title">Who's in Congress</h2>
-                <Link to="/members" className="more">
-                  All members
-                </Link>
-              </div>
-              {chambers ? <ChamberComposition counts={chambers} /> : <LoadingState message="Counting current members…" />}
+              {chambers ? (
+                <ChamberComposition counts={chambers} />
+              ) : (
+                <>
+                  <div className="composition-toolbar"><h2 id="chambers-title">Seats</h2></div>
+                  <LoadingState message="Counting current members…" />
+                </>
+              )}
             </section>
           </div>
 
@@ -242,27 +241,31 @@ export default function DashboardPage() {
               topics; without a profile, one card invites them to set it up. */}
           {district ? (
             <div className="home__mine">
-              <section className="card" aria-label="Your district">
+              <section className="card panel--stack" aria-label="Your district">
                 <DistrictBills state={district.state} district={district.district} />
               </section>
-              <section className="card" aria-label="Topics you follow">
+              <section className="card panel--stack" aria-label="Topics you follow">
                 <TopicFeed topicIds={topics} />
               </section>
             </div>
           ) : (
             <section className="card home__setup" aria-labelledby="setup-title">
               <div>
-                <h2 id="setup-title">Make this dashboard yours</h2>
+                <h2 id="setup-title">Your district in Congress</h2>
                 <p>
-                  Pick your congressional district and Pull follows your representatives and the bills that concern
-                  your district, plus the topics you choose to track.
+                  Start with the bills your representatives have sponsored. Add topics to follow legislation across Congress.
                 </p>
               </div>
-              <Link to="/onboarding" className="btn btn--ink">
-                Set up my profile
+              <Link to={user && profile ? '/profile?section=district' : '/onboarding'} className="btn btn--ink">
+                {user && profile ? 'Set up my district' : 'Set up my profile'}
               </Link>
             </section>
           )}
+          {user && !district && !profileLoading ? (
+            <section className="card panel--stack" aria-label="Topics you follow">
+              <TopicFeed topicIds={topics} />
+            </section>
+          ) : null}
         </div>
       )}
     </div>

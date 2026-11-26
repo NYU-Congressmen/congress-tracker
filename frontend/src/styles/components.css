@@ -109,12 +109,23 @@ a.chip:hover {
   font-weight: 800;
 }
 
-.panel h2:not(.panel__heading-row h2) {
+.panel:not(.panel--stack) h2:not(.panel__heading-row h2) {
   margin-bottom: 12px;
 }
 
-.panel p + p {
+.panel:not(.panel--stack) p + p {
   margin-top: 10px;
+}
+
+.panel--stack {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 16px;
+}
+
+.panel--stack > :is(.panel__heading-row, .card__head, .card__title, .cache-notice, .form-error) {
+  margin-block: 0;
 }
 
 .panel__count,
@@ -150,7 +161,7 @@ a.chip:hover {
   text-decoration: underline;
 }
 
-/* party badge: color plus a letter, never color alone */
+/* Use a party outline when available and a text abbreviation for other affiliations. */
 .pb {
   display: inline-grid;
   place-items: center;
@@ -174,6 +185,31 @@ a.chip:hover {
 
 .pb--i {
   background: var(--i);
+}
+
+.pb--neutral {
+  width: max-content;
+  min-width: 18px;
+  max-width: 70px;
+  padding-inline: 3px;
+  background: var(--ink-2);
+  color: var(--card);
+  overflow: hidden;
+}
+
+.pb--icon {
+  min-width: 21px;
+  min-height: 21px;
+  color: #fff;
+}
+
+.pb__icon {
+  width: 92%;
+  height: 84%;
+  background: currentColor;
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: 100% 100%;
 }
 
 /* six fixed-size cells, filled up to the bill's stage */
@@ -343,7 +379,7 @@ a.chip:hover {
 
 .field {
   display: grid;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -368,6 +404,29 @@ a.chip:hover {
 
 .field__control::placeholder {
   color: var(--ink-3);
+}
+
+.field:has(> select.field__control) {
+  position: relative;
+}
+
+select.field__control {
+  appearance: none;
+  height: 44px;
+  padding-inline-end: 32px;
+}
+
+.field:has(> select.field__control)::after {
+  content: '';
+  position: absolute;
+  inset-inline-end: 14px;
+  bottom: 20px;
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid var(--ink-2);
+  border-bottom: 2px solid var(--ink-2);
+  transform: rotate(45deg);
+  pointer-events: none;
 }
 
 .filters__keyword {
@@ -606,8 +665,9 @@ a.chip:hover {
   position: relative;
   display: grid;
   place-items: center;
-  width: 52px;
-  height: 52px;
+  inline-size: var(--avatar-size, 52px);
+  block-size: var(--avatar-size, 52px);
+  aspect-ratio: 1;
   border-radius: 50%;
   background: var(--s2);
   color: var(--ink);
@@ -617,6 +677,8 @@ a.chip:hover {
 }
 
 .avatar img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   border-radius: 50%;

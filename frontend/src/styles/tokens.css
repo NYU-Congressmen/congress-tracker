@@ -54,11 +54,12 @@
   --d5: #9c8a6c;
   --d6: var(--hl);
   --d6-ring: rgba(15, 23, 42, 0.35);
-  --band-mask: linear-gradient(to bottom, #000 66%, transparent 100%);
 
-  /* Party colors always travel with a letter, never alone. */
-  --r: #d1453b;
-  --d: #2f5fb3;
+  /* Pair party colors with a label or symbol. */
+  --r: #660000;
+  --d: #000066;
+  --r-edge: transparent;
+  --d-edge: transparent;
   --i: #7b8190;
 
   --error-bg: #fdecea;
@@ -109,8 +110,10 @@
     --d4: #5a4b25;
     --d5: #6b5a3d;
     --d6-ring: transparent;
-    --r: #ff7b72;
-    --d: #86a8ef;
+    --r-edge: #b37580;
+    --d-edge: #777cb3;
+    --r-seat: #cf485b;
+    --d-seat: #5166e0;
     --i: #a3a8b2;
     --error-bg: #2a1614;
     --error-ink: #ffb4ab;
@@ -158,8 +161,10 @@
   --d4: #5a4b25;
   --d5: #6b5a3d;
   --d6-ring: transparent;
-  --r: #ff7b72;
-  --d: #86a8ef;
+  --r-edge: #b37580;
+  --d-edge: #777cb3;
+  --r-seat: #cf485b;
+  --d-seat: #5166e0;
   --i: #a3a8b2;
   --error-bg: #2a1614;
   --error-ink: #ffb4ab;

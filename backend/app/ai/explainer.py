@@ -10,7 +10,6 @@ from openai import OpenAI
 from pydantic import BaseModel, Field
 
 from app.ai.service import ask
-from app.config import settings
 from app.db import fetch_one
 from app.sync.bills import make_bill_id
 from app.sync.client import CongressClient
@@ -292,18 +291,14 @@ def source_label(from_summary: bool, version: str | None) -> str:
 
 
 def stored_explanation(bill_id: str) -> ExplainResult | None:
-    """Return the bill's most recent saved explanation, or None when it has never been explained.
-
-    The page shows it when Congress.gov or the model cannot be reached, so a bill explained once
-    stays readable during an outage.
-    """
+    """Return the latest saved explanation from the current prompt, with its recorded model."""
     row = fetch_one(
         """
-        SELECT result FROM ai_results
-        WHERE feature = %s AND bill_id = %s AND prompt_version = %s AND model = %s
-        ORDER BY created_at DESC LIMIT 1
+        SELECT result, model FROM ai_results
+        WHERE feature = %s AND bill_id = %s AND prompt_version = %s
+        ORDER BY created_at DESC, cache_key DESC LIMIT 1
         """,
-        (FEATURE, bill_id, PROMPT_VERSION, settings.llm_model),
+        (FEATURE, bill_id, PROMPT_VERSION),
     )
     if row is None:
         return None
@@ -319,7 +314,7 @@ def stored_explanation(bill_id: str) -> ExplainResult | None:
         explanation=Explanation.model_validate(parts),
         source=source_label(from_summary, version),
         from_summary=from_summary,
-        model=settings.llm_model,
+        model=row["model"],
         cached=True,
         input_tokens=0,
         output_tokens=0,

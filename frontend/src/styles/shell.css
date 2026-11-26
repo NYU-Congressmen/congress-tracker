@@ -29,16 +29,18 @@
 }
 
 .site-header__bar {
-  display: flex;
+  display: grid;
   align-items: center;
-  justify-content: space-between;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: 'brand nav actions';
   gap: 10px 18px;
-  flex-wrap: wrap;
   padding: 8px 10px 8px 16px;
   border-radius: 18px;
 }
 
 .brand {
+  grid-area: brand;
+  justify-self: start;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -57,13 +59,15 @@
   color: var(--ink-3);
   padding-left: 10px;
   border-left: 1px solid var(--line);
+  white-space: nowrap;
 }
 
 .site-nav {
+  grid-area: nav;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
-  flex-wrap: wrap;
 }
 
 .site-nav__link {
@@ -73,6 +77,7 @@
   font-weight: 700;
   font-size: 14.5px;
   color: var(--ink-2);
+  white-space: nowrap;
 }
 
 .site-nav__link:hover {
@@ -85,43 +90,115 @@
   color: var(--btn-ink);
 }
 
-.theme-toggle {
-  width: 40px;
-  height: 40px;
-  border-radius: 999px;
-  display: grid;
-  place-items: center;
-  background: transparent;
-  color: var(--ink);
+.theme-control {
+  display: flex;
+  align-items: center;
   border: 1px solid var(--line);
-  cursor: pointer;
-  margin-left: 4px;
+  border-radius: 999px;
 }
 
-.theme-toggle:hover {
+.theme-toggle,
+.theme-options > summary {
+  height: 40px;
+  display: grid;
+  place-items: center;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.theme-toggle {
+  width: 40px;
+  border: 0;
+  border-radius: 999px 0 0 999px;
+  background: transparent;
+}
+
+.theme-options {
+  position: relative;
+}
+
+.theme-options > summary {
+  width: 30px;
+  border-left: 1px solid var(--line);
+  border-radius: 0 999px 999px 0;
+  list-style: none;
+}
+
+.theme-options > summary::-webkit-details-marker {
+  display: none;
+}
+
+.theme-toggle:hover,
+.theme-options > summary:hover,
+.theme-options[open] > summary {
   background: var(--line);
 }
 
-/* the dot band: every page opens on it, and it fades into the page */
+.theme-options__arrow {
+  transform: rotate(90deg);
+}
+
+.theme-options[open] .theme-options__arrow {
+  transform: rotate(-90deg);
+}
+
+.theme-options__panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  box-shadow: var(--shadow);
+  white-space: nowrap;
+}
+
 .band {
+  --mosaic-offset: 12px;
+  --mosaic-max-height: 420px;
   position: relative;
-  overflow: hidden;
   padding-top: 100px;
 }
 
-.band__dots {
+/* Limit the dot field independently of the content so wrapping does not extend the fade. */
+.band__mosaic {
   position: absolute;
-  inset: 0;
+  inset: var(--mosaic-offset) 0 auto;
+  height: min(calc(100% - var(--mosaic-offset)), var(--mosaic-max-height));
+  pointer-events: none;
+}
+
+.band__dots {
+  display: block;
   width: 100%;
   height: 100%;
-  -webkit-mask-image: var(--band-mask);
-  mask-image: var(--band-mask);
-  pointer-events: none;
+}
+
+/* Overlay the canvas so the headings and controls stay solid. */
+.band__mosaic::before,
+.band__mosaic::after {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  z-index: 1;
+}
+
+.band__mosaic::before {
+  top: 0;
+  height: 32px;
+  background: linear-gradient(to bottom, var(--bg), transparent);
+}
+
+.band__mosaic::after {
+  bottom: 0;
+  height: 34%;
+  background: linear-gradient(to top, var(--bg), transparent);
 }
 
 .band__in {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   padding-bottom: 64px;
 }
 
@@ -161,7 +238,6 @@
   font-weight: 600;
   color: var(--ink-2);
   max-width: 52ch;
-  text-shadow: 0 1px 10px var(--bg), 0 0 2px var(--bg);
 }
 
 /* footer */
@@ -274,12 +350,26 @@
   }
 }
 
+@media (max-width: 1120px) {
+  .site-header__bar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'brand actions' 'nav nav';
+  }
+  .brand__tag {
+    display: none;
+  }
+  .band {
+    --mosaic-offset: -24px;
+    --mosaic-max-height: 376px;
+  }
+}
+
 @media (max-width: 640px) {
-  .brand__tag,
-  .site-nav__link {
+  .site-nav {
     display: none;
   }
   .site-header__bar {
+    grid-template-areas: 'brand actions';
     padding: 8px;
   }
   .tabbar {
@@ -289,6 +379,8 @@
     padding-bottom: 64px;
   }
   .band {
+    --mosaic-offset: 12px;
+    --mosaic-max-height: 288px;
     padding-top: 92px;
   }
   .band__in {

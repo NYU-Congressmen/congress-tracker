@@ -29,7 +29,13 @@ def signed_in(db):
 
 def test_a_second_review_replaces_the_first(signed_in):
     first = signed_in.put(
-        URL, json={"stance": "support", "story": "My clinic closed.", "consent_to_share": True}
+        URL,
+        json={
+            "stance": "support",
+            "story": "My clinic closed.",
+            "consent_to_share": True,
+            "share_publicly": True,
+        },
     ).json()
     second = signed_in.put(URL, json={"stance": "oppose", "action_taken": "Called my senator"})
     assert second.status_code == 200
@@ -39,11 +45,44 @@ def test_a_second_review_replaces_the_first(signed_in):
     # PUT replaces the whole review, so fields left out go back to their defaults
     assert body["story"] is None
     assert body["consent_to_share"] is False
+    assert body["share_publicly"] is False
     assert body["created_at"] == first["created_at"]
     assert datetime.fromisoformat(body["updated_at"]) > datetime.fromisoformat(first["updated_at"])
     with psycopg.connect(TEST_DATABASE_URL) as conn:
         assert conn.execute("SELECT count(*) FROM reviews").fetchone()[0] == 1
     assert signed_in.get(URL).json()["stance"] == "oppose"
+
+
+def test_quick_stance_keeps_review_text_visibility_and_consent(signed_in):
+    created = signed_in.put(
+        URL,
+        json={
+            "stance": "support",
+            "story": "My clinic closed.",
+            "action_taken": "Called my representative.",
+            "consent_to_share": True,
+            "share_publicly": True,
+        },
+    ).json()
+    assert signed_in.put(f"{URL}/visibility", json={"hidden": True}).status_code == 200
+    changed = signed_in.put(f"{URL}/stance", json={"stance": "oppose"})
+    assert changed.status_code == 200
+    body = changed.json()
+    assert body["stance"] == "oppose"
+    assert body["hidden"] is True
+    for key in ("story", "action_taken", "consent_to_share", "share_publicly", "created_at"):
+        assert body[key] == created[key]
+    assert signed_in.put(f"{URL}/stance", json={"stance": "oppose"}).json() == body
+    assert signed_in.get(URL).json() == body
+
+
+def test_quick_stance_creates_a_review_with_default_sharing(signed_in):
+    response = signed_in.put(f"{URL}/stance", json={"stance": "unsure"})
+    assert response.status_code == 200
+    assert response.json()["stance"] == "unsure"
+    assert response.json()["story"] is None
+    assert response.json()["consent_to_share"] is False
+    assert response.json()["share_publicly"] is False
 
 
 def test_an_unknown_stance_is_rejected(signed_in):
@@ -66,6 +105,7 @@ def test_reviews_need_sign_in(db):
     client = TestClient(app)
     assert client.put(URL, json={"stance": "support"}).status_code == 401
     assert client.get(URL).status_code == 401
+    assert client.put(f"{URL}/stance", json={"stance": "support"}).status_code == 401
 
 
 def test_blank_text_is_stored_as_no_text(signed_in):

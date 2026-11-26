@@ -72,15 +72,29 @@ export interface BillAction {
 }
 
 // Describe a bill with its cached sponsor, action history and freshness.
-// Co-sponsors are optional: the backend records them once Congress.gov
-// reports them, and the bill page shows the section either way.
 export interface BillDetail extends BillSummary {
   policy_area: string | null
   sponsor_id: string | null
   sponsor: Member | null
-  co_sponsors?: Member[]
   actions: BillAction[]
   cache: CacheInfo
+}
+
+export interface Cosponsor {
+  bioguide_id: string
+  name: string
+  party: string | null
+  state: string | null
+  district: number | null
+  withdrawn_date: string | null
+}
+
+// Read the cosponsors and cache status from the bill's legislative relationships.
+export function getBillGraph(congress: number, type: BillType, number: number): Promise<{
+  cosponsors: Cosponsor[]
+  cache: CacheInfo
+}> {
+  return request(`/api/bills/${congress}/${type}/${number}/graph`)
 }
 
 export interface BillSearchParams {
@@ -118,18 +132,18 @@ export function getBill(congress: number, type: BillType, number: number): Promi
 export interface BillExplanation {
   bill_id: string
   does: string
-  does_not: string
-  stands: string
-  decides: string
+  does_not: string | null
+  stands: string | null
+  decides: string | null
   does_source: 'crs_summary' | 'ai'
   source: string
-  model: string
+  model: string | null
   cached: boolean
   missing: string[]
   from_stored: boolean
 }
 
-// Return a bill's plain-language explanation, which the backend writes on the first request.
+// Return a bill's saved explanation or official summary.
 export function getExplanation(
   congress: number,
   type: BillType,

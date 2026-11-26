@@ -4,14 +4,14 @@ import { SiteHeader } from './SiteHeader'
 import { SiteFooter } from './SiteFooter'
 import { TabBar } from './TabBar'
 
-// Return to the top of the page whenever the route changes. The scrollY
-// check keeps the call a no-op at the top of the page and in test
-// environments that do not implement scrolling.
-function ScrollToTop() {
-  const { pathname } = useLocation()
+// Scroll to the linked section or the top of the new page.
+function RouteScroll() {
+  const { pathname, hash } = useLocation()
   useEffect(() => {
-    if (window.scrollY > 0) window.scrollTo(0, 0)
-  }, [pathname])
+    const target = hash ? document.getElementById(hash.slice(1)) : null
+    if (target) target.scrollIntoView?.()
+    else if (window.scrollY > 0) window.scrollTo(0, 0)
+  }, [pathname, hash])
   return null
 }
 
@@ -21,7 +21,7 @@ function ScrollToTop() {
 export function Layout() {
   return (
     <div className="site-shell">
-      <ScrollToTop />
+      <RouteScroll />
       <a className="skip-link" href="#main">
         Skip to main content
       </a>

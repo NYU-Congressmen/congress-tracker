@@ -44,7 +44,35 @@ def test_refresh_budget_limits_each_request_and_ends_a_stalled_one():
     with CongressClient("test", transport=httpx.MockTransport(stall), budget=0.05) as client:
         with pytest.raises(httpx.TimeoutException):
             client.get("/bill")
+    assert len(timeouts) == 1
     assert 0 < timeouts[0] <= 0.05
+
+
+@pytest.mark.parametrize("failures", [2, 3])
+def test_batch_sync_retries_the_same_page_after_a_read_timeout(failures):
+    requests = []
+
+    def slow_summary(request: httpx.Request) -> httpx.Response:
+        requests.append(request.url)
+        if len(requests) <= failures:
+            raise httpx.ReadTimeout("stalled", request=request)
+        return httpx.Response(200, json={"summaries": [{"versionCode": "00"}]})
+
+    with CongressClient(
+        "test-key", transport=httpx.MockTransport(slow_summary), retry_read_timeouts=True
+    ) as client:
+        if failures == 3:
+            with pytest.raises(httpx.ReadTimeout):
+                client.get("/summaries/119", offset=250)
+        else:
+            assert client.get("/summaries/119", offset=250) == {
+                "summaries": [{"versionCode": "00"}]
+            }
+
+    assert len(requests) == 3
+    assert all(
+        url.path == "/v3/summaries/119" and url.params["offset"] == "250" for url in requests
+    )
 
 
 def test_refresh_budget_is_shared_across_pages():

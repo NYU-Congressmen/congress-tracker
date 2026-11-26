@@ -1,7 +1,11 @@
+import json
+from types import SimpleNamespace
+
 import psycopg
 import pytest
 from fastapi.testclient import TestClient
 
+from app.ai.embeddings import DIMENSIONS, backfill
 from app.main import app
 from app.routes.feed import keyword_pattern
 from tests.conftest import TEST_DATABASE_URL
@@ -91,3 +95,130 @@ def test_feed_requires_an_issue(issues):
 
 def test_keyword_pattern_escapes_special_characters():
     assert keyword_pattern(["a.b", "c"]) == r"\y(a\.b|c)\y"
+
+
+@pytest.fixture
+def saved_embeddings(issues):
+    """Provide topic IDs and clear the saved topic vectors after the test."""
+    yield issues
+    with psycopg.connect(TEST_DATABASE_URL) as conn:
+        conn.execute("DELETE FROM issue_embeddings")
+
+
+def test_backfill_ranks_the_feed_and_refreshes_a_changed_summary(saved_embeddings):
+    calls = []
+
+    def create(**request):
+        calls.append(request["input"])
+        rows = []
+        for index, text in enumerate(request["input"]):
+            if text.startswith("Housing policy") or "Rural Roads" in text:
+                values = [1.0, 0.0]
+            elif text.startswith("Affordable Housing"):
+                values = [0.8, 0.6]
+            else:
+                values = [0.0, 1.0]
+            rows.append(SimpleNamespace(index=index, embedding=values + [0.0] * (DIMENSIONS - 2)))
+        return SimpleNamespace(data=rows[::-1], usage=SimpleNamespace(prompt_tokens=100))
+
+    model = SimpleNamespace(embeddings=SimpleNamespace(create=create))
+    housing = saved_embeddings["Housing"]
+    params = {"issue_id": [housing, housing], "limit": 1}
+
+    assert backfill(model, limit_bills=2) == (len(saved_embeddings), 2)
+    assert backfill(model) == (0, 2)
+    assert len(calls) == 3
+    assert backfill(model) == (0, 0)
+    assert len(calls) == 3
+
+    first = client.get("/api/feed", params=params)
+    second = client.get("/api/feed", params={**params, "page": 2})
+    empty = client.get("/api/feed", params={**params, "page": 3})
+    assert first.json()["total"] == second.json()["total"] == empty.json()["total"] == 2
+    assert titles(first) == ["Rural Roads Act"]
+    assert titles(second) == ["Affordable Housing Act"]
+    assert titles(empty) == []
+
+    with psycopg.connect(TEST_DATABASE_URL) as conn:
+        conn.execute(
+            """
+            INSERT INTO bill_summaries (bill_id, version_code, text)
+            VALUES ('119-hr-2', '01', 'Newer summary of housing assistance near roads.')
+            """
+        )
+    stale = client.get("/api/feed", params=params)
+    stale_next = client.get("/api/feed", params={**params, "page": 2})
+    # The changed bill stays in the feed by keyword until its vector is refreshed
+    assert stale.json()["total"] == 2
+    assert titles(stale) == ["Affordable Housing Act"]
+    assert titles(stale_next) == ["Rural Roads Act"]
+
+    assert backfill(model) == (0, 1)
+    assert calls[-1] == ["Rural Roads Act\n\nNewer summary of housing assistance near roads."]
+    assert titles(client.get("/api/feed", params=params)) == ["Rural Roads Act"]
+
+
+def test_bills_without_a_vector_follow_the_ranked_ones(saved_embeddings):
+    def create(**request):
+        rows = [
+            SimpleNamespace(
+                index=index,
+                embedding=([1.0, 0.0] if "housing" in text.lower() else [0.0, 1.0])
+                + [0.0] * (DIMENSIONS - 2),
+            )
+            for index, text in enumerate(request["input"])
+        ]
+        return SimpleNamespace(data=rows, usage=SimpleNamespace(prompt_tokens=10))
+
+    model = SimpleNamespace(embeddings=SimpleNamespace(create=create))
+    params = {"issue_id": saved_embeddings["Housing"]}
+
+    # Topic vectors alone rank nothing, so every keyword match is listed
+    backfill(model, limit_bills=0)
+    assert titles(client.get("/api/feed", params=params)) == [
+        "Affordable Housing Act",
+        "Rural Roads Act",
+    ]
+
+    # A sample run embeds hr-1 and hr-2 only, and a later sync adds hr-5 with no vector
+    backfill(model, limit_bills=2)
+    with psycopg.connect(TEST_DATABASE_URL) as conn:
+        add_bill(conn, 5, "Housing Vouchers Act", "2026-10-01")
+
+    response = client.get("/api/feed", params=params)
+    assert response.json()["total"] == 3
+    assert titles(response) == ["Rural Roads Act", "Housing Vouchers Act", "Affordable Housing Act"]
+
+
+def test_feed_scores_a_changed_embedding_before_the_distance_cache_refresh(saved_embeddings):
+    housing = saved_embeddings["Housing"]
+    same = json.dumps([1.0, 0.0] + [0.0] * (DIMENSIONS - 2))
+    different = json.dumps([0.0, 1.0] + [0.0] * (DIMENSIONS - 2))
+    with psycopg.connect(TEST_DATABASE_URL) as conn:
+        conn.execute(
+            """
+            INSERT INTO issue_embeddings (issue_id, source_key, embedding)
+            SELECT issue_id, source_key, %s::vector FROM issue_embedding_inputs WHERE issue_id = %s
+            """,
+            (same, housing),
+        )
+        conn.execute(
+            """
+            INSERT INTO bill_embeddings (bill_id, source_key, embedding)
+            SELECT bill_id, source_key, %s::vector FROM bill_embedding_inputs
+            WHERE bill_id IN ('119-hr-2', '119-hr-4')
+            """,
+            (same,),
+        )
+        conn.execute("REFRESH MATERIALIZED VIEW feed_embedding_distances")
+        conn.execute("UPDATE bills SET title = 'Rural Housing Roads' WHERE bill_id = '119-hr-2'")
+        conn.execute(
+            """
+            UPDATE bill_embeddings e SET source_key = src.source_key, embedding = %s::vector
+            FROM bill_embedding_inputs src WHERE e.bill_id = src.bill_id AND e.bill_id = '119-hr-2'
+            """,
+            (different,),
+        )
+
+    response = client.get("/api/feed", params={"issue_id": housing})
+    assert titles(response) == ["Affordable Housing Act"]

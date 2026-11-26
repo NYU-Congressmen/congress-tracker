@@ -12,11 +12,18 @@ export interface TextVersion {
   downloaded: boolean
 }
 
-// Describe the line-by-line changes between two versions of a bill's text.
+// Describe the full text of one published bill version.
+export interface BillText {
+  version_type: string
+  text: string
+}
+
+// Describe the line-by-line changes and any saved summary for two versions.
 export interface BillDiff {
   from_version: string
   to_version: string
   changes: string[]
+  summary?: string | null
 }
 
 // Return a bill's text versions, oldest first, fetching the list if none is stored yet.
@@ -24,14 +31,24 @@ export function listTextVersions(congress: number, type: BillType, number: numbe
   return request<TextVersion[]>(`/api/bills/${congress}/${type}/${number}/texts`)
 }
 
-// Return the changes between two text versions, downloading either text not yet stored.
+// Return the full text of a single bill version.
+export function readTextVersion(congress: number, type: BillType, number: number, version: string): Promise<BillText> {
+  const search = new URLSearchParams({ version })
+  return request<BillText>(`/api/bills/${congress}/${type}/${number}/texts/content?${search.toString()}`)
+}
+
+// Return a public diff and request generation when the reader supplies a Firebase token.
 export function diffTextVersions(
   congress: number,
   type: BillType,
   number: number,
   from: string,
   to: string,
+  token?: string,
+  fullText = false,
 ): Promise<BillDiff> {
   const search = new URLSearchParams({ from, to })
-  return request<BillDiff>(`/api/bills/${congress}/${type}/${number}/diff?${search.toString()}`)
+  if (fullText) search.set('full_text', 'true')
+  const path = `/api/bills/${congress}/${type}/${number}/diff?${search.toString()}`
+  return request<BillDiff>(path, token ? { method: 'POST', headers: { Authorization: `Bearer ${token}` } } : undefined)
 }

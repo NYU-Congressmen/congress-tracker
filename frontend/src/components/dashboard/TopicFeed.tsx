@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom'
-import { getFeed, listIssues } from '../../api/feed'
+import { useSession } from '../../auth/SessionContext'
+import { getAccountToken } from '../../auth/accountToken'
+import { getFeed, listCustomTopics, listIssues } from '../../api/feed'
 import type { BillSummary } from '../../api/bills'
 import { useApi } from '../../hooks/useApi'
 import { BillListItem } from '../bills/BillListItem'
@@ -14,38 +16,52 @@ interface TopicFeedProps {
   topicIds: number[]
 }
 
-// The newest bills on the topics the person follows, listed in the same
-// format as "Latest activity". The topics themselves are chosen in
-// onboarding, so this panel only shows and links back.
+// Show bills on followed topics and link to the profile settings.
 export function TopicFeed({ topicIds }: TopicFeedProps) {
+  const { user } = useSession()
+  const custom = useApi(async () => user
+    ? { uid: user.uid, topics: await listCustomTopics(await getAccountToken(user)) }
+    : null, [user])
+  const customTopics = user && custom.data?.uid === user.uid ? custom.data.topics : []
+  const hasTopics = topicIds.length > 0 || customTopics.length > 0
   const { data: issues, loading: issuesLoading } = useApi(
     () => (topicIds.length > 0 ? listIssues() : Promise.resolve(null)),
     [topicIds.join(',')],
   )
 
+  // The feed reads a signed-in reader's custom topics itself, so with preset topics it starts
+  // without waiting for their names. With none, it waits to learn whether any custom topic exists.
+  const customOnly = topicIds.length === 0 && customTopics.length > 0
   const feed = useApi(
-    () => (topicIds.length > 0 ? getFeed({ issueIds: topicIds, limit: FEED_SIZE }) : Promise.resolve(null)),
-    [topicIds.join(',')],
+    async () => {
+      if (topicIds.length === 0 && !customOnly) return null
+      const customToken = user ? await getAccountToken(user) : undefined
+      return getFeed({ issueIds: topicIds, limit: FEED_SIZE, customToken })
+    },
+    [topicIds.join(','), user, customOnly],
   )
 
-  const names = (issues ?? [])
+  const names = [...(issues ?? [])
     .filter((issue) => topicIds.includes(issue.issue_id))
-    .map((issue) => issue.name)
-    .join(' · ')
+    .map((issue) => issue.name), ...customTopics].join(' · ')
 
   return (
     <>
       <div className="panel__heading-row">
         <h2>Topics you follow</h2>
-        <Link to="/onboarding" className="link-more">
-          {topicIds.length > 0 ? 'Change topics' : 'Choose topics'}
+        <Link to={user ? '/profile?section=topics' : '/onboarding'} className="link-more">
+          {hasTopics ? 'Change topics' : 'Choose topics'}
         </Link>
       </div>
 
-      {topicIds.length === 0 ? (
+      {user && custom.loading ? (
+        <LoadingState message="Loading your topics…" />
+      ) : user && custom.error ? (
+        <ErrorState title="Your topics could not be loaded" message={custom.error.message} onRetry={custom.refetch} />
+      ) : !hasTopics ? (
         <EmptyState
           title="No topics chosen yet"
-          hint="Add the topics you care about in onboarding and Pull lists the newest bills working on them."
+          hint="Choose topics to see related bills."
         />
       ) : issuesLoading || feed.loading ? (
         <LoadingState message="Loading the bills on your topics…" />

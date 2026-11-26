@@ -1,13 +1,39 @@
 from fastapi import FastAPI
+from starlette.routing import Route
 
-from app.routes import bills, explanations, feed, health, members, reviews
+from app.mcp import http_app as mcp_app
+from app.routes import (
+    account,
+    bills,
+    calls,
+    custom_topics,
+    explanations,
+    feed,
+    graph,
+    health,
+    members,
+    responses,
+    reviews,
+    sharing,
+    votes,
+)
 
-app = FastAPI(title="Pull API", version="0.1.0")
+app = FastAPI(title="Pull API", version="0.1.0", lifespan=mcp_app.lifespan)
 
-# Every route lives under /api so the Vite dev server can proxy it as one prefix
+# Keep browser API routes under /api and serve Streamable HTTP at the exact MCP path.
+app.router.routes.append(Route("/mcp", mcp_app, methods=["GET", "POST", "DELETE"]))
 app.include_router(health.router, prefix="/api")
 app.include_router(members.router, prefix="/api")
 app.include_router(bills.router, prefix="/api")
 app.include_router(explanations.router, prefix="/api")
 app.include_router(feed.router, prefix="/api")
 app.include_router(reviews.router, prefix="/api")
+app.include_router(account.router, prefix="/api")
+app.include_router(custom_topics.router, prefix="/api")
+app.include_router(graph.router, prefix="/api")
+app.include_router(responses.router, prefix="/api")
+app.include_router(votes.router, prefix="/api")
+app.include_router(sharing.router, prefix="/api")
+app.include_router(calls.router, prefix="/api")
+# Share links live at /s/{code}, outside /api, so the address people see stays short
+app.include_router(sharing.pages)

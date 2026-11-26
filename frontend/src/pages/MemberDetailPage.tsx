@@ -2,13 +2,14 @@ import { Link, useParams } from 'react-router-dom'
 import { getMember } from '../api/members'
 import { PageBand } from '../components/layout/PageBand'
 import { BillListItem } from '../components/bills/BillListItem'
+import { MemberAvatar } from '../components/members/MemberAvatar'
 import { ChevronLeftIcon, ExternalLinkIcon } from '../components/icons'
 import { CacheNotice } from '../components/ui/CacheNotice'
 import { EmptyState } from '../components/ui/EmptyState'
 import { ErrorState } from '../components/ui/ErrorState'
 import { LoadingState } from '../components/ui/LoadingState'
 import { useApi } from '../hooks/useApi'
-import { initialsOf, memberUrl, stateName } from '../lib/format'
+import { memberUrl, officeAddressLines, stateName } from '../lib/format'
 import { CONGRESS_NUMBER, PARTY_LABELS } from '../lib/constants'
 import { useProfile } from '../profile/ProfileContext'
 
@@ -62,7 +63,8 @@ export default function MemberDetailPage() {
     member.chamber === 'House' && member.district !== null ? `District ${member.district}` : null,
     member.chamber,
   ].filter((chip): chip is string => Boolean(chip))
-  const hasContacts = Boolean(member.office_phone || member.office_address || member.website_url)
+  const officeAddress = officeAddressLines(member.office_address ?? '')
+  const hasContacts = Boolean(member.office_phone || officeAddress.length || member.website_url)
 
   // Flag the member when they sit in the signed-in person's district, so the
   // profile page doubles as the "my representatives" detail view.
@@ -83,18 +85,7 @@ export default function MemberDetailPage() {
       <PageBand labelledBy="member-name">
         <BackLink />
         <section className="profile glass" aria-labelledby="member-name">
-          <span className="avatar avatar--lg">
-            {member.image_url ? (
-              <img src={member.image_url} alt={`Official photo of ${member.name}`} />
-            ) : (
-              <span aria-hidden="true">{initialsOf(member.name)}</span>
-            )}
-            {member.party ? (
-              <i className={`pb pb--${member.party.toLowerCase()}`} aria-hidden="true">
-                {member.party}
-              </i>
-            ) : null}
-          </span>
+          <MemberAvatar key={member.bioguide_id} member={member} size="lg" describePhoto />
           <div className="profile__info">
             {isMine ? <p className="profile__mine">Your representative</p> : null}
             <h1 id="member-name" className="profile__name">
@@ -124,9 +115,9 @@ export default function MemberDetailPage() {
 
       <div className="container page-body member-grid-page">
         <div className="member-grid-page__main">
-          <section className="card" aria-labelledby="sponsored-title">
+          <section className="card panel--stack" aria-labelledby="sponsored-title">
             <div className="card__head">
-              <h2 id="sponsored-title">Bills they've sponsored</h2>
+              <h2 id="sponsored-title">Sponsored bills</h2>
               <span className="card__note">
                 {member.sponsored_bills.length} in the {CONGRESS_NUMBER}th Congress
               </span>
@@ -146,9 +137,9 @@ export default function MemberDetailPage() {
             )}
           </section>
 
-          <section className="card" aria-labelledby="cosponsored-title">
+          <section className="card panel--stack" aria-labelledby="cosponsored-title">
             <div className="card__head">
-              <h2 id="cosponsored-title">Bills they've co-sponsored</h2>
+              <h2 id="cosponsored-title">Co-sponsored bills</h2>
               {coSponsored.length > 0 ? (
                 <span className="card__note">
                   {coSponsored.length} in the {CONGRESS_NUMBER}th Congress
@@ -170,7 +161,7 @@ export default function MemberDetailPage() {
           </section>
         </div>
 
-        <section className="card" aria-labelledby="office-title">
+        <section className="card panel--stack" aria-labelledby="office-title">
           <h2 id="office-title" className="card__title">
             Reach their office
           </h2>
@@ -184,12 +175,14 @@ export default function MemberDetailPage() {
                   </dd>
                 </div>
               ) : null}
-              {member.office_address ? (
+              {officeAddress.length > 0 && (
                 <div>
                   <dt>Address</dt>
-                  <dd>{member.office_address}</dd>
+                  <dd className="office__address">
+                    {officeAddress.map((line, index) => <span key={index}>{line}</span>)}
+                  </dd>
                 </div>
-              ) : null}
+              )}
               {member.website_url ? (
                 <div>
                   <dt>Website</dt>

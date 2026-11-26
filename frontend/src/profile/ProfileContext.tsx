@@ -1,16 +1,20 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { ProfileError, currentProfile, selectProfile as storeSelectProfile, leaveProfile as storeLeaveProfile, createProfile as storeCreateProfile, updateProfile as storeUpdateProfile } from './store'
-import type { NewProfile } from './store'
+import type { User } from '@firebase/auth'
+import { getAccountProfile, saveAccountProfile } from '../api/account'
+import { useSession } from '../auth/SessionContext'
+import { ProfileError, currentProfile, forgetAccountProfiles, importablePreferences, legacyProfileFor, selectProfile as storeSelectProfile, leaveProfile as storeLeaveProfile, updateProfile as storeUpdateProfile } from './store'
+import type { ProfileChanges } from './store'
 import type { Profile } from './types'
 
 interface ProfileContextValue {
   profile: Profile | null
-  // Throws ProfileError with a readable message when the attempt fails.
-  createProfile: (username: string, base: NewProfile) => Profile
+  loading: boolean
+  error: string | null
+  reload: () => void
   selectProfile: (username: string) => Profile
   leaveProfile: () => void
-  updateProfile: (patch: Partial<Pick<Profile, 'district' | 'topics' | 'socials'>>) => Profile
+  updateProfile: (patch: ProfileChanges) => Promise<Profile>
 }
 
 const ProfileContext = createContext<ProfileContextValue | null>(null)
@@ -18,54 +22,120 @@ const ProfileContext = createContext<ProfileContextValue | null>(null)
 // Let standalone components render without a selected profile.
 const FALLBACK: ProfileContextValue = {
   profile: null,
-  createProfile: () => {
-    throw new ProfileError('Profile management is not available here.')
-  },
+  loading: false,
+  error: null,
+  reload: () => {},
   selectProfile: () => {
     throw new ProfileError('Profile management is not available here.')
   },
   leaveProfile: () => {},
-  updateProfile: () => {
+  updateProfile: async () => {
     throw new ProfileError('Profile management is not available here.')
   },
 }
 
-// Provide the active local profile and actions for changing it.
-export function ProfileProvider({ children }: { children: ReactNode }) {
-  const [profile, setProfile] = useState<Profile | null>(() => currentProfile())
+interface LoadedAccount {
+  uid: string
+  profile: Profile | null
+  error: string | null
+}
 
-  const createProfile = useCallback((username: string, base: NewProfile) => {
-    const nextProfile = storeCreateProfile(username, base)
-    setProfile(nextProfile)
-    return nextProfile
+// Provide the verified account's profile or the signed-out browser profile.
+export function ProfileProvider({ children }: { children: ReactNode }) {
+  const { user } = useSession()
+  const uid = user?.uid
+  const [local, setLocal] = useState(currentProfile)
+  const [account, setAccount] = useState<LoadedAccount | null>(null)
+  const [attempt, setAttempt] = useState(0)
+  const saves = useRef(0)
+  const activeOwner = useRef<User | null>(null)
+  if (!uid && account) setAccount(null)
+  const loaded = uid && account?.uid === uid ? account : null
+  // A signed-in reader sees only the account's profile, so a failed load or import cannot
+  // pass off a browser copy as saved.
+  const profile = uid ? loaded?.profile ?? null : local?.firebase_uid ? null : local
+
+  useEffect(() => {
+    activeOwner.current = user
+    if (!user) return
+    let active = true
+    const savedBeforeLoad = saves.current
+
+    async function restore(owner: NonNullable<typeof user>) {
+      try {
+        let saved = await getAccountProfile(owner)
+        const legacy = legacyProfileFor(owner.uid)
+        let imported: Profile | null = null
+        // Copy a browser profile from earlier builds once, into an account that has none.
+        if (!saved.saved && legacy && active) {
+          saved = await saveAccountProfile(owner, importablePreferences(legacy), true)
+          imported = legacy
+        }
+        if (saved.saved) {
+          forgetAccountProfiles(owner.uid, imported)
+          if (active) setLocal(currentProfile())
+        }
+        if (active && savedBeforeLoad === saves.current) {
+          setAccount({ uid: owner.uid, profile: { ...saved, firebase_uid: owner.uid }, error: null })
+        }
+      } catch {
+        if (active && savedBeforeLoad === saves.current) {
+          setAccount({ uid: owner.uid, profile: null, error: 'Your profile could not be loaded.' })
+        }
+      }
+    }
+
+    void restore(user)
+    return () => {
+      active = false
+      activeOwner.current = null
+    }
+  }, [user, attempt])
+
+  const reload = useCallback(() => {
+    setAccount(null)
+    setAttempt((n) => n + 1)
   }, [])
 
   const selectProfile = useCallback((username: string) => {
-    const nextProfile = storeSelectProfile(username)
-    setProfile(nextProfile)
-    return nextProfile
-  }, [])
+    if (uid) throw new ProfileError('Open Edit profile to change your account.')
+    const next = storeSelectProfile(username)
+    setLocal(next)
+    return next
+  }, [uid])
 
   const leaveProfile = useCallback(() => {
     storeLeaveProfile()
-    setProfile(null)
+    setLocal(null)
   }, [])
 
-  const updateProfile = useCallback((patch: Partial<Pick<Profile, 'district' | 'topics' | 'socials'>>) => {
-    const nextProfile = storeUpdateProfile(patch)
-    setProfile(nextProfile)
-    return nextProfile
-  }, [])
+  const updateProfile = useCallback(async (patch: ProfileChanges) => {
+    if (user) {
+      const saved = await saveAccountProfile(user, patch)
+      const next = { ...saved, firebase_uid: user.uid }
+      if (activeOwner.current === user) {
+        saves.current += 1
+        setAccount({ uid: user.uid, profile: next, error: null })
+      }
+      return next
+    }
+    if (!profile) throw new ProfileError('Open a profile before editing it.')
+    const next = storeUpdateProfile(patch, profile.username)
+    setLocal(next)
+    return next
+  }, [profile, user])
 
-  const value = useMemo(
-    () => ({ profile, createProfile, selectProfile, leaveProfile, updateProfile }),
-    [profile, createProfile, selectProfile, leaveProfile, updateProfile],
+  return (
+    <ProfileContext.Provider value={{
+      profile, loading: Boolean(uid && !loaded), error: loaded?.error ?? null,
+      reload, selectProfile, leaveProfile, updateProfile,
+    }}>
+      {children}
+    </ProfileContext.Provider>
   )
-
-  return <ProfileContext.Provider value={value}>{children}</ProfileContext.Provider>
 }
 
-// Return the active profile and profile actions.
+// Return the active profile and its actions.
 export function useProfile(): ProfileContextValue {
   return useContext(ProfileContext) ?? FALLBACK
 }

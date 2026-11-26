@@ -75,11 +75,14 @@ export async function stateDistrictGeometry(state: string): Promise<FeatureColle
     where: `GEOID LIKE '${prefix}%'`,
     outFields: 'CD119',
     outSR: '4326',
+    // Reduce the download before the browser simplifies the map for display.
+    maxAllowableOffset: '0.0005',
+    geometryPrecision: '5',
     f: 'geojson',
   })
   let response: Response
   try {
-    response = await fetch(`${LAYER}/query?${query.toString()}`)
+    response = await fetch(`${LAYER}/query?${query.toString()}`, { cache: 'force-cache' })
   } catch {
     throw new CensusError('The district map could not be loaded. Check your connection and try again.')
   }

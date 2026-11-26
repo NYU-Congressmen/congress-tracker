@@ -1,0 +1,109 @@
+from typing import Annotated, Any
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Path
+
+from app.auth import current_uid
+from app.db import connect, fetch_all, fetch_one
+from app.models import BillType, CallEntry, CallIn, CallNoteIn
+from app.sync.bills import make_bill_id
+
+router = APIRouter(tags=["calls"])
+Uid = Annotated[str, Depends(current_uid)]
+ActionId = Annotated[int, Path(gt=0, le=2_147_483_647)]
+CALL_PATH = "/bills/{congress}/{bill_type}/{number}/calls"
+
+
+@router.get(CALL_PATH, response_model=list[CallEntry])
+def list_calls(congress: int, bill_type: BillType, number: int, uid: Uid) -> list[dict[str, Any]]:
+    """Return this account's most recent calls about the bill."""
+    return fetch_all(
+        """
+        SELECT a.action_id, a.bioguide_id, m.name AS member_name, a.created_at, a.call_note AS note
+        FROM actions a JOIN members m USING (bioguide_id)
+        WHERE a.uid = %s AND a.bill_id = %s AND a.action_type = 'call'
+        ORDER BY a.created_at DESC, a.action_id DESC LIMIT 20
+        """,
+        (uid, make_bill_id(congress, bill_type, number)),
+    )
+
+
+@router.put(CALL_PATH + "/{request_id}", response_model=CallEntry)
+def log_call(
+    congress: int, bill_type: BillType, number: int, request_id: UUID, entry: CallIn, uid: Uid
+) -> dict[str, Any]:
+    """Record an office call about a bill and return the same entry for a retry."""
+    bill_id = make_bill_id(congress, bill_type, number)
+    with connect() as conn:
+        found = conn.execute(
+            """
+            SELECT EXISTS (SELECT 1 FROM bills WHERE bill_id = %(bill_id)s) AS bill_found,
+                   EXISTS (SELECT 1 FROM users WHERE uid = %(uid)s) AS user_found,
+                   (SELECT name FROM members WHERE bioguide_id = %(member)s) AS member_name
+            """,
+            {"uid": uid, "bill_id": bill_id, "member": entry.bioguide_id},
+        ).fetchone()
+        if not found["bill_found"]:
+            raise HTTPException(404, "Bill not found")
+        if not found["user_found"]:
+            raise HTTPException(403, "Finish signing up before logging a call")
+        if found["member_name"] is None:
+            raise HTTPException(404, "Representative not found")
+
+        # A retry can arrive while the first request is still committing.
+        row = conn.execute(
+            """
+            INSERT INTO actions (uid, bill_id, bioguide_id, action_type, request_id, call_note)
+            VALUES (%s, %s, %s, 'call', %s, %s)
+            ON CONFLICT (uid, request_id) DO UPDATE SET request_id = EXCLUDED.request_id
+            WHERE actions.bill_id = EXCLUDED.bill_id AND actions.bioguide_id = EXCLUDED.bioguide_id
+              AND actions.action_type = 'call'
+            RETURNING action_id, bioguide_id, created_at, call_note AS note
+            """,
+            (uid, bill_id, entry.bioguide_id, request_id, entry.note or None),
+        ).fetchone()
+        if row is None:
+            raise HTTPException(409, "That request ID belongs to a different call")
+        return {**row, "member_name": found["member_name"]}
+
+
+@router.patch(CALL_PATH + "/{action_id}/note", response_model=CallEntry)
+def update_call_note(
+    congress: int,
+    bill_type: BillType,
+    number: int,
+    action_id: ActionId,
+    entry: CallNoteIn,
+    uid: Uid,
+) -> dict[str, Any]:
+    """Save the caller's note on an existing call and return the updated entry."""
+    row = fetch_one(
+        """
+        UPDATE actions AS a
+        SET call_note = %s
+        FROM members AS m
+        WHERE a.bioguide_id = m.bioguide_id AND a.action_id = %s
+          AND a.uid = %s AND a.bill_id = %s AND a.action_type = 'call'
+        RETURNING a.action_id, a.bioguide_id, m.name AS member_name, a.created_at,
+                  a.call_note AS note
+        """,
+        (entry.note or None, action_id, uid, make_bill_id(congress, bill_type, number)),
+    )
+    if row is None:
+        raise HTTPException(404, "Call not found.")
+    return row
+
+
+@router.delete(CALL_PATH + "/{action_id}", status_code=204)
+def delete_call(
+    congress: int, bill_type: BillType, number: int, action_id: ActionId, uid: Uid
+) -> None:
+    """Delete the caller's saved call about the bill."""
+    with connect() as conn:
+        conn.execute(
+            """
+            DELETE FROM actions
+            WHERE action_id = %s AND uid = %s AND bill_id = %s AND action_type = 'call'
+            """,
+            (action_id, uid, make_bill_id(congress, bill_type, number)),
+        )
