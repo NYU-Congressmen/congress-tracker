@@ -126,7 +126,7 @@ export function profileForUser(uid: string): Profile | null {
     .sort((left, right) => (right.updated_at ?? '').localeCompare(left.updated_at ?? ''))[0] ?? null
 }
 
-// Return the browser profile to copy into a new account: the one linked to it, else the one in use.
+// Return the browser profile to copy into a new account, preferring the one linked to it over the unlinked one in use.
 export function legacyProfileFor(uid: string): Profile | null {
   const linked = profileForUser(uid)
   if (linked) return linked
