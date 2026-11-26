@@ -15,7 +15,7 @@ def main() -> int:
     if not settings.congress_api_key:
         print("CONGRESS_API_KEY is not set. Add it to the .env file at the repo root.")
         return 1
-    with CongressClient(settings.congress_api_key) as client:
+    with CongressClient(settings.congress_api_key, retry_read_timeouts=True) as client:
         bills = client.get("/bill", limit=1)["pagination"]["count"]
         members = client.get("/member", currentMember="true", limit=1)["pagination"]["count"]
         print(f"Congress.gov is reachable: {bills:,} bills and {members:,} current members.")

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { districtsInState, stateDistrictGeometry } from '../../geo/census'
 import { simplifyFeatureCollection } from '../../geo/simplify'
 import type { FeatureCollection } from '../../geo/simplify'
@@ -25,7 +25,7 @@ interface DistrictStepProps {
 
 // The state's district boundaries, simplified once and kept in memory, so
 // revisiting the step does not re-download tens of megabytes.
-const geometryCache = new Map<string, FeatureCollection>()
+const geometryCache = new Map<string, Promise<FeatureCollection>>()
 
 // The whole-state point budget for the map: dense enough that every boundary
 // stays smooth at any zoom (a deviation-based decimation of this data
@@ -33,6 +33,20 @@ const geometryCache = new Map<string, FeatureCollection>()
 // most. Sharp corners are kept on top of the budget, so the total is a
 // little higher for states with many hard angles.
 const DIST_MAP_POINTS = 4000
+
+// Share the in-flight boundary request with the map tab and retry failed requests.
+function loadMap(state: string): Promise<FeatureCollection> {
+  const cached = geometryCache.get(state)
+  if (cached) return cached
+  const geometry = stateDistrictGeometry(state)
+    .then((features) => simplifyFeatureCollection(features, DIST_MAP_POINTS, state === 'AK'))
+    .catch((error: unknown) => {
+      geometryCache.delete(state)
+      throw error
+    })
+  geometryCache.set(state, geometry)
+  return geometry
+}
 
 // Choose a congressional district by address, map or district number.
 export function DistrictStep({ initial, preferAddress, deferAddressSave, nextLabel, onBack, onDone }: DistrictStepProps) {
@@ -43,14 +57,16 @@ export function DistrictStep({ initial, preferAddress, deferAddressSave, nextLab
   const [numState, setNumState] = useState(initial?.state ?? '')
   const [numPick, setNumPick] = useState(initial ? String(initial.district ?? 0) : '')
 
-  const map = useApi(async () => {
-    if (method !== 'map' || !mapState || isAtLargeState(mapState)) return null
-    const cached = geometryCache.get(mapState)
-    if (cached) return cached
-    const geometry = simplifyFeatureCollection(await stateDistrictGeometry(mapState), DIST_MAP_POINTS, mapState === 'AK')
-    geometryCache.set(mapState, geometry)
-    return geometry
-  }, [method, mapState])
+  const knownState = initial?.state
+  useEffect(() => {
+    if (knownState && !isAtLargeState(knownState)) void loadMap(knownState).catch(() => {})
+  }, [knownState])
+
+  const map = useApi(
+    () => method === 'map' && mapState && !isAtLargeState(mapState)
+      ? loadMap(mapState) : Promise.resolve(null),
+    [method, mapState],
+  )
 
   const numbers = useApi(
     () => method === 'number' && numState && !isAtLargeState(numState)
@@ -111,9 +127,6 @@ export function DistrictStep({ initial, preferAddress, deferAddressSave, nextLab
               }}
               options={[{ value: '', label: 'Choose a state or territory' }, ...STATE_OPTIONS]}
             />
-            <p className="muted">
-              First choose the state or territory, then zoom in and click your district.
-            </p>
           </div>
           {isAtLargeState(mapState) ? (
             <div className="onboard-atlarge">

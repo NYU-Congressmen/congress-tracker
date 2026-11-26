@@ -47,6 +47,7 @@ class FakeCongress:
         self.paths = []
         self.members_down = False
         self.ignore_offset = False
+        self.ignore_limit = False
 
     def handle(self, request: httpx.Request) -> httpx.Response:
         path = request.url.path.removeprefix("/v3")
@@ -57,7 +58,7 @@ class FakeCongress:
             if self.members_down:
                 raise httpx.ConnectError("Congress.gov is down", request=request)
             offset = 0 if self.ignore_offset else int(request.url.params["offset"])
-            limit = int(request.url.params["limit"])
+            limit = len(MEMBERS) if self.ignore_limit else int(request.url.params["limit"])
             return httpx.Response(
                 200,
                 json={
@@ -135,6 +136,15 @@ def test_one_members_position_keeps_the_full_totals(fake):
     assert vote["totals"] == {"Yea": 2, "Nay": 1}
 
 
+def test_totals_only_omits_member_positions(fake):
+    run_sync(fake)
+
+    (vote,) = TestClient(app).get(URL, params={"include_positions": "false"}).json()
+
+    assert vote["positions"] == []
+    assert vote["totals"] == {"Yea": 2, "Nay": 1}
+
+
 def test_a_quiet_day_costs_no_requests(fake):
     run_sync(fake)
     requests = len(fake.paths)
@@ -177,6 +187,19 @@ def test_a_repeated_page_leaves_the_vote_pending_until_the_next_sync(fake):
     assert run_sync(fake) == 1
     (vote,) = TestClient(app).get(URL).json()
     assert vote["positions_complete"] is True
+    assert vote["totals"] == {"Yea": 2, "Nay": 1}
+
+
+def test_a_full_member_list_ignoring_the_limit_completes_in_one_request(fake):
+    # Congress.gov answers every limit and offset with the whole member list.
+    fake.ignore_limit = True
+    fake.ignore_offset = True
+
+    assert run_sync(fake) == 1
+
+    member_requests = [path for path in fake.paths if path.endswith("/members")]
+    assert len(member_requests) == 1
+    (vote,) = TestClient(app).get(URL).json()
     assert vote["totals"] == {"Yea": 2, "Nay": 1}
 
 

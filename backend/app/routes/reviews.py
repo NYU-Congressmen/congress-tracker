@@ -1,10 +1,13 @@
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response
+from psycopg import Connection
 
+from app.ai.moderation import moderate_review
 from app.auth import current_uid, optional_uid
 from app.db import connect, fetch_all, fetch_one
-from app.models import BillType, ReportIn, Review, ReviewIn, ReviewPage, ReviewVisibility
+from app.models import BillType, ReportIn, Review, ReviewIn, ReviewPage, ReviewVisibility, Stance
+from app.sample_data import EXCLUDE_SAMPLE_REVIEWS_SQL, sees_sample_data
 from app.sync.bills import make_bill_id
 
 router = APIRouter(tags=["reviews"])
@@ -14,7 +17,7 @@ Uid = Annotated[str, Depends(current_uid)]
 
 REVIEW_COLUMNS = (
     "bill_id, stance, story, action_taken, consent_to_share, share_publicly, created_at, "
-    "updated_at, hidden_at IS NOT NULL AS hidden"
+    "updated_at, hidden_at IS NOT NULL AS hidden, moderation_status"
 )
 
 # Reports from this many different signed-in people withhold a review until the team looks.
@@ -24,7 +27,7 @@ WITHHOLD_AFTER_REPORTS = 3
 # A review is shared when its author chose to list it publicly, has not hidden it and reports
 # have not withheld it. Consent to the office brief (consent_to_share) is a separate choice.
 SHARED_REVIEW_SQL = f"""
-    r.share_publicly AND r.hidden_at IS NULL
+    r.share_publicly AND r.hidden_at IS NULL AND r.moderation_status = 'cleared'
     AND (SELECT count(*) FROM review_reports rr
          WHERE rr.review_id = r.review_id
            AND rr.reporter_uid IS NOT NULL AND rr.dismissed_at IS NULL)
@@ -44,8 +47,21 @@ SAVE_REVIEW_SQL = f"""
         consent_to_share = EXCLUDED.consent_to_share,
         share_publicly = EXCLUDED.share_publicly,
         updated_at = now()
-    RETURNING {REVIEW_COLUMNS}
+    RETURNING {REVIEW_COLUMNS}, review_id, moderation_revision
 """
+
+
+def check_review_target(conn: Connection, bill_id: str, uid: str) -> None:
+    """Check that the bill and signed-in account exist before writing a review."""
+    found = conn.execute(
+        "SELECT EXISTS (SELECT 1 FROM bills WHERE bill_id = %s) AS bill_found, "
+        "EXISTS (SELECT 1 FROM users WHERE uid = %s) AS user_found",
+        (bill_id, uid),
+    ).fetchone()
+    if not found["bill_found"]:
+        raise HTTPException(404, "Bill not found")
+    if not found["user_found"]:
+        raise HTTPException(403, "Finish signing up before reviewing a bill")
 
 
 @router.put("/bills/{congress}/{bill_type}/{number}/review", response_model=Review)
@@ -55,17 +71,41 @@ def save_review(
     """Create or replace the signed-in user's review of a bill and return it."""
     bill_id = make_bill_id(congress, bill_type, number)
     with connect() as conn:
-        found = conn.execute(
-            "SELECT EXISTS (SELECT 1 FROM bills WHERE bill_id = %s) AS bill_found, "
-            "EXISTS (SELECT 1 FROM users WHERE uid = %s) AS user_found",
-            (bill_id, uid),
-        ).fetchone()
-        if not found["bill_found"]:
-            raise HTTPException(404, "Bill not found")
-        if not found["user_found"]:
-            raise HTTPException(403, "Finish signing up before reviewing a bill")
+        check_review_target(conn, bill_id, uid)
         params = {**review.model_dump(), "uid": uid, "bill_id": bill_id}
-        return conn.execute(SAVE_REVIEW_SQL, params).fetchone()
+        saved = conn.execute(SAVE_REVIEW_SQL, params).fetchone()
+
+    # Commit the author's text before calling the provider and release the database connection.
+    status = moderate_review(saved)
+    if status is not None:
+        saved["moderation_status"] = status
+    return saved
+
+
+@router.put("/bills/{congress}/{bill_type}/{number}/review/stance", response_model=Review)
+def save_stance(
+    congress: int,
+    bill_type: BillType,
+    number: int,
+    stance: Annotated[Stance, Body(embed=True)],
+    uid: Uid,
+) -> dict[str, Any]:
+    """Save the signed-in user's stance and return the review with its other fields intact."""
+    bill_id = make_bill_id(congress, bill_type, number)
+    with connect() as conn:
+        check_review_target(conn, bill_id, uid)
+        return conn.execute(
+            f"""
+            INSERT INTO reviews (uid, bill_id, stance)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (uid, bill_id) DO UPDATE SET
+                stance = EXCLUDED.stance,
+                updated_at = CASE WHEN EXCLUDED.stance <> reviews.stance THEN now()
+                                  ELSE reviews.updated_at END
+            RETURNING {REVIEW_COLUMNS}
+            """,
+            (uid, bill_id, stance),
+        ).fetchone()
 
 
 @router.get("/bills/{congress}/{bill_type}/{number}/review", response_model=Review)
@@ -113,6 +153,7 @@ def list_shared_reviews(
     number: int,
     page: Annotated[int, Query(ge=1)] = 1,
     limit: Annotated[int, Query(ge=1, le=50)] = 20,
+    viewer: Annotated[str | None, Depends(optional_uid)] = None,
 ) -> dict[str, Any]:
     """Return the reviews of a bill that their authors shared, most recently edited first.
 
@@ -123,6 +164,8 @@ def list_shared_reviews(
     if fetch_one("SELECT 1 FROM bills WHERE bill_id = %s", (bill_id,)) is None:
         raise HTTPException(404, "Bill not found")
     where = f"r.bill_id = %(bill_id)s AND {SHARED_REVIEW_SQL}"
+    if not sees_sample_data(viewer):
+        where += f" AND {EXCLUDE_SAMPLE_REVIEWS_SQL}"
     params = {"bill_id": bill_id}
     total = fetch_one(f"SELECT count(*) AS n FROM reviews r WHERE {where}", params)["n"]
     reviews = fetch_all(
@@ -155,7 +198,8 @@ def report_review(
     """
     with connect() as conn:
         review = conn.execute(
-            "SELECT uid FROM reviews WHERE review_id = %s AND share_publicly AND hidden_at IS NULL",
+            "SELECT uid FROM reviews WHERE review_id = %s AND share_publicly "
+            "AND hidden_at IS NULL AND moderation_status = 'cleared'",
             (review_id,),
         ).fetchone()
         if review is None:

@@ -107,11 +107,11 @@ function ProfileMenu() {
       </summary>
       <div className="site-profile__panel">
         <Link
-          to={profile ? '/profile' : '/onboarding'}
+          to="/profile"
           className="btn btn--ghost"
           onClick={() => { if (disclosure.current) disclosure.current.open = false }}
         >
-          {profile ? 'Edit profile' : 'Set up profile'}
+          Edit profile
         </Link>
         <button type="button" className="btn btn--ghost" disabled={busy} onClick={() => void leave()}>Sign out</button>
         {error ? <p className="form-error" role="alert">Sign-out failed. Try again.</p> : null}

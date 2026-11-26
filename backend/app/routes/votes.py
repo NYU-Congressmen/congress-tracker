@@ -15,11 +15,13 @@ def list_house_votes(
     bill_type: BillType,
     number: int,
     bioguide_id: Annotated[str | None, Query(pattern="^[A-Za-z][0-9]{6}$")] = None,
+    include_positions: bool = True,
 ) -> list[dict[str, Any]]:
     """Return a bill's House roll-call votes, oldest first, with each member's position.
 
     With bioguide_id, each vote lists only that member's position, which is how a page puts a
     representative's vote beside what Pull users said. The totals always count every member.
+    A totals-only request omits member positions.
     The daily sync stores these for bills someone tracks or reviews.
     """
     bill_id = make_bill_id(congress, bill_type, number)
@@ -46,17 +48,21 @@ def list_house_votes(
         (bill_id,),
     )
     member_filter = "AND p.bioguide_id = %(bioguide_id)s" if bioguide_id else ""
-    positions = fetch_all(
-        f"""
-        SELECT p.congress, p.session, p.roll_number, p.bioguide_id, m.name, p.party, p.state,
-               m.district, p.position
-        FROM house_vote_positions p
-        JOIN house_votes v USING (congress, session, roll_number)
-        LEFT JOIN members m ON m.bioguide_id = p.bioguide_id
-        WHERE v.bill_id = %(bill_id)s {member_filter}
-        ORDER BY p.state, m.district NULLS FIRST, p.bioguide_id
-        """,
-        {"bill_id": bill_id, "bioguide_id": bioguide_id.upper() if bioguide_id else None},
+    positions = (
+        fetch_all(
+            f"""
+            SELECT p.congress, p.session, p.roll_number, p.bioguide_id, m.name, p.party, p.state,
+                   m.district, p.position
+            FROM house_vote_positions p
+            JOIN house_votes v USING (congress, session, roll_number)
+            LEFT JOIN members m ON m.bioguide_id = p.bioguide_id
+            WHERE v.bill_id = %(bill_id)s {member_filter}
+            ORDER BY p.state, m.district NULLS FIRST, p.bioguide_id
+            """,
+            {"bill_id": bill_id, "bioguide_id": bioguide_id.upper() if bioguide_id else None},
+        )
+        if include_positions
+        else []
     )
 
     by_vote = {(v["congress"], v["session"], v["roll_number"]): v for v in votes}

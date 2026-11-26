@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     llm_api_key: str | None = None
     llm_base_url: str | None = None
     llm_model: str | None = None
+    moderation_api_key: str | None = None
+    openai_embedding_api_key: str | None = None
     # The public address share links point to
     public_site_url: str = "https://congress-pull.web.app"
     # Pull's own Bluesky account, which searches for posts carrying share links

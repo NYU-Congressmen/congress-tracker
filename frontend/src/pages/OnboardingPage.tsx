@@ -7,6 +7,8 @@ import { TopicsStep } from '../components/onboarding/TopicsStep'
 import { PageBand } from '../components/layout/PageBand'
 import { StepActions } from '../components/onboarding/StepActions'
 import { clearAccountDistrict, replacesAccountDistrict, saveAccountDistrict } from '../api/account'
+import { saveCustomTopics } from '../api/feed'
+import { getAccountToken } from '../auth/accountToken'
 import { useSession } from '../auth/SessionContext'
 import { useProfile } from '../profile/ProfileContext'
 import type { DistrictSelection, SocialProfile } from '../profile/types'
@@ -21,7 +23,7 @@ type SetupStep = keyof typeof STEP_LABELS
 
 // Set up the local profile and dashboard preferences.
 export default function OnboardingPage() {
-  const { profile, createProfile, selectProfile, leaveProfile, updateProfile } = useProfile()
+  const { profile, selectProfile, leaveProfile, updateProfile } = useProfile()
   const { user, loading } = useSession()
   const [params] = useSearchParams()
   const navigate = useNavigate()
@@ -35,6 +37,7 @@ export default function OnboardingPage() {
   const [district, setDistrict] = useState<DistrictSelection | null>(profile?.district ?? null)
   const [addressToSave, setAddressToSave] = useState<string>()
   const [topics, setTopics] = useState<number[]>(profile?.topics ?? [])
+  const [customTopics, setCustomTopics] = useState<string[]>([])
   const [socials, setSocials] = useState<SocialProfile[]>(profile?.socials ?? [])
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -43,7 +46,7 @@ export default function OnboardingPage() {
   const saveAttempted = useRef(false)
   const restartRequired = codeFailures >= MAX_FAILED_ATTEMPTS || saveFailures >= MAX_FAILED_ATTEMPTS
 
-  // Save the browser profile after the API registers the verified Firebase user.
+  // Save the profile after the API registers the verified Firebase user.
   const saveProfile = useCallback(async () => {
     if (!user || loading || restartRequired || saveAttempted.current) return
     saveAttempted.current = true
@@ -58,9 +61,8 @@ export default function OnboardingPage() {
         setAddressToSave(undefined)
       }
       if (replacesAccountDistrict(verifiedDistrict)) await clearAccountDistrict(user)
-      const details = { firebase_uid: user.uid, district: verifiedDistrict, topics, socials }
-      if (profile?.username === username) updateProfile(details)
-      else createProfile(username, details)
+      if (customTopics.length) await saveCustomTopics(await getAccountToken(user), customTopics)
+      await updateProfile({ username, district: verifiedDistrict, topics, socials })
       setStep('done')
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Something went wrong while saving your profile.')
@@ -68,7 +70,7 @@ export default function OnboardingPage() {
     } finally {
       setSaving(false)
     }
-  }, [addressToSave, createProfile, district, loading, profile, restartRequired, socials, topics, updateProfile, user, username])
+  }, [addressToSave, customTopics, district, loading, restartRequired, socials, topics, updateProfile, user, username])
 
   useEffect(() => {
     if (step !== 'verify') return
@@ -95,6 +97,7 @@ export default function OnboardingPage() {
     setDistrict(profile?.district ?? null)
     setAddressToSave(undefined)
     setTopics(profile?.topics ?? [])
+    setCustomTopics([])
     setSocials(profile?.socials ?? [])
     setDistrictFirst(false)
     setCodeFailures(0)
@@ -159,6 +162,7 @@ export default function OnboardingPage() {
                     setAddressToSave(undefined)
                   }
                   setTopics([])
+                  setCustomTopics([])
                   setSocials([])
                 }
                 setStep(afterProfile)
@@ -174,6 +178,7 @@ export default function OnboardingPage() {
                       setAddressToSave(undefined)
                     }
                     setTopics(saved.topics)
+                    setCustomTopics([])
                     setSocials(saved.socials)
                   }
                   setStep(afterProfile)
@@ -203,9 +208,11 @@ export default function OnboardingPage() {
           {step === 'topics' ? (
             <TopicsStep
               initial={topics}
+              initialCustom={customTopics}
               onBack={goBack}
-              onDone={(nextTopics) => {
+              onDone={(nextTopics, nextCustom) => {
                 setTopics(nextTopics)
+                setCustomTopics(nextCustom)
                 setStep('social')
               }}
             />
@@ -270,21 +277,6 @@ export default function OnboardingPage() {
 
         </div>
 
-        {profile && user && step !== 'verify' ? (
-          <div className="onboard-signout">
-            <span className="muted">Active profile is {profile.username}.</span>
-            <button
-              type="button"
-              className="btn btn--ghost btn--sm"
-              onClick={() => {
-                leaveProfile()
-                setStep('account')
-              }}
-            >
-              Switch profile
-            </button>
-          </div>
-        ) : null}
       </div>
     </div>
   )

@@ -6,6 +6,7 @@ from app.routes import (
     account,
     bills,
     calls,
+    custom_topics,
     explanations,
     feed,
     graph,
@@ -28,6 +29,7 @@ app.include_router(explanations.router, prefix="/api")
 app.include_router(feed.router, prefix="/api")
 app.include_router(reviews.router, prefix="/api")
 app.include_router(account.router, prefix="/api")
+app.include_router(custom_topics.router, prefix="/api")
 app.include_router(graph.router, prefix="/api")
 app.include_router(responses.router, prefix="/api")
 app.include_router(votes.router, prefix="/api")

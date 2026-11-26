@@ -28,6 +28,42 @@ class AccountDistrict(BaseModel):
     district: int | None
 
 
+class ProfileDistrict(AccountDistrict):
+    """Describe the location shown in the account's profile."""
+
+    state: Annotated[str, StringConstraints(pattern=r"^[A-Z]{2}$")]
+    district: Annotated[int | None, Field(ge=1, le=99)]
+    method: Literal["address", "map", "number"]
+
+
+class ProfileSocial(BaseModel):
+    """Describe a saved social handle."""
+
+    platform: Annotated[str, StringConstraints(min_length=1, max_length=32)]
+    handle: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=512)]
+
+
+class ProfilePreferences(BaseModel):
+    """Describe editable preferences for a verified account."""
+
+    username: Annotated[
+        str, StringConstraints(strip_whitespace=True, pattern=r"^[a-zA-Z0-9_.-]{3,80}$")
+    ] = "Profile"
+    district: ProfileDistrict | None = None
+    topics: Annotated[list[Annotated[int, Field(gt=0)]], Field(max_length=100)] = Field(
+        default_factory=list
+    )
+    socials: Annotated[list[ProfileSocial], Field(max_length=20)] = Field(default_factory=list)
+
+
+class AccountProfile(ProfilePreferences):
+    """Describe a verified account's profile and whether preferences have been saved."""
+
+    saved: bool
+    created_at: datetime
+    updated_at: datetime
+
+
 # Far beyond any real post, while keeping huge pastes out of the database and the AI brief
 MAX_REVIEW_TEXT = 20_000
 
@@ -192,6 +228,7 @@ class Review(ReviewIn):
     """Describe a saved review of one bill by the signed-in user."""
 
     bill_id: str
+    moderation_status: Literal["pending", "flagged", "held", "cleared"]
     created_at: datetime
     updated_at: datetime
     # A hidden review stays the author's own, out of shared lists and response counts
@@ -266,6 +303,8 @@ class BillResponses(BaseModel):
     district: int | None
     total: int
     counts: StanceCounts
+    # True when sample accounts are among the counted respondents
+    includes_sample: bool = False
 
 
 class ReviewVisibility(BaseModel):
@@ -385,6 +424,12 @@ class CallIn(BaseModel):
 
     bioguide_id: str = Field(min_length=1, max_length=32)
     note: Annotated[str, StringConstraints(strip_whitespace=True, max_length=2_000)] | None = None
+
+
+class CallNoteIn(BaseModel):
+    """Describe the replacement note for a saved call."""
+
+    note: Annotated[str, StringConstraints(strip_whitespace=True, max_length=2_000)] | None
 
 
 class CallEntry(CallIn):

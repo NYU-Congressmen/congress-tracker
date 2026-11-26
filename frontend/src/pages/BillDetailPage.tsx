@@ -6,7 +6,9 @@ import type { BillDetail, BillType } from '../api/bills'
 import { PageBand } from '../components/layout/PageBand'
 import { ActionTimeline } from '../components/bills/ActionTimeline'
 import { BillDiff } from '../components/bills/BillDiff'
+import { BillCosponsors } from '../components/bills/BillCosponsors'
 import { BillExplanation } from '../components/bills/BillExplanation'
+import { BillStances } from '../components/bills/BillStances'
 import { CallLog } from '../components/bills/CallLog'
 import { ReviewPanel } from '../components/bills/ReviewPanel'
 import { MemberAvatar } from '../components/members/MemberAvatar'
@@ -23,7 +25,6 @@ import {
   districtLabel,
   formatDate,
   originChamber,
-  seatLabel,
   sessionLabel,
 } from '../lib/format'
 
@@ -69,6 +70,7 @@ function CopyLinkButton() {
 }
 
 export default function BillDetailPage() {
+  const [stanceRevision, setStanceRevision] = useState(0)
   const { congress: congressParam, type: typeParam, number: numberParam } = useParams()
   const congress = Number(congressParam)
   const number = Number(numberParam)
@@ -226,30 +228,7 @@ export default function BillDetailPage() {
               <p className="muted">The sponsor has not been recorded for this bill yet.</p>
             )}
 
-            <div className="sponsor-panel__cosponsors">
-              <h3>Co-sponsors</h3>
-              {(bill.co_sponsors ?? []).length > 0 ? (
-                <ul className="cosponsor-grid" aria-label="Co-sponsor list">
-                  {(bill.co_sponsors ?? []).map((member) => (
-                    <li key={member.bioguide_id}>
-                      <Link to={`/members/${member.bioguide_id}`} className="cosponsor-card">
-                        <MemberAvatar member={member} size="sm" />
-                        <span className="cosponsor-card__body">
-                          <span className="cosponsor-card__name">{member.name}</span>
-                          <span className="cosponsor-card__meta">
-                            {seatLabel(member.state, member.chamber, member.district)}
-                          </span>
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="muted">
-                  No co-sponsors on record yet. They appear here once the tracker records them from Congress.gov.
-                </p>
-              )}
-            </div>
+            <BillCosponsors key={bill.bill_id} bill={bill} />
           </section>
 
           <section className="card chat" aria-labelledby="history-title">
@@ -277,7 +256,9 @@ export default function BillDetailPage() {
 
         <BillDiff key={bill.bill_id} congress={bill.congress} type={bill.type} number={bill.number} />
 
-        <ReviewPanel congress={bill.congress} type={bill.type} number={bill.number} />
+        <ReviewPanel key={bill.bill_id} congress={bill.congress} type={bill.type} number={bill.number}
+          onStanceSaved={() => setStanceRevision((value) => value + 1)} />
+        <BillStances key={bill.bill_id} bill={bill} revision={stanceRevision} />
         <CallLog key={bill.bill_id} congress={bill.congress} type={bill.type} number={bill.number} />
       </div>
     </div>
