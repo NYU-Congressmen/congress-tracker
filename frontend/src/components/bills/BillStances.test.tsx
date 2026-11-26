@@ -49,8 +49,10 @@ test('keeps the official stage visible when there are no responses', async () =>
   )))
   render(<BillStances bill={bill} />)
 
-  expect(await screen.findByText('No verified Pull responses for this area yet.')).toBeTruthy()
+  expect(await screen.findByText('No responses from District 12 in New York yet.')).toBeTruthy()
   expect(screen.getByRole('heading', { name: 'Official bill stage' })).toBeTruthy()
+  fireEvent.change(screen.getByLabelText('Response area'), { target: { value: 'all' } })
+  expect(await screen.findByText('No responses to this bill yet.')).toBeTruthy()
 })
 
 test('shows the district representative’s position beside the full official roll call', async () => {

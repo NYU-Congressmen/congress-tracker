@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { BillDetail } from '../../api/bills'
 import { getBillResponses, STANCE_LABELS, STANCES } from '../../api/reviews'
 import { useApi } from '../../hooks/useApi'
-import { districtHeading } from '../../lib/districts'
+import { districtHeading, stateName } from '../../lib/districts'
 import { billUrl, formatDate } from '../../lib/format'
 import { useProfile } from '../../profile/ProfileContext'
 import type { DistrictSelection } from '../../profile/types'
@@ -62,7 +62,13 @@ function StanceCounts({ bill, scope, revision }: { bill: BillDetail; scope: Dist
   )
   if (loading) return <LoadingState message="Loading stances…" />
   if (error) return <ErrorState title="Stances could not be loaded" message={error.message} onRetry={refetch} />
-  if (!data || data.total === 0) return <p className="muted">No verified Pull responses for this area yet.</p>
+  if (!data || data.total === 0) {
+    const area = scope && (scope.district === null
+      ? stateName(scope.state)
+      : `District ${scope.district} in ${stateName(scope.state)}`)
+    const message = area ? `No responses from ${area} yet.` : 'No responses to this bill yet.'
+    return <p className="muted">{message}</p>
+  }
 
   return (
     <>
