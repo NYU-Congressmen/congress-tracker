@@ -20,6 +20,7 @@ export function saveCall(
 ): Promise<CallEntry> {
   return request<CallEntry>(`/api/bills/${congress}/${type}/${number}/calls/${requestId}`, {
     method: 'PUT',
+    keepalive: true,
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ bioguide_id: bioguideId, note }),
   })

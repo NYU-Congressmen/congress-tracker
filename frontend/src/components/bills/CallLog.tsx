@@ -41,11 +41,16 @@ function AccountCalls({ user, congress, type, number }: CallLogProps & { user: U
   const [memberId, setMemberId] = useState('')
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
-  const [notice, setNotice] = useState<{ error: boolean; text: string } | null>(null)
+  const [notice, setNotice] = useState<{ error: boolean; text: string; retryOffice?: string } | null>(null)
   const pending = useRef(new Map<string, string>())
-  const submitting = useRef(false)
+  const submitting = useRef(new Set<string>())
+  const recentToken = useRef<{ value: string; obtainedAt: number } | null>(null)
   const members = useApi(() => state ? listMembers({ state }) : Promise.resolve(null), [state])
-  const calls = useApi(async () => listCalls(congress, type, number, await getAccountToken(user)), [user, congress, type, number])
+  const calls = useApi(async () => {
+    const value = await getAccountToken(user)
+    recentToken.current = { value, obtainedAt: Date.now() }
+    return listCalls(congress, type, number, value)
+  }, [user, congress, type, number])
 
   const directory = (members.data?.data ?? []).filter((member) => member.state === state)
   const home = district?.state === state ? representativesForDistrict(directory, state, district.district) : null
@@ -61,27 +66,34 @@ function AccountCalls({ user, congress, type, number }: CallLogProps & { user: U
     }
   }
 
-  async function recordCall(officeId: string, text?: string): Promise<boolean> {
-    if (submitting.current) return false
-    submitting.current = true
+  async function recordCall(officeId: string, text?: string, retryFromNotice = false): Promise<boolean> {
+    if (submitting.current.has(officeId)) return false
+    submitting.current.add(officeId)
     setSaving(true)
     setNotice(null)
     try {
       // Keep the key for this office until the server confirms the write.
       const key = pending.current.get(officeId) ?? crypto.randomUUID()
       pending.current.set(officeId, key)
-      const saved = await saveCall(congress, type, number, key, officeId, await getAccountToken(user), text)
+      // Start the request before the dialer takes focus when a recently checked token is available.
+      const token = recentToken.current
+      const value = token && Date.now() - token.obtainedAt < 60_000 ? token.value : await getAccountToken(user)
+      const saved = await saveCall(congress, type, number, key, officeId, value, text)
       pending.current.delete(officeId)
       const message = (saved.note ?? undefined) === text ? 'Call logged.' : 'The call was already logged with its original note.'
       setNotice({ error: false, text: message })
       calls.refetch()
       return true
     } catch (error) {
-      setNotice({ error: true, text: error instanceof ApiError ? error.message : 'The call could not be saved.' })
+      setNotice({
+        error: true,
+        text: error instanceof ApiError ? error.message : 'The call could not be saved.',
+        retryOffice: retryFromNotice ? officeId : undefined,
+      })
       return false
     } finally {
-      submitting.current = false
-      setSaving(false)
+      submitting.current.delete(officeId)
+      setSaving(submitting.current.size > 0)
     }
   }
 
@@ -123,29 +135,37 @@ function AccountCalls({ user, congress, type, number }: CallLogProps & { user: U
     <>
       {contactOffices.length ? (
         <>
+          <p className="muted">Opening a phone number adds an entry to your call log.</p>
           <ul className="call-log__offices" aria-label="Your congressional offices">
             {contactOffices.map(({ member, phone }) => (
               <li key={member.bioguide_id}>
                 <span>{member.name}</span>
-                <a aria-label={`Call ${member.name}`} href={`tel:${phone}`}>
+                <a aria-label={`Call ${member.name}`} href={`tel:${phone}`}
+                  onClick={() => void recordCall(member.bioguide_id, undefined, true)}>
                   {member.office_phone}
                 </a>
-                <button type="button" className="btn btn--secondary" disabled={saving}
-                  aria-label={`I called ${member.name}`} onClick={() => void recordCall(member.bioguide_id)}>
-                  I called
-                </button>
               </li>
             ))}
           </ul>
           <details className="call-log__other">
-            <summary>Choose an office or add a note</summary>
+            <summary>Log a call manually</summary>
             {directoryForm}
           </details>
         </>
       ) : directoryForm}
       {state && members.error ? <ErrorState title="Offices could not be loaded" message={members.error.message} onRetry={members.refetch} /> : null}
       {state && !members.loading && !members.error && offices.length === 0 ? <p className="muted">No offices found.</p> : null}
-      {notice ? <p role={notice.error ? 'alert' : 'status'} className={notice.error ? 'form-error' : 'muted'}>{notice.text}</p> : null}
+      {notice ? (
+        <p role={notice.error ? 'alert' : 'status'} className={notice.error ? 'form-error' : 'muted'}>
+          {notice.text}
+          {notice.retryOffice ? (
+            <> <button type="button" className="link-more" disabled={saving}
+              onClick={() => notice.retryOffice && void recordCall(notice.retryOffice, undefined, true)}>
+              Retry save
+            </button></>
+          ) : null}
+        </p>
+      ) : null}
       {calls.error ? <ErrorState title="Calls could not be loaded" message={calls.error.message} onRetry={calls.refetch} /> : null}
       {calls.data?.length ? (
         <ul className="call-log__entries" aria-label="Recent calls">
