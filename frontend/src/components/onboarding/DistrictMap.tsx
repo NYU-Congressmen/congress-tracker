@@ -332,7 +332,7 @@ export function DistrictMap({ features, state, selected, onSelect }: DistrictMap
           viewBox={`${x} ${y} ${w} ${view[3]}`}
           preserveAspectRatio="xMidYMid meet"
           role="group"
-          aria-label="District map. Drag to pan or pinch to zoom."
+          aria-label="District map. Drag to pan, pinch or scroll to zoom, and tap a district to choose it."
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
