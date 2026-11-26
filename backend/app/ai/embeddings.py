@@ -9,9 +9,11 @@ from time import monotonic
 from openai import OpenAI, OpenAIError
 
 from app.ai.service import cost_usd, llm_client, log_call
+from app.config import settings
 from app.db import connect, fetch_all
 
 MODEL = "text-embedding-3-small"
+OPENAI_BASE_URL = "https://api.openai.com/v1"
 DIMENSIONS = 1536
 BATCH_SIZE = 64
 MAX_SUMMARY_CHARS = 4_000
@@ -66,6 +68,14 @@ SAVE_CUSTOM_MATCHES = """
       AND (%(uid)s::text IS NULL OR (t.uid = %(uid)s AND t.topic_key = ANY(%(keys)s)))
     ON CONFLICT (uid, topic_key, bill_id) DO UPDATE SET distance = EXCLUDED.distance
 """
+
+
+def embedding_api_key() -> str | None:
+    """Return the OpenAI key for topic vectors, using the model key when it is also OpenAI's."""
+    if settings.openai_embedding_api_key:
+        return settings.openai_embedding_api_key
+    model_base_url = (settings.llm_base_url or OPENAI_BASE_URL).rstrip("/")
+    return settings.llm_api_key if model_base_url == OPENAI_BASE_URL else None
 
 
 def save_custom_matches(conn, uid: str | None = None, keys: list[str] | None = None) -> None:

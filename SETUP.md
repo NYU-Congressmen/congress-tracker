@@ -104,6 +104,8 @@ GitHub Actions uses Workload Identity Federation to impersonate `pull-release@co
 
 The private `pull-schema-check` job in `us-east1` runs a pinned image built from `scripts/release-schema` as the Cloud Run runtime account. It reads the Alembic revision and checks the feed, account profile and call log schema in a read-only transaction. The release account's Cloud Run Source Developer role lets GitHub execute the job with the expected revision as an argument. The API and job use the same numbered database secret version. When that version changes, the release check resumes after both references match. [Cloud Run jobs](https://docs.cloud.google.com/run/docs/execute/jobs)
 
+Cloud Run reads `OPENAI_EMBEDDING_API_KEY` from the `pull-openai-embedding-key` secret for custom topics and `LLM_API_KEY` from `pull-llm-api-key` for comparison summaries, each pinned to a numbered version, with `LLM_BASE_URL` and `LLM_MODEL` as plain variables. Separate OpenAI keys keep each feature's spend visible on the OpenAI usage page, and `ai_calls` records the cost of every call by feature. A release keeps these bindings, and `/api/health` reports `custom_topics_configured` and `summaries_configured`.
+
 ### Schema checker image
 
 After a change to the checker, build its image from the reviewed checkout and update the job using the SHA-256 digest shown in the Cloud Build results. Replace `REVIEWED_COMMIT` and `IMAGE_DIGEST` with the commit identifier and full digest, including the `sha256:` prefix.

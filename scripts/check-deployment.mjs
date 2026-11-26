@@ -61,6 +61,10 @@ async function checkApi() {
   const health = await (await request('/api/health')).json()
   assert.equal(health.status, 'ok')
   assert.equal(health.database_configured, true)
+  // A missing OpenAI key turns off one feature, so the release reports it without failing.
+  for (const [flag, feature] of [['custom_topics_configured', 'Custom topics'], ['summaries_configured', 'Comparison summaries']]) {
+    if (health[flag] === false) console.warn(`${feature} are unavailable because the API has no key for them.`)
+  }
 
   const topics = await (await request('/api/issues')).json()
   assert(Number.isInteger(topics[0]?.issue_id), 'The topic list is empty or invalid.')
