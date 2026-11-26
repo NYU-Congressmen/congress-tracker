@@ -41,13 +41,11 @@ function AccountCalls({ user, congress, type, number }: CallLogProps & { user: U
   const [callError, setCallError] = useState<{ officeId: string; text: string } | null>(null)
   const pending = useRef(new Map<string, string>())
   const submitting = useRef(new Set<string>())
-  const recentToken = useRef<{ value: string; obtainedAt: number } | null>(null)
   const members = useApi(() => state ? listMembers({ state }) : Promise.resolve(null), [state])
-  const calls = useApi(async () => {
-    const value = await getAccountToken(user)
-    recentToken.current = { value, obtainedAt: Date.now() }
-    return listCalls(congress, type, number, value)
-  }, [user, congress, type, number])
+  const calls = useApi(
+    async () => listCalls(congress, type, number, await getAccountToken(user)),
+    [user, congress, type, number],
+  )
 
   const directory = (members.data?.data ?? []).filter((member) => member.state === state)
   const home = district ? representativesForDistrict(directory, state, district.district) : null
@@ -62,10 +60,9 @@ function AccountCalls({ user, congress, type, number }: CallLogProps & { user: U
       // Keep the key for this office until the server confirms the write.
       const key = pending.current.get(officeId) ?? crypto.randomUUID()
       pending.current.set(officeId, key)
-      // Start the request before the dialer takes focus when a recently checked token is available.
-      const token = recentToken.current
-      const value = token && Date.now() - token.obtainedAt < 60_000 ? token.value : await getAccountToken(user)
-      await saveCall(congress, type, number, key, officeId, value)
+      // Firebase returns its cached token without a network request, so the save starts
+      // before the dialer takes focus, and keepalive lets it finish if the page is hidden.
+      await saveCall(congress, type, number, key, officeId, await getAccountToken(user))
       pending.current.delete(officeId)
       calls.refetch()
     } catch (error) {
