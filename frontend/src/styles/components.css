@@ -365,6 +365,19 @@ button.link-more:disabled {
   line-height: 1.3;
 }
 
+/* Marks a tracked bill whose latest action the reader has not opened */
+.entry__new {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--hl);
+  color: var(--hl-ink);
+  font-size: 12px;
+  font-weight: 800;
+  vertical-align: 2px;
+}
+
 .entry:hover .entry__title {
   text-decoration: underline;
   text-underline-offset: 3px;

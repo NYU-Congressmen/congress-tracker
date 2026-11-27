@@ -44,6 +44,27 @@
   font-weight: 800;
 }
 
+/* Unread bill updates on the account avatar */
+.site-user__avatar {
+  position: relative;
+}
+
+.site-user__badge {
+  position: absolute;
+  top: -5px;
+  right: -6px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--hl);
+  color: var(--hl-ink);
+  box-shadow: 0 0 0 2px var(--card);
+  font-size: 10.5px;
+  line-height: 17px;
+  text-align: center;
+}
+
 .site-user__text {
   display: grid;
   min-width: 0;

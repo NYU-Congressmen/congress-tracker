@@ -12,6 +12,7 @@ import { BillStances } from '../components/bills/BillStances'
 import { CallLog } from '../components/bills/CallLog'
 import { ReviewPanel } from '../components/bills/ReviewPanel'
 import { SharedReviews } from '../components/bills/SharedReviews'
+import { TrackButton } from '../components/bills/TrackButton'
 import { MemberAvatar } from '../components/members/MemberAvatar'
 import { ChamberFlags } from '../components/ui/ChamberFlags'
 import { CacheNotice } from '../components/ui/CacheNotice'
@@ -181,6 +182,7 @@ export default function BillDetailPage() {
               >
                 View on congress.gov <ExternalLinkIcon size={14} />
               </a>
+              <TrackButton bill={bill} />
               <CopyLinkButton />
             </div>
             <dl className="facts">

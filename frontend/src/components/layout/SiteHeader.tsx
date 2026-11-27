@@ -8,6 +8,8 @@ import { initialsOf } from '../../lib/format'
 import { districtHeading } from '../../lib/districts'
 import { useSession } from '../../auth/SessionContext'
 import { loadFirebaseAuth } from '../../auth/firebase'
+import { getAccountToken } from '../../auth/accountToken'
+import { listUpdates, UPDATES_CHANGED } from '../../api/tracking'
 
 // Render the wordmark, primary links, account controls and theme switch.
 export function SiteHeader() {
@@ -54,8 +56,34 @@ export function SiteHeader() {
 }
 
 // Open the signed-in profile and handle sign-out from the header.
+// Count the signed-in reader's unread bill updates and follow changes made on other screens.
+function useUnreadUpdates(): number {
+  const { user } = useSession()
+  const [unread, setUnread] = useState(0)
+  useEffect(() => {
+    if (!user) return
+    let active = true
+    async function load() {
+      try {
+        const page = await listUpdates(await getAccountToken(user!))
+        if (active) setUnread(page.unread)
+      } catch {
+        // The badge is a convenience, so a failed count leaves it hidden
+      }
+    }
+    void load()
+    window.addEventListener(UPDATES_CHANGED, load)
+    return () => {
+      active = false
+      window.removeEventListener(UPDATES_CHANGED, load)
+    }
+  }, [user])
+  return user ? unread : 0
+}
+
 function ProfileMenu() {
   const { profile } = useProfile()
+  const unread = useUnreadUpdates()
   const navigate = useNavigate()
   const disclosure = useRef<HTMLDetailsElement>(null)
   const summary = useRef<HTMLElement>(null)
@@ -92,9 +120,11 @@ function ProfileMenu() {
         summary.current?.focus()
       }
     }}>
-      <summary className="site-user" ref={summary} aria-label={profile ? `${profile.username} profile options` : 'Account options'}>
+      <summary className="site-user" ref={summary}
+        aria-label={`${profile ? `${profile.username} profile options` : 'Account options'}${unread ? `, ${unread} unread bill ${unread === 1 ? 'update' : 'updates'}` : ''}`}>
         <span className="site-user__avatar" aria-hidden="true">
           {profile ? initialsOf(profile.username) : <PeopleIcon size={17} />}
+          {unread ? <span className="site-user__badge">{unread > 9 ? '9+' : unread}</span> : null}
         </span>
         <span className="site-user__text">
           <span className="site-user__name">{profile?.username ?? 'Account'}</span>

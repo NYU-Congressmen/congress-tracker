@@ -7,6 +7,7 @@ import { PageBand } from '../components/layout/PageBand'
 import { ChamberComposition } from '../components/dashboard/ChamberComposition'
 import { DistrictBills } from '../components/dashboard/DistrictBills'
 import { TopicFeed } from '../components/dashboard/TopicFeed'
+import { TrackedBills } from '../components/dashboard/TrackedBills'
 import { AlertIcon, ChevronRightIcon, SearchIcon } from '../components/icons'
 import { EmptyState } from '../components/ui/EmptyState'
 import { LoadingState } from '../components/ui/LoadingState'
@@ -221,6 +222,11 @@ export default function DashboardPage() {
 
           {/* The personal panels follow the signed-in person's district and
               topics; without a profile, one card invites them to set it up. */}
+          {user ? (
+            <section className="card panel--stack" aria-label="Bills you track">
+              <TrackedBills />
+            </section>
+          ) : null}
           {district ? (
             <div className="home__mine">
               <section className="card panel--stack" aria-label="Your district">
