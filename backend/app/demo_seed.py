@@ -18,6 +18,7 @@ from psycopg.types.json import Jsonb
 
 from app.config import settings
 from app.db import connect
+from app.tracking import notify_tracked_updates
 
 # The Firebase project's fictional test number signs in as this account.
 VIEWER_UID = "9bVp6U75ItXOcuVGapdsz3hcTX63"
@@ -64,6 +65,11 @@ BILLS = {
     "119-hr-1049": (0.49, 0.29, "education"),
 }
 AI_BILLS = {"119-s-3108", "119-hr-9352"}
+
+# Bills the viewer tracks, with how many days before each bill's latest official action they
+# started. A bill tracked after its latest action has no update yet, and the others get one
+# notification each from the same step the daily sync runs.
+VIEWER_TRACKED = {"119-s-3108": None, "119-hr-1190": 14, "119-hr-10159": 14}
 
 STORIES = {
     ("ai", "support"): [
@@ -253,6 +259,8 @@ def seed(conn, rng_seed: int = 119) -> dict[str, int]:
     )
     conn.execute("DELETE FROM reviews WHERE uid = %s", (VIEWER_UID,))
     conn.execute("DELETE FROM actions WHERE uid = %s AND action_type = 'call'", (VIEWER_UID,))
+    conn.execute("DELETE FROM notifications WHERE uid = %s", (VIEWER_UID,))
+    conn.execute("DELETE FROM tracked_bills WHERE uid = %s", (VIEWER_UID,))
 
     accounts = sample_accounts(rng)
     with conn.cursor() as cursor:
@@ -299,6 +307,21 @@ def seed(conn, rng_seed: int = 119) -> dict[str, int]:
                 if bill_id in bills
             ],
         )
+    for bill_id, days_before in VIEWER_TRACKED.items():
+        if bill_id not in bills:
+            continue
+        conn.execute(
+            """
+            INSERT INTO tracked_bills (uid, bill_id, followed_at)
+            SELECT %(uid)s, bill_id,
+                   CASE WHEN %(days)s::int IS NULL OR latest_action_date IS NULL
+                        THEN now() - interval '3 days'
+                        ELSE latest_action_date - %(days)s::int END
+            FROM bills WHERE bill_id = %(bill_id)s
+            """,
+            {"uid": VIEWER_UID, "bill_id": bill_id, "days": days_before},
+        )
+        notify_tracked_updates(conn, bill_id)
     # The seeded stories are written for the demo, so they skip the moderation queue.
     conn.execute(
         "UPDATE reviews r SET moderation_status = 'cleared' FROM users u "
