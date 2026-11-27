@@ -516,3 +516,29 @@ class NotificationsReadIn(BaseModel):
     """Choose which updates to mark read, either one bill's or all of them."""
 
     bill_id: str | None = None
+
+
+class SignalOffice(BaseModel):
+    """Describe one office's Constituent Signal counts for a bill."""
+
+    bioguide_id: str
+    name: str
+    party: str | None
+    chamber: str | None
+    state: str | None
+    district: int | None
+    support: int
+    oppose: int
+    unsure: int
+    calls: int
+
+
+class SignalPage(BaseModel):
+    """Describe the Constituent Signal the reader's offices would get for a bill this week."""
+
+    window_start: datetime
+    window_end: datetime
+    includes_sample: bool
+    # Whether the reader's own review counts: none, not_consented, not_included or included
+    your_review: Literal["none", "not_consented", "not_included", "included"]
+    offices: list[SignalOffice]
