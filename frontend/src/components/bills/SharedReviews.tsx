@@ -19,11 +19,12 @@ type Scope = Pick<DistrictSelection, 'state' | 'district'> | null
 interface SharedReviewsProps {
   bill: BillDetail
   revision?: number
-  onReviewHidden?: () => void
+  // Called after the author hides or shows their review, so the stance panel and counts reload
+  onVisibilityChange?: () => void
 }
 
 // List the stories readers shared about a bill, by default from the reader's own district.
-export function SharedReviews({ bill, revision = 0, onReviewHidden }: SharedReviewsProps) {
+export function SharedReviews({ bill, revision = 0, onVisibilityChange }: SharedReviewsProps) {
   const district = useProfile().profile?.district ?? null
   const [showAll, setShowAll] = useState(false)
   const scope = showAll ? null : district
@@ -42,12 +43,12 @@ export function SharedReviews({ bill, revision = 0, onReviewHidden }: SharedRevi
           </select>
         </label>
       ) : null}
-      <ReviewList key={key} bill={bill} scope={scope} onReviewHidden={onReviewHidden} />
+      <ReviewList key={key} bill={bill} scope={scope} onVisibilityChange={onVisibilityChange} />
     </section>
   )
 }
 
-function ReviewList({ bill, scope, onReviewHidden }: { bill: BillDetail; scope: Scope; onReviewHidden?: () => void }) {
+function ReviewList({ bill, scope, onVisibilityChange }: { bill: BillDetail; scope: Scope; onVisibilityChange?: () => void }) {
   const { congress, type, number } = bill
   const { user } = useSession()
   const first = useApi(
@@ -60,13 +61,13 @@ function ReviewList({ bill, scope, onReviewHidden }: { bill: BillDetail; scope: 
   const [page, setPage] = useState(1)
   const [loadingMore, setLoadingMore] = useState(false)
   const [moreError, setMoreError] = useState('')
-  const [removed, setRemoved] = useState<number[]>([])
 
   if (first.loading) return <LoadingState message="Loading shared reviews…" />
   if (first.error) return <ErrorState title="Shared reviews could not be loaded" message={first.error.message} onRetry={first.refetch} />
   const total = first.data?.total ?? 0
-  const reviews = [...(first.data?.data ?? []), ...more].filter((review) => !removed.includes(review.review_id))
-  if (total === 0) {
+  const reviews = [...(first.data?.data ?? []), ...more]
+  const ownHidden = first.data?.mine_hidden ?? null
+  if (total === 0 && !ownHidden) {
     const area = scope && (scope.district === null ? stateName(scope.state) : districtHeading(scope.state, scope.district))
     return <p className="muted">{area ? `No shared reviews from ${area} yet.` : 'No one has shared a review of this bill yet.'}</p>
   }
@@ -96,12 +97,12 @@ function ReviewList({ bill, scope, onReviewHidden }: { bill: BillDetail; scope: 
         {reviews.some((review) => review.is_sample) ? <span className="bill-stances__sample">Sample data</span> : null}
       </p>
       <ul className="shared-reviews">
+        {ownHidden ? (
+          <SharedReview key={`hidden-${ownHidden.review_id}`} review={ownHidden} bill={bill} hidden
+            onVisibilityChange={onVisibilityChange} />
+        ) : null}
         {reviews.map((review) => (
-          <SharedReview key={review.review_id} review={review} bill={bill}
-            onHidden={() => {
-              setRemoved((current) => [...current, review.review_id])
-              onReviewHidden?.()
-            }} />
+          <SharedReview key={review.review_id} review={review} bill={bill} onVisibilityChange={onVisibilityChange} />
         ))}
       </ul>
       {moreError ? <p role="alert" className="form-error">{moreError}</p> : null}
@@ -114,48 +115,66 @@ function ReviewList({ bill, scope, onReviewHidden }: { bill: BillDetail; scope: 
   )
 }
 
-function SharedReview({ review, bill, onHidden }: { review: PublicReview; bill: BillDetail; onHidden: () => void }) {
+interface SharedReviewProps {
+  review: PublicReview
+  bill: BillDetail
+  // The author's own review that everyone else no longer sees
+  hidden?: boolean
+  onVisibilityChange?: () => void
+}
+
+function SharedReview({ review, bill, hidden = false, onVisibilityChange }: SharedReviewProps) {
   const { user } = useSession()
   const [reporting, setReporting] = useState(false)
   const [reported, setReported] = useState(false)
-  const [hiding, setHiding] = useState(false)
+  const [changing, setChanging] = useState(false)
   const [error, setError] = useState('')
   const place = review.state ? districtHeading(review.state, review.district) : 'District not saved'
 
-  async function hide() {
+  async function setHidden(next: boolean) {
     if (!user) return
-    setHiding(true)
+    setChanging(true)
     setError('')
     try {
-      await setReviewHidden(bill.congress, bill.type, bill.number, true, await getAccountToken(user))
-      onHidden()
+      await setReviewHidden(bill.congress, bill.type, bill.number, next, await getAccountToken(user))
+      onVisibilityChange?.()
     } catch {
-      setError('Your review could not be hidden. Try again.')
-      setHiding(false)
+      setError(next ? 'Your review could not be hidden. Try again.' : 'Your review could not be shown again. Try again.')
+      setChanging(false)
     }
   }
 
+  let action = null
+  if (review.mine) {
+    action = (
+      <button type="button" className="link-more" disabled={changing} onClick={() => void setHidden(!hidden)}>
+        {hidden
+          ? changing ? 'Showing…' : 'Show in shared reviews'
+          : changing ? 'Hiding…' : 'Hide from shared reviews'}
+      </button>
+    )
+  } else if (reported) {
+    action = <span role="status" className="muted review__meta">Report sent.</span>
+  } else if (!reporting) {
+    action = <button type="button" className="link-more" onClick={() => setReporting(true)}>Report</button>
+  }
+
   return (
-    <li className="shared-review">
+    <li className={`shared-review${hidden ? ' shared-review--hidden' : ''}`}>
       <div className="shared-review__head">
         <span className={`review__stance review__stance--${review.stance}`}>{STANCE_LABELS[review.stance]}</span>
         <span className="muted review__meta">Constituent in {place} · {timeAgo(review.updated_at) || 'recently'}</span>
-        {review.mine ? <span className="bill-stances__sample">Your review</span> : null}
+        {review.mine ? (
+          <span className="bill-stances__sample">{hidden ? 'Only you can see this' : 'Your review'}</span>
+        ) : null}
+        {action ? <span className="shared-review__action">{action}</span> : null}
       </div>
       {review.story ? <p className="review__story">{review.story}</p> : null}
       {review.action_taken ? <p className="review__action"><strong>Action taken</strong>{' '}{review.action_taken}</p> : null}
       {error ? <p role="alert" className="form-error">{error}</p> : null}
-      {review.mine ? (
-        <button type="button" className="link-more" disabled={hiding} onClick={() => void hide()}>
-          {hiding ? 'Hiding…' : 'Hide from shared reviews'}
-        </button>
-      ) : reported ? (
-        <p role="status" className="muted review__meta">Report sent.</p>
-      ) : reporting ? (
+      {reporting && !reported ? (
         <ReportForm reviewId={review.review_id} onCancel={() => setReporting(false)} onSent={() => setReported(true)} />
-      ) : (
-        <button type="button" className="link-more" onClick={() => setReporting(true)}>Report</button>
-      )}
+      ) : null}
     </li>
   )
 }

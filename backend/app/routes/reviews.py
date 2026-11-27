@@ -162,21 +162,23 @@ def list_shared_reviews(
     Each one carries the state and district its author saved, which is what makes it a verified
     neighbor's view, and the optional filters match the stance counts. Names and phone numbers
     never leave the database, and `mine` marks the viewer's own review so the page offers Hide
-    instead of Report.
+    instead of Report. A signed-in viewer who hid their review gets it back in `mine_hidden`,
+    outside the count, so the page can show it to them alone and offer to share it again.
     """
     bill_id = make_bill_id(congress, bill_type, number)
     if fetch_one("SELECT 1 FROM bills WHERE bill_id = %s", (bill_id,)) is None:
         raise HTTPException(404, "Bill not found")
-    where = f"r.bill_id = %(bill_id)s AND {SHARED_REVIEW_SQL}"
-    if not sees_sample_data(viewer):
-        where += f" AND {EXCLUDE_SAMPLE_REVIEWS_SQL}"
+    area = ""
     params: dict[str, Any] = {"bill_id": bill_id, "viewer": viewer}
     if state is not None:
-        where += " AND u.state = %(state)s"
+        area += " AND u.state = %(state)s"
         params["state"] = state.upper()
     if district is not None:
-        where += " AND u.district = %(district)s"
+        area += " AND u.district = %(district)s"
         params["district"] = district
+    where = f"r.bill_id = %(bill_id)s AND {SHARED_REVIEW_SQL}{area}"
+    if not sees_sample_data(viewer):
+        where += f" AND {EXCLUDE_SAMPLE_REVIEWS_SQL}"
     total = fetch_one(
         f"SELECT count(*) AS n FROM reviews r JOIN users u ON u.uid = r.uid WHERE {where}", params
     )["n"]
@@ -195,7 +197,25 @@ def list_shared_reviews(
         """,
         {**params, "limit": limit, "offset": (page - 1) * limit},
     )
-    return {"total": total, "page": page, "limit": limit, "data": reviews}
+    mine_hidden = None
+    if viewer is not None:
+        mine_hidden = fetch_one(
+            f"""
+            SELECT r.review_id, r.bill_id, r.stance, r.story, r.action_taken, u.state, u.district,
+                   r.created_at, r.updated_at, true AS mine, u.is_sample
+            FROM reviews r JOIN users u ON u.uid = r.uid
+            WHERE r.bill_id = %(bill_id)s AND r.uid = %(viewer)s AND r.share_publicly
+              AND r.hidden_at IS NOT NULL AND r.moderation_status = 'cleared'{area}
+            """,
+            params,
+        )
+    return {
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "data": reviews,
+        "mine_hidden": mine_hidden,
+    }
 
 
 @router.post("/reviews/{review_id}/reports", status_code=204)

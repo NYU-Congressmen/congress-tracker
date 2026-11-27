@@ -110,6 +110,8 @@ export interface ReviewPage {
   page: number
   limit: number
   data: PublicReview[]
+  // The signed-in reader's own review when they hid it, which only they see
+  mine_hidden?: PublicReview | null
 }
 
 // List a bill's shared reviews, optionally from one state or district, newest first.

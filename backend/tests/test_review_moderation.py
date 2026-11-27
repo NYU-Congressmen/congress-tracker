@@ -119,11 +119,21 @@ def test_author_hides_and_shows_their_review(client, monkeypatch):
     assert client.get(SHARED).json()["total"] == 0
     assert client.get("/api/bills/119/hr/1/responses").json()["counts"]["oppose"] == 0
 
+    # Only the author gets the hidden review back, outside the count and the page
+    own = client.get(SHARED).json()["mine_hidden"]
+    assert (own["story"], own["mine"]) == ("My clinic closed.", True)
+    assert client.get(f"{SHARED}?state=CA").json()["mine_hidden"] is None
+    sign_in("r1")
+    assert client.get(SHARED).json()["mine_hidden"] is None
+    sign_in("author")
+
     # Editing keeps it hidden until the author shows it again
     client.put(REVIEW, json={"stance": "oppose", "story": "Edited.", "share_publicly": True})
     assert client.get(REVIEW).json()["hidden"] is True
     assert client.put(f"{REVIEW}/visibility", json={"hidden": False}).json()["hidden"] is False
-    assert client.get(SHARED).json()["data"][0]["story"] == "Edited."
+    shown = client.get(SHARED).json()
+    assert shown["data"][0]["story"] == "Edited."
+    assert shown["mine_hidden"] is None
 
 
 def test_hiding_needs_a_review_and_sign_in(client):

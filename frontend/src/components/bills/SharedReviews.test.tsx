@@ -19,13 +19,13 @@ function review(id: number, overrides: Record<string, unknown> = {}) {
   }
 }
 
-function renderReviews(user: User | null, onReviewHidden = vi.fn()) {
+function renderReviews(user: User | null, onVisibilityChange = vi.fn()) {
   render(
     <SessionContext.Provider value={{ user, loading: false, error: null, retry: () => {} }}>
-      <SharedReviews bill={BILL} onReviewHidden={onReviewHidden} />
+      <SharedReviews bill={BILL} onVisibilityChange={onVisibilityChange} />
     </SessionContext.Provider>,
   )
-  return onReviewHidden
+  return onVisibilityChange
 }
 
 test('lists shared stories with their district and loads the next page', async () => {
@@ -60,22 +60,44 @@ test('lets a visitor report a story with a reason', async () => {
   }))
 })
 
-test('offers the author Hide in place of Report and removes the story', async () => {
+test('offers the author Hide in place of Report and asks the page to reload', async () => {
   const fetchMock = mockApi([
     { match: '/review/visibility', body: { hidden: true } },
     { match: 'reviews?page=1', body: { total: 2, page: 1, limit: 10, data: [review(1, { mine: true }), review(2)] } },
   ])
   const user = { uid: 'author', getIdToken: vi.fn().mockResolvedValue('verified-token') } as unknown as User
-  const onReviewHidden = renderReviews(user)
+  const onVisibilityChange = renderReviews(user)
 
   expect(await screen.findByText('Your review')).toBeTruthy()
   expect(screen.getAllByRole('button', { name: 'Report' })).toHaveLength(1)
   fireEvent.click(screen.getByRole('button', { name: 'Hide from shared reviews' }))
 
-  await waitFor(() => expect(screen.queryByText('Story 1.')).toBeNull())
-  expect(onReviewHidden).toHaveBeenCalledTimes(1)
+  await waitFor(() => expect(onVisibilityChange).toHaveBeenCalledTimes(1))
   expect(fetchMock).toHaveBeenCalledWith('/api/bills/119/hr/1/review/visibility', expect.objectContaining({
     method: 'PUT', body: JSON.stringify({ hidden: true }),
     headers: expect.objectContaining({ Authorization: 'Bearer verified-token' }),
+  }))
+})
+
+test('shows the author their hidden review first and lets them share it again', async () => {
+  const fetchMock = mockApi([
+    { match: '/review/visibility', body: { hidden: false } },
+    { match: 'reviews?page=1', body: {
+      total: 1, page: 1, limit: 10, data: [review(2)], mine_hidden: review(1, { mine: true }),
+    } },
+  ])
+  const user = { uid: 'author', getIdToken: vi.fn().mockResolvedValue('verified-token') } as unknown as User
+  const onVisibilityChange = renderReviews(user)
+
+  expect(await screen.findByText('Only you can see this')).toBeTruthy()
+  expect(screen.getByText('1 shared review')).toBeTruthy()
+  const items = screen.getAllByRole('listitem')
+  expect(items[0].textContent).toContain('Story 1.')
+  expect(items[0].className).toContain('shared-review--hidden')
+  fireEvent.click(screen.getByRole('button', { name: 'Show in shared reviews' }))
+
+  await waitFor(() => expect(onVisibilityChange).toHaveBeenCalledTimes(1))
+  expect(fetchMock).toHaveBeenCalledWith('/api/bills/119/hr/1/review/visibility', expect.objectContaining({
+    method: 'PUT', body: JSON.stringify({ hidden: false }),
   }))
 })

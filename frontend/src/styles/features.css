@@ -1664,6 +1664,36 @@ button.chip {
   margin: 0;
 }
 
+.shared-review__head {
+  width: 100%;
+}
+
+/* Hide, Show and Report sit at the right end of the stance line */
+.shared-review__action {
+  margin-left: auto;
+}
+
+/* On a phone the stance and its action share the top line, and the district and tag go below */
+@media (max-width: 640px) {
+  .shared-review__head {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-areas: "stance action" "meta meta" "tag tag";
+    row-gap: 6px;
+  }
+  .shared-review__head .review__stance { grid-area: stance; }
+  .shared-review__head .review__meta { grid-area: meta; }
+  .shared-review__head .bill-stances__sample { grid-area: tag; justify-self: start; }
+  .shared-review__action { grid-area: action; justify-self: end; text-align: right; }
+}
+
+/* The author's hidden review reads as set apart from what everyone else sees */
+.shared-review--hidden {
+  background: transparent;
+  outline: 1px dashed var(--chip-border);
+  outline-offset: -1px;
+}
+
 .shared-review .review__story,
 .shared-review .review__action {
   margin: 0;

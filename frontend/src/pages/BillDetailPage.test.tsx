@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { User } from '@firebase/auth'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, test, vi } from 'vitest'
@@ -144,8 +144,8 @@ describe('BillDetailPage', () => {
     let hidden = false
     renderBill(author, [
       { match: '/api/bills/119/hr/7/reviews', respond: () => hidden
-        ? { total: 0, page: 1, limit: 10, data: [] }
-        : { total: 1, page: 1, limit: 10, data: [shared] } },
+        ? { total: 0, page: 1, limit: 10, data: [], mine_hidden: shared }
+        : { total: 1, page: 1, limit: 10, data: [shared], mine_hidden: null } },
       { match: '/api/bills/119/hr/7/review/visibility', respond: (init) => {
         hidden = JSON.parse(String(init?.body)).hidden
         return { ...review, hidden }
@@ -155,7 +155,13 @@ describe('BillDetailPage', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Hide from shared reviews' }))
     expect(await screen.findByRole('button', { name: 'Show it again' })).toBeTruthy()
-    expect(await screen.findByText('No one has shared a review of this bill yet.')).toBeTruthy()
+    expect(await screen.findByText('Only you can see this')).toBeTruthy()
+    expect(screen.getAllByRole('heading', { name: 'Shared reviews' })).toHaveLength(1)
+
+    // The shared list offers the same way back as the stance panel
+    fireEvent.click(screen.getByRole('button', { name: 'Show in shared reviews' }))
+    expect(await screen.findByText('Your review')).toBeTruthy()
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Show it again' })).toBeNull())
     expect(screen.getAllByRole('heading', { name: 'Shared reviews' })).toHaveLength(1)
   })
 

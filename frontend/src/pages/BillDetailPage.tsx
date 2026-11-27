@@ -262,7 +262,7 @@ export default function BillDetailPage() {
         <ReviewPanel key={`review-${bill.bill_id}-${reviewRevision}`} congress={bill.congress} type={bill.type} number={bill.number}
           onStanceSaved={() => setStanceRevision((value) => value + 1)} />
         <BillStances key={`stances-${bill.bill_id}`} bill={bill} revision={stanceRevision} />
-        <SharedReviews key={`shared-${bill.bill_id}`} bill={bill} revision={stanceRevision} onReviewHidden={() => {
+        <SharedReviews key={`shared-${bill.bill_id}`} bill={bill} revision={stanceRevision} onVisibilityChange={() => {
           setReviewRevision((value) => value + 1)
           setStanceRevision((value) => value + 1)
         }} />

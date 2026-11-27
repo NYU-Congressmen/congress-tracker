@@ -372,6 +372,8 @@ class ReviewPage(BaseModel):
     page: int
     limit: int
     data: list[PublicReview]
+    # The viewer's own review when they hid it from everyone else, which only they see
+    mine_hidden: PublicReview | None = None
 
 
 ReportReason = Literal["spam", "harassment", "misinformation", "personal_info", "other"]
