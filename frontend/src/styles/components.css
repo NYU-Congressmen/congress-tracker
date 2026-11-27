@@ -148,6 +148,21 @@ a.chip:hover {
   text-decoration: underline;
 }
 
+/* The same link look on buttons that act in place */
+button.link-more {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+button.link-more:disabled {
+  cursor: default;
+  opacity: 0.6;
+  text-decoration: none;
+}
+
 .ext-link {
   display: inline-flex;
   align-items: center;

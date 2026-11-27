@@ -1479,10 +1479,6 @@ button.chip {
 
 .call-log__history button.link-more {
   padding: 4px 0;
-  border: 0;
-  background: transparent;
-  font-family: inherit;
-  cursor: pointer;
 }
 
 .call-log__history .call-log__delete {
