@@ -53,8 +53,8 @@ describe('browser profiles from earlier builds', () => {
     expect(importablePreferences(stored)).toEqual({
       username: 'Adam-W', topics: [3, 5], socials: [{ platform: 'bluesky', handle: 'adam.bsky.social' }],
     })
-    expect(importablePreferences({ ...stored, username: '!!', district: { state: 'NY', district: 12, method: 'map' } })).toEqual({
-      district: { state: 'NY', district: 12, method: 'map' }, topics: [3, 5],
+    expect(importablePreferences({ ...stored, username: '!!', district: { state: 'NY', district: 12, method: 'search' } })).toEqual({
+      district: { state: 'NY', district: 12, method: 'search' }, topics: [3, 5],
       socials: [{ platform: 'bluesky', handle: 'adam.bsky.social' }],
     })
   })

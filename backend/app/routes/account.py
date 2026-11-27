@@ -6,8 +6,16 @@ from psycopg.types.json import Jsonb
 
 from app.auth import PhoneIdentity, current_phone_identity, current_uid
 from app.db import connect, fetch_one
+from app.district_search import search as search_districts
 from app.geocoding import district_for_address
-from app.models import AccountDistrict, AccountProfile, DistrictAddress, ProfilePreferences
+from app.models import (
+    AccountDistrict,
+    AccountProfile,
+    DistrictAddress,
+    DistrictQuery,
+    DistrictSearchResult,
+    ProfilePreferences,
+)
 
 router = APIRouter(tags=["account"])
 
@@ -59,10 +67,10 @@ def save_profile(
     return profile_response(row)
 
 
-@router.post("/district-lookup", response_model=AccountDistrict)
-def lookup_district(address: DistrictAddress) -> AccountDistrict:
-    """Return the Census district for a street address during browser profile setup."""
-    return district_for_address(address.address)
+@router.post("/district-search", response_model=DistrictSearchResult)
+def district_search(body: DistrictQuery) -> DistrictSearchResult:
+    """Return candidate districts and their members for an address, ZIP code or state."""
+    return search_districts(body.query)
 
 
 @router.put("/account", status_code=204)

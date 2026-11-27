@@ -28,12 +28,46 @@ class AccountDistrict(BaseModel):
     district: int | None
 
 
+class DistrictQuery(BaseModel):
+    """Describe what a reader typed into the district search."""
+
+    query: Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=300)]
+
+
+class MemberBrief(BaseModel):
+    """Describe a current member listed beside a district search result."""
+
+    bioguide_id: str
+    name: str
+    party: str | None
+    state: str
+    image_url: str | None
+
+
+class DistrictCandidate(AccountDistrict):
+    """Describe one district a search matched and its House member, if known."""
+
+    representative: MemberBrief | None
+
+
+class DistrictSearchResult(BaseModel):
+    """Describe the districts a search matched, how they were matched and the state's senators.
+
+    A source of address means the Census verified the match, so a single district can be saved
+    to the account. Zip and state results are candidates the reader chooses among.
+    """
+
+    source: Literal["address", "zip", "state"]
+    districts: list[DistrictCandidate]
+    senators: list[MemberBrief]
+
+
 class ProfileDistrict(AccountDistrict):
     """Describe the location shown in the account's profile."""
 
     state: Annotated[str, StringConstraints(pattern=r"^[A-Z]{2}$")]
     district: Annotated[int | None, Field(ge=1, le=99)]
-    method: Literal["address", "map", "number"]
+    method: Literal["address", "map", "number", "search"]
 
 
 class ProfileSocial(BaseModel):

@@ -93,7 +93,7 @@ export function importablePreferences(profile: Profile): ProfileChanges {
   const district = profile.district
   if (district && /^[A-Z]{2}$/.test(district.state)
     && (district.district === null || (Number.isInteger(district.district) && district.district >= 1 && district.district <= 99))
-    && ['address', 'map', 'number'].includes(district.method)) {
+    && ['address', 'map', 'number', 'search'].includes(district.method)) {
     preferences.district = { state: district.state, district: district.district, method: district.method }
   }
 
