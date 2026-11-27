@@ -201,7 +201,7 @@ def sample_accounts(rng: random.Random) -> list[tuple[str, str, str, int]]:
 
 
 def sample_reviews(rng: random.Random, accounts, bills: list[str]) -> list[tuple]:
-    """Return sample stances, with some stories shared publicly or with the brief."""
+    """Return sample stances, some with stories shared publicly and some included in the brief."""
     now = datetime.now(UTC)
     reviews = []
     # Each theme and stance deals its stories in a shuffled rotation, so neighboring reviews
@@ -227,7 +227,8 @@ def sample_reviews(rng: random.Random, accounts, bills: list[str]) -> list[tuple
                     stance,
                     story,
                     story is not None and rng.random() < 0.7,
-                    story is not None and rng.random() < 0.55,
+                    # Any stance can go into the brief, and people who wrote a story opt in more
+                    rng.random() < (0.55 if story is not None else 0.3),
                     written,
                 )
             )
