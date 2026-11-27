@@ -2,7 +2,7 @@ import type { User } from '@firebase/auth'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { BillType } from '../../api/bills'
-import { getReview, saveStance, STANCE_LABELS, STANCES } from '../../api/reviews'
+import { getReview, saveStance, setReviewHidden, STANCE_LABELS, STANCES } from '../../api/reviews'
 import type { ModerationStatus, Review, Stance } from '../../api/reviews'
 import { useSession } from '../../auth/SessionContext'
 import { getAccountToken } from '../../auth/accountToken'
@@ -49,6 +49,20 @@ function AccountReview({ congress, type, number, user, onStanceSaved }: ReviewPa
   const [saveError, setSaveError] = useState('')
   const review = saved ?? data
   const discussionPath = `/social?bill=${congress}-${type}-${number}#bill-review`
+
+  // Return a hidden review to the shared list and the stance counts.
+  async function showAgain() {
+    setSaving(true)
+    setSaveError('')
+    try {
+      setSaved(await setReviewHidden(congress, type, number, false, await getAccountToken(user)))
+      onStanceSaved?.()
+    } catch {
+      setSaveError('Your review could not be shown again. Try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   async function recordStance(stance: Stance) {
     if (saving || stance === review?.stance) return
@@ -98,6 +112,14 @@ function AccountReview({ congress, type, number, user, onStanceSaved }: ReviewPa
               {review.action_taken ? <p className="review__action"><strong>Action taken</strong>{' '}{review.action_taken}</p> : null}
               {MODERATION_NOTICES[review.moderation_status] ? (
                 <p className="muted review__meta">{MODERATION_NOTICES[review.moderation_status]}</p>
+              ) : null}
+              {review.hidden ? (
+                <p className="muted review__meta">
+                  Hidden from shared reviews and stance counts.{' '}
+                  <button type="button" className="link-more" disabled={saving} onClick={() => void showAgain()}>
+                    Show it again
+                  </button>
+                </p>
               ) : null}
               <p className="muted review__meta">Saved {timeAgo(review.updated_at) || 'recently'}</p>
             </div>

@@ -1637,3 +1637,49 @@ button.chip {
   display: grid;
   gap: 2px;
 }
+
+/* stories readers shared about a bill */
+.shared-reviews {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.shared-review {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--note-bg);
+}
+
+.shared-review__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.shared-review__head .review__stance,
+.shared-review__head .bill-stances__sample {
+  margin: 0;
+}
+
+.shared-review .review__story,
+.shared-review .review__action {
+  margin: 0;
+}
+
+.shared-review__report {
+  display: grid;
+  gap: 10px;
+  width: min(100%, 30rem);
+}
+
+.shared-review__report-actions {
+  display: flex;
+  gap: 8px;
+}

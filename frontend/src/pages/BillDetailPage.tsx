@@ -11,6 +11,7 @@ import { BillExplanation } from '../components/bills/BillExplanation'
 import { BillStances } from '../components/bills/BillStances'
 import { CallLog } from '../components/bills/CallLog'
 import { ReviewPanel } from '../components/bills/ReviewPanel'
+import { SharedReviews } from '../components/bills/SharedReviews'
 import { MemberAvatar } from '../components/members/MemberAvatar'
 import { ChamberFlags } from '../components/ui/ChamberFlags'
 import { CacheNotice } from '../components/ui/CacheNotice'
@@ -71,6 +72,8 @@ function CopyLinkButton() {
 
 export default function BillDetailPage() {
   const [stanceRevision, setStanceRevision] = useState(0)
+  // Hiding a review from the shared list reloads the author's own panel.
+  const [reviewRevision, setReviewRevision] = useState(0)
   const { congress: congressParam, type: typeParam, number: numberParam } = useParams()
   const congress = Number(congressParam)
   const number = Number(numberParam)
@@ -256,9 +259,13 @@ export default function BillDetailPage() {
 
         <BillDiff key={bill.bill_id} congress={bill.congress} type={bill.type} number={bill.number} />
 
-        <ReviewPanel key={bill.bill_id} congress={bill.congress} type={bill.type} number={bill.number}
+        <ReviewPanel key={`${bill.bill_id}-${reviewRevision}`} congress={bill.congress} type={bill.type} number={bill.number}
           onStanceSaved={() => setStanceRevision((value) => value + 1)} />
         <BillStances key={bill.bill_id} bill={bill} revision={stanceRevision} />
+        <SharedReviews key={bill.bill_id} bill={bill} revision={stanceRevision} onReviewHidden={() => {
+          setReviewRevision((value) => value + 1)
+          setStanceRevision((value) => value + 1)
+        }} />
         <CallLog key={bill.bill_id} congress={bill.congress} type={bill.type} number={bill.number} />
       </div>
     </div>
