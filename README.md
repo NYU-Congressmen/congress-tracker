@@ -20,16 +20,16 @@ Firebase Hosting serves the React app over HTTPS and forwards `/api` requests to
 
 ## Initial roadmap
 
-The initial roadmap follows the bootcamp's weekly structure. It brings integration checks forward by including a deployment smoke test in Week 5 and one complete login, bill-tracking and in-app update flow in Week 6.
+The initial roadmap follows the bootcamp's weekly sessions for our Tuesday section. It brings integration checks forward by including a deployment smoke test in Week 6 and one complete login, bill-tracking and in-app update flow in Week 7.
 
-| Week | Starts | Focus |
+| Week | Session | Focus |
 |---|---|---|
-| 4 | Oct 26 | Mid-checkpoint presentation of the backend, schema and API integration |
-| 5 | Nov 2 | Frontend structure, legislative dashboard and an early deployment smoke test |
-| 6 | Nov 9 | Member profiles, Firebase login and one complete bill-tracking flow with an in-app update |
-| 7 | Nov 16 | Notifications, charts, testing and debugging |
-| 8 | Nov 23 | Final deployment and preparation |
-| 9 | Nov 30 | Final presentation |
+| 5 | Oct 27 | Mid-checkpoint presentation of the backend, schema and API integration |
+| 6 | Nov 3 | Frontend structure, legislative dashboard and an early deployment smoke test |
+| 7 | Nov 10 | Member profiles, Firebase login and one complete bill-tracking flow with an in-app update |
+| 8 | Nov 17 | Notifications, charts, testing and debugging |
+| Break | None | Thanksgiving break, with the final deployment and preparation |
+| 9 | Dec 1 | Final presentation |
 
 ## Team
 
