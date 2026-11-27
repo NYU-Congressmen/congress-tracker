@@ -153,12 +153,16 @@ def list_shared_reviews(
     number: int,
     page: Annotated[int, Query(ge=1)] = 1,
     limit: Annotated[int, Query(ge=1, le=50)] = 20,
+    state: Annotated[str | None, Query(pattern="^[A-Za-z]{2}$")] = None,
+    district: Annotated[int | None, Query(ge=0)] = None,
     viewer: Annotated[str | None, Depends(optional_uid)] = None,
 ) -> dict[str, Any]:
     """Return the reviews of a bill that their authors shared, most recently edited first.
 
     Each one carries the state and district its author saved, which is what makes it a verified
-    neighbor's view. Names and phone numbers never leave the database.
+    neighbor's view, and the optional filters match the stance counts. Names and phone numbers
+    never leave the database, and `mine` marks the viewer's own review so the page offers Hide
+    instead of Report.
     """
     bill_id = make_bill_id(congress, bill_type, number)
     if fetch_one("SELECT 1 FROM bills WHERE bill_id = %s", (bill_id,)) is None:
@@ -166,12 +170,21 @@ def list_shared_reviews(
     where = f"r.bill_id = %(bill_id)s AND {SHARED_REVIEW_SQL}"
     if not sees_sample_data(viewer):
         where += f" AND {EXCLUDE_SAMPLE_REVIEWS_SQL}"
-    params = {"bill_id": bill_id}
-    total = fetch_one(f"SELECT count(*) AS n FROM reviews r WHERE {where}", params)["n"]
+    params: dict[str, Any] = {"bill_id": bill_id, "viewer": viewer}
+    if state is not None:
+        where += " AND u.state = %(state)s"
+        params["state"] = state.upper()
+    if district is not None:
+        where += " AND u.district = %(district)s"
+        params["district"] = district
+    total = fetch_one(
+        f"SELECT count(*) AS n FROM reviews r JOIN users u ON u.uid = r.uid WHERE {where}", params
+    )["n"]
     reviews = fetch_all(
         f"""
         SELECT r.review_id, r.bill_id, r.stance, r.story, r.action_taken, u.state, u.district,
-               r.created_at, r.updated_at,
+               r.created_at, r.updated_at, r.uid = %(viewer)s IS TRUE AS mine,
+               u.is_sample,
                ARRAY(SELECT DISTINCT p.platform FROM post_cards p
                      WHERE p.review_id = r.review_id AND NOT p.hidden_on_pull
                      ORDER BY p.platform) AS posted_to

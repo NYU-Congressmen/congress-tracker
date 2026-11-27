@@ -361,6 +361,8 @@ class PublicReview(BaseModel):
     updated_at: datetime
     # Platforms where a live post carrying one of the review's share links was found
     posted_to: list[str] = Field(default_factory=list)
+    mine: bool = False
+    is_sample: bool = False
 
 
 class ReviewPage(BaseModel):
