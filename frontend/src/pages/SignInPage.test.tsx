@@ -9,7 +9,6 @@ import SignInPage from './SignInPage'
 import OnboardingPage from './OnboardingPage'
 import { SiteHeader } from '../components/layout/SiteHeader'
 import { ProfileProvider } from '../profile/ProfileContext'
-import { createProfile } from '../profile/store'
 import { mockApi } from '../test/fetchMock'
 
 const mocks = vi.hoisted(() => ({
@@ -38,8 +37,17 @@ afterEach(() => {
   document.documentElement.style.colorScheme = ''
 })
 
+// Write browser profiles the way earlier builds stored them, with one of them in use.
+function storeLegacy(profiles: Record<string, unknown>[], active: string) {
+  const stamp = '2026-11-01T00:00:00Z'
+  localStorage.setItem('pull:accounts', JSON.stringify(Object.fromEntries(profiles.map((profile) => [profile.username, {
+    district: null, topics: [], socials: [], created_at: stamp, updated_at: stamp, ...profile,
+  }]))))
+  localStorage.setItem('pull:session', active)
+}
+
 test('uses one profile menu and returns to the signed-out header after sign-out', async () => {
-  createProfile('maya', { firebase_uid: 'reviewer', district: null, topics: [], socials: [] })
+  storeLegacy([{ username: 'maya', firebase_uid: 'reviewer' }], 'maya')
   const user = { uid: 'reviewer', getIdToken: vi.fn().mockResolvedValue('verified-token') }
   const auth = {
     onAuthStateChanged: vi.fn((callback: (value: typeof user | null) => void) => {

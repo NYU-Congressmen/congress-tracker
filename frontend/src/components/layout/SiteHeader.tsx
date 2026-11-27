@@ -55,7 +55,7 @@ export function SiteHeader() {
 
 // Open the signed-in profile and handle sign-out from the header.
 function ProfileMenu() {
-  const { profile, leaveProfile } = useProfile()
+  const { profile } = useProfile()
   const navigate = useNavigate()
   const disclosure = useRef<HTMLDetailsElement>(null)
   const summary = useRef<HTMLElement>(null)
@@ -77,7 +77,6 @@ function ProfileMenu() {
     try {
       const { signOut } = await import('@firebase/auth')
       await signOut(await loadFirebaseAuth())
-      if (profile && !profile.firebase_uid) leaveProfile()
       navigate('/')
     } catch {
       setError(true)

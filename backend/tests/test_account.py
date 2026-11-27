@@ -30,34 +30,34 @@ def census_match(url, *, params, timeout):
     return httpx.Response(200, json=body, request=httpx.Request("GET", url))
 
 
-def test_district_lookups_stop_at_the_per_minute_limit(monkeypatch, fresh_limiter):
+def test_district_lookups_stop_at_the_per_minute_limit(db, monkeypatch, fresh_limiter):
     fresh_limiter.max_per_minute = 2
     monkeypatch.setattr("app.geocoding.httpx.get", census_match)
-    address = {"address": "100 Example Street, Example City"}
+    query = {"query": "100 Example Street, Example City"}
 
-    assert client.post("/api/district-lookup", json=address).status_code == 200
-    assert client.post("/api/district-lookup", json=address).status_code == 200
-    limited = client.post("/api/district-lookup", json=address)
+    assert client.post("/api/district-search", json=query).status_code == 200
+    assert client.post("/api/district-search", json=query).status_code == 200
+    limited = client.post("/api/district-search", json=query)
     assert limited.status_code == 429
     assert limited.headers["Retry-After"] == "60"
 
     # A minute later the oldest lookups no longer count
     fresh_limiter.started = type(fresh_limiter.started)(t - 61 for t in fresh_limiter.started)
-    assert client.post("/api/district-lookup", json=address).status_code == 200
+    assert client.post("/api/district-search", json=query).status_code == 200
 
 
-def test_district_lookups_wait_for_a_free_slot(monkeypatch, fresh_limiter):
+def test_district_lookups_wait_for_a_free_slot(db, monkeypatch, fresh_limiter):
     fresh_limiter.max_in_flight = 1
-    address = {"address": "100 Example Street, Example City"}
+    query = {"query": "100 Example Street, Example City"}
     statuses = []
 
     def slow_census(url, *, params, timeout):
         # A second lookup while this one is still in flight finds no free slot
-        statuses.append(client.post("/api/district-lookup", json=address).status_code)
+        statuses.append(client.post("/api/district-search", json=query).status_code)
         return census_match(url, params=params, timeout=timeout)
 
     monkeypatch.setattr("app.geocoding.httpx.get", slow_census)
-    assert client.post("/api/district-lookup", json=address).status_code == 200
+    assert client.post("/api/district-search", json=query).status_code == 200
     assert statuses == [429]
     assert fresh_limiter.in_flight == 0
 
@@ -145,7 +145,7 @@ def test_verified_account_has_one_profile_and_import_cannot_replace_it(db, verif
     assert client.get(path, headers=headers).json() == latest
 
 
-def test_guest_district_lookup_returns_the_district_without_an_account(monkeypatch):
+def test_guest_district_search_returns_the_census_district_without_an_account(db, monkeypatch):
     def census_get(url, *, params, timeout):
         assert params["address"] == "100 Example Street, Example City"
         return httpx.Response(
@@ -164,10 +164,15 @@ def test_guest_district_lookup_returns_the_district_without_an_account(monkeypat
         )
 
     monkeypatch.setattr("app.geocoding.httpx.get", census_get)
-    address = {"address": "100 Example Street, Example City"}
-    result = client.post("/api/district-lookup", json=address)
+    query = {"query": "100 Example Street, Example City"}
+    result = client.post("/api/district-search", json=query)
     assert result.status_code == 200
-    assert result.json() == {"state": "NY", "district": 12}
+    assert result.json() == {
+        "source": "address",
+        "districts": [{"state": "NY", "district": 12, "representative": None}],
+        "senators": [],
+    }
+    address = {"address": "100 Example Street, Example City"}
     assert client.put("/api/account/district", json=address).status_code == 401
 
 

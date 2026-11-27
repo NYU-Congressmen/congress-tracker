@@ -79,7 +79,7 @@ test('saves a district on request and uses it for My representatives', async () 
   ]
   const fetchMock = mockApi([
     account.route,
-    { match: '/api/district-lookup', body: match },
+    { match: '/api/district-search', body: { source: 'address', districts: [{ ...match, representative: null }], senators: [] } },
     { match: '/api/account/district', body: match },
     { match: '/api/members', body: { total: members.length, data: members } },
   ])
@@ -87,7 +87,7 @@ test('saves a district on request and uses it for My representatives', async () 
 
   expect(screen.getByRole('link', { name: 'Edit profile' }).getAttribute('href')).toBe('/profile')
   expect(screen.queryByRole('link', { name: 'Set up profile' })).toBeNull()
-  fireEvent.change(await screen.findByLabelText('Street address'), { target: { value: '350 Fifth Avenue, New York, NY' } })
+  fireEvent.change(await screen.findByLabelText('Address, ZIP code or state'), { target: { value: '350 Fifth Avenue, New York, NY' } })
   fireEvent.click(screen.getByRole('button', { name: 'Find district' }))
   expect(await screen.findByText('New York · District 12')).toBeTruthy()
   expect(fetchMock).not.toHaveBeenCalledWith('/api/account/district', expect.objectContaining({ method: 'PUT' }))

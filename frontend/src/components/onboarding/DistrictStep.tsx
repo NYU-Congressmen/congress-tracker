@@ -12,7 +12,7 @@ import { SelectField } from '../ui/Fields'
 import { LoadingState } from '../ui/LoadingState'
 import { StepActions } from './StepActions'
 
-type Method = DistrictSelection['method']
+type Method = Exclude<DistrictSelection['method'], 'search'>
 
 interface DistrictStepProps {
   initial: DistrictSelection | null
@@ -48,10 +48,12 @@ function loadMap(state: string): Promise<FeatureCollection> {
   return geometry
 }
 
-// Choose a congressional district by address, map or district number.
+// Choose a congressional district by search, map or district number.
 export function DistrictStep({ initial, preferAddress, deferAddressSave, nextLabel, onBack, onDone }: DistrictStepProps) {
-  const [method, setMethod] = useState<Method>(preferAddress ? 'address' : initial?.method ?? 'address')
-  const [choice, setChoice] = useState<DistrictSelection | null>(initial?.method === 'address' ? null : initial)
+  // Search results and Census matches both reopen in the search tab.
+  const searched = initial?.method === 'address' || initial?.method === 'search'
+  const [method, setMethod] = useState<Method>(preferAddress || searched || !initial ? 'address' : initial.method as Method)
+  const [choice, setChoice] = useState<DistrictSelection | null>(searched ? null : initial)
 
   const [mapState, setMapState] = useState(initial?.state ?? '')
   const [numState, setNumState] = useState(initial?.state ?? '')
@@ -81,7 +83,7 @@ export function DistrictStep({ initial, preferAddress, deferAddressSave, nextLab
   }
 
   const methodTabs: { id: Method; label: string }[] = [
-    { id: 'address', label: 'Find by address' },
+    { id: 'address', label: 'Find by address or ZIP' },
     { id: 'map', label: 'Pick it on the map' },
     { id: 'number', label: 'Pick the number' },
   ]
@@ -106,7 +108,7 @@ export function DistrictStep({ initial, preferAddress, deferAddressSave, nextLab
 
       {method === 'address' ? (
         <AddressDistrict
-          initial={initial?.method === 'address' ? initial : null}
+          initial={searched ? initial : null}
           deferSave={deferAddressSave}
           nextLabel={nextLabel}
           onBack={onBack}

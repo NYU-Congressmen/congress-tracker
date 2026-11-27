@@ -15,7 +15,7 @@ export interface DistrictSelection {
   state: string
   district: number | null
   // How the person picked, kept for a future "improve your district" step.
-  method: 'address' | 'map' | 'number'
+  method: 'address' | 'map' | 'number' | 'search'
 }
 
 export interface Profile {
