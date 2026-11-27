@@ -130,6 +130,35 @@ describe('BillDetailPage', () => {
     }))
   })
 
+  test('hides an author\'s shared review and keeps one shared reviews panel', async () => {
+    const author = { uid: 'author', getIdToken: vi.fn().mockResolvedValue('test-token') } as unknown as User
+    const review = {
+      bill_id: BILL.bill_id, stance: 'support', story: 'My shared story', consent_to_share: true,
+      share_publicly: true, moderation_status: 'cleared', hidden: false, updated_at: '2026-11-25T12:00:00Z',
+    }
+    const shared = {
+      review_id: 5, bill_id: BILL.bill_id, stance: 'support', story: 'My shared story', action_taken: null,
+      state: 'NY', district: 13, created_at: review.updated_at, updated_at: review.updated_at,
+      posted_to: [], mine: true, is_sample: false,
+    }
+    let hidden = false
+    renderBill(author, [
+      { match: '/api/bills/119/hr/7/reviews', respond: () => hidden
+        ? { total: 0, page: 1, limit: 10, data: [] }
+        : { total: 1, page: 1, limit: 10, data: [shared] } },
+      { match: '/api/bills/119/hr/7/review/visibility', respond: (init) => {
+        hidden = JSON.parse(String(init?.body)).hidden
+        return { ...review, hidden }
+      } },
+      { match: '/api/bills/119/hr/7/review', respond: () => ({ ...review, hidden }) },
+    ])
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Hide from shared reviews' }))
+    expect(await screen.findByRole('button', { name: 'Show it again' })).toBeTruthy()
+    expect(await screen.findByText('No one has shared a review of this bill yet.')).toBeTruthy()
+    expect(screen.getAllByRole('heading', { name: 'Shared reviews' })).toHaveLength(1)
+  })
+
   test('shows a saved call and its private note on the signed-in bill page', async () => {
     const caller = { uid: 'caller', getIdToken: vi.fn().mockResolvedValue('test-token') } as unknown as User
     const note = 'Asked about the committee date.'
