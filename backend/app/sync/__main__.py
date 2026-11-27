@@ -1,5 +1,6 @@
 import sys
 
+from app.ai.briefs import draft_followed_bills
 from app.config import settings
 from app.db import connect
 from app.sync.bills import sync_bills
@@ -41,6 +42,8 @@ def main() -> int:
         with connect() as conn:
             saved = notify_tracked_updates(conn)
         print(f"Recorded {saved} notifications of new actions on tracked bills.")
+        saved = draft_followed_bills()
+        print(f"Drafted {saved} Constituent Signal briefs for this week.")
     found = sync_bluesky_posts()
     if found is None:
         print("BLUESKY_HANDLE and BLUESKY_APP_PASSWORD are not set, so no posts were searched.")
