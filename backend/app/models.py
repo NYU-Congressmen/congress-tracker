@@ -476,3 +476,43 @@ class CallEntry(CallIn):
     action_id: int
     member_name: str
     created_at: datetime
+
+
+class TrackStatus(BaseModel):
+    """Describe whether the signed-in reader tracks a bill."""
+
+    tracking: bool
+
+
+class TrackedBill(BillSummary):
+    """Describe a bill the reader tracks and how many of its updates they have not opened."""
+
+    followed_at: datetime
+    unread: int
+
+
+class Notification(BaseModel):
+    """Describe one update about a tracked bill."""
+
+    notification_id: int
+    bill_id: str
+    congress: int
+    type: BillType
+    number: int
+    title: str
+    message: str
+    is_read: bool
+    created_at: datetime
+
+
+class NotificationPage(BaseModel):
+    """Describe the reader's most recent updates and how many are unread."""
+
+    unread: int
+    data: list[Notification]
+
+
+class NotificationsReadIn(BaseModel):
+    """Choose which updates to mark read, either one bill's or all of them."""
+
+    bill_id: str | None = None

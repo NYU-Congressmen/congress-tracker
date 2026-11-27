@@ -15,6 +15,7 @@ from app.routes import (
     responses,
     reviews,
     sharing,
+    tracking,
     votes,
 )
 
@@ -35,5 +36,6 @@ app.include_router(responses.router, prefix="/api")
 app.include_router(votes.router, prefix="/api")
 app.include_router(sharing.router, prefix="/api")
 app.include_router(calls.router, prefix="/api")
+app.include_router(tracking.router, prefix="/api")
 # Share links live at /s/{code}, outside /api, so the address people see stays short
 app.include_router(sharing.pages)

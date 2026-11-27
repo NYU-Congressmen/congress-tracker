@@ -7,6 +7,7 @@ from app.sync.client import CongressClient
 from app.sync.members import SAVE_MEMBER_SQL, clean_member_detail
 from app.sync.status import NEVER_DOWNGRADE_SQL, summarize_actions
 from app.sync.texts import SAVE_VERSION_SQL, clean_version
+from app.tracking import notify_tracked_updates
 
 # Sponsorship has no update date to compare against, so it is refreshed on a schedule
 SPONSORED_MAX_AGE = timedelta(days=1)
@@ -155,6 +156,7 @@ def refresh_bill(client: CongressClient, congress: int, bill_type: str, number: 
         conn.cursor().executemany(
             SAVE_VERSION_SQL, [clean_version(row["bill_id"], v) for v in versions]
         )
+        notify_tracked_updates(conn, row["bill_id"])
     return row["bill_id"]
 
 
