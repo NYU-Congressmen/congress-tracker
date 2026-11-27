@@ -58,8 +58,8 @@ class LookupLimiter:
 limiter = LookupLimiter()
 
 
-def district_for_address(address: str) -> AccountDistrict:
-    """Return the postal state and 119th Congress district for an unambiguous address."""
+def census_districts(address: str) -> set[tuple[str, int | None]]:
+    """Return every postal state and 119th Congress district the Census matches for an address."""
     try:
         with limiter.slot():
             response = httpx.get(
@@ -86,11 +86,18 @@ def district_for_address(address: str) -> AccountDistrict:
             for geography in match["geographies"].get(DISTRICT_LAYER, []):
                 geoid = geography.get("GEOID", "")
                 if re.fullmatch(r"[0-9]{4}", geoid):
-                    districts.add((state, geoid[-2:]))
+                    code = geoid[-2:]
+                    districts.add((state, None if code in {"00", "98"} else int(code)))
     except (httpx.HTTPError, AttributeError, KeyError, TypeError, ValueError):
         # The upstream URL contains the submitted address.
         raise HTTPException(502, "District lookup is unavailable. Try again shortly.") from None
+    return districts
+
+
+def district_for_address(address: str) -> AccountDistrict:
+    """Return the postal state and 119th Congress district for an unambiguous address."""
+    districts = census_districts(address)
     if len(districts) != 1:
         raise HTTPException(422, "No single congressional district matched that address.")
-    state, code = districts.pop()
-    return AccountDistrict(state=state, district=None if code in {"00", "98"} else int(code))
+    state, district = districts.pop()
+    return AccountDistrict(state=state, district=district)

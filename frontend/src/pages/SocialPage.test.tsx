@@ -4,7 +4,7 @@ import type { User } from '@firebase/auth'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { SessionContext } from '../auth/SessionContext'
 import { ProfileProvider } from '../profile/ProfileContext'
-import { createProfile, currentProfile, leaveProfile } from '../profile/store'
+import { currentProfile } from '../profile/store'
 import SocialPage from './SocialPage'
 import { listDiscussions, recordDiscussion } from '../social/drafts'
 import { mockAccountProfile, mockApi } from '../test/fetchMock'
@@ -74,12 +74,20 @@ afterEach(() => {
   localStorage.clear()
 })
 
+// Write browser profiles the way earlier builds stored them, with one of them in use.
+function storeLegacy(profiles: Record<string, unknown>[], active: string) {
+  const stamp = '2026-11-01T00:00:00Z'
+  localStorage.setItem('pull:accounts', JSON.stringify(Object.fromEntries(profiles.map((profile) => [profile.username, {
+    district: null, topics: [], socials: [], created_at: stamp, updated_at: stamp, ...profile,
+  }]))))
+  localStorage.setItem('pull:session', active)
+}
+
 describe('SocialPage', () => {
 
   test('restores the signed-in profile and loads a linked review after the session check', async () => {
-    createProfile('maya', { firebase_uid: 'reviewer', district: null, topics: [1], socials: [] })
-    createProfile('sam', { firebase_uid: 'other-user', district: null, topics: [], socials: [] })
-    leaveProfile()
+    storeLegacy([{ username: 'maya', firebase_uid: 'reviewer', topics: [1] }, { username: 'sam', firebase_uid: 'other-user' }], '')
+    localStorage.removeItem('pull:session')
     const account = mockAccountProfile({}, false)
     mockApi([
       account.route,

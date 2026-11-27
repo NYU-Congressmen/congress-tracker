@@ -44,12 +44,14 @@ function ApiStatusPanel() {
   )
 }
 
-const ROADMAP: { week: string; starts: string; focus: string }[] = [
-  { week: '5', starts: 'Nov 2', focus: 'Frontend structure, legislative dashboard and an early deployment smoke test' },
-  { week: '6', starts: 'Nov 9', focus: 'Member profiles, login and one complete bill-tracking flow with an in-app update' },
-  { week: '7', starts: 'Nov 16', focus: 'Notifications, charts, testing and debugging' },
-  { week: '8', starts: 'Nov 23', focus: 'Final deployment and preparation' },
-  { week: '9', starts: 'Nov 30', focus: 'Final presentation' },
+// Weeks and session dates follow the bootcamp schedule for the team's Tuesday section.
+const ROADMAP: { week: string; session: string; focus: string }[] = [
+  { week: '5', session: 'Oct 27', focus: 'Mid-checkpoint presentation of the backend, schema and API integration' },
+  { week: '6', session: 'Nov 3', focus: 'Frontend structure, legislative dashboard and an early deployment smoke test' },
+  { week: '7', session: 'Nov 10', focus: 'Member profiles, login and one complete bill-tracking flow with an in-app update' },
+  { week: '8', session: 'Nov 17', focus: 'Notifications, charts, testing and debugging' },
+  { week: 'Break', session: 'None', focus: 'Thanksgiving break, with the final deployment and preparation' },
+  { week: '9', session: 'Dec 1', focus: 'Final presentation' },
 ]
 
 export default function AboutPage() {
@@ -87,7 +89,7 @@ export default function AboutPage() {
               <thead>
                 <tr>
                   <th scope="col">Week</th>
-                  <th scope="col">Starts</th>
+                  <th scope="col">Session</th>
                   <th scope="col">Focus</th>
                 </tr>
               </thead>
@@ -95,7 +97,7 @@ export default function AboutPage() {
                 {ROADMAP.map((row) => (
                   <tr key={row.week}>
                     <td>{row.week}</td>
-                    <td>{row.starts}</td>
+                    <td>{row.session}</td>
                     <td>{row.focus}</td>
                   </tr>
                 ))}

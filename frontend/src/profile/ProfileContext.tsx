@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import type { User } from '@firebase/auth'
 import { getAccountProfile, saveAccountProfile } from '../api/account'
 import { useSession } from '../auth/SessionContext'
-import { ProfileError, currentProfile, forgetAccountProfiles, importablePreferences, legacyProfileFor, selectProfile as storeSelectProfile, leaveProfile as storeLeaveProfile, updateProfile as storeUpdateProfile } from './store'
+import { ProfileError, forgetAccountProfiles, importablePreferences, legacyProfileFor } from './store'
 import type { ProfileChanges } from './store'
 import type { Profile } from './types'
 
@@ -12,8 +12,6 @@ interface ProfileContextValue {
   loading: boolean
   error: string | null
   reload: () => void
-  selectProfile: (username: string) => Profile
-  leaveProfile: () => void
   updateProfile: (patch: ProfileChanges) => Promise<Profile>
 }
 
@@ -25,10 +23,6 @@ const FALLBACK: ProfileContextValue = {
   loading: false,
   error: null,
   reload: () => {},
-  selectProfile: () => {
-    throw new ProfileError('Profile management is not available here.')
-  },
-  leaveProfile: () => {},
   updateProfile: async () => {
     throw new ProfileError('Profile management is not available here.')
   },
@@ -40,20 +34,19 @@ interface LoadedAccount {
   error: string | null
 }
 
-// Provide the verified account's profile or the signed-out browser profile.
+// Provide the verified account's profile, which is the only profile the app shows.
 export function ProfileProvider({ children }: { children: ReactNode }) {
   const { user } = useSession()
   const uid = user?.uid
-  const [local, setLocal] = useState(currentProfile)
   const [account, setAccount] = useState<LoadedAccount | null>(null)
   const [attempt, setAttempt] = useState(0)
   const saves = useRef(0)
   const activeOwner = useRef<User | null>(null)
   if (!uid && account) setAccount(null)
   const loaded = uid && account?.uid === uid ? account : null
-  // A signed-in reader sees only the account's profile, so a failed load or import cannot
-  // pass off a browser copy as saved.
-  const profile = uid ? loaded?.profile ?? null : local?.firebase_uid ? null : local
+  // Browser profiles from earlier builds only seed an empty account at sign-in. Showing one to a
+  // signed-out visitor would carry a previous reader's district and topics on a shared browser.
+  const profile = uid ? loaded?.profile ?? null : null
 
   useEffect(() => {
     activeOwner.current = user
@@ -71,10 +64,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
           saved = await saveAccountProfile(owner, importablePreferences(legacy), true)
           imported = legacy
         }
-        if (saved.saved) {
-          forgetAccountProfiles(owner.uid, imported)
-          if (active) setLocal(currentProfile())
-        }
+        if (saved.saved) forgetAccountProfiles(owner.uid, imported)
         if (active && savedBeforeLoad === saves.current) {
           setAccount({ uid: owner.uid, profile: { ...saved, firebase_uid: owner.uid }, error: null })
         }
@@ -97,38 +87,21 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     setAttempt((n) => n + 1)
   }, [])
 
-  const selectProfile = useCallback((username: string) => {
-    if (uid) throw new ProfileError('Open Edit profile to change your account.')
-    const next = storeSelectProfile(username)
-    setLocal(next)
-    return next
-  }, [uid])
-
-  const leaveProfile = useCallback(() => {
-    storeLeaveProfile()
-    setLocal(null)
-  }, [])
-
   const updateProfile = useCallback(async (patch: ProfileChanges) => {
-    if (user) {
-      const saved = await saveAccountProfile(user, patch)
-      const next = { ...saved, firebase_uid: user.uid }
-      if (activeOwner.current === user) {
-        saves.current += 1
-        setAccount({ uid: user.uid, profile: next, error: null })
-      }
-      return next
+    if (!user) throw new ProfileError('Sign in to save your profile.')
+    const saved = await saveAccountProfile(user, patch)
+    const next = { ...saved, firebase_uid: user.uid }
+    if (activeOwner.current === user) {
+      saves.current += 1
+      setAccount({ uid: user.uid, profile: next, error: null })
     }
-    if (!profile) throw new ProfileError('Open a profile before editing it.')
-    const next = storeUpdateProfile(patch, profile.username)
-    setLocal(next)
     return next
-  }, [profile, user])
+  }, [user])
 
   return (
     <ProfileContext.Provider value={{
       profile, loading: Boolean(uid && !loaded), error: loaded?.error ?? null,
-      reload, selectProfile, leaveProfile, updateProfile,
+      reload, updateProfile,
     }}>
       {children}
     </ProfileContext.Provider>

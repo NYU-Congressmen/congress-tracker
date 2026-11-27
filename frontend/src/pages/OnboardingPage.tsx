@@ -23,7 +23,7 @@ type SetupStep = keyof typeof STEP_LABELS
 
 // Set up the local profile and dashboard preferences.
 export default function OnboardingPage() {
-  const { profile, selectProfile, leaveProfile, updateProfile } = useProfile()
+  const { profile, updateProfile } = useProfile()
   const { user, loading } = useSession()
   const [params] = useSearchParams()
   const navigate = useNavigate()
@@ -153,7 +153,6 @@ export default function OnboardingPage() {
               next={afterProfile}
               onBack={goBack}
               onCreate={(name) => {
-                leaveProfile()
                 setError(null)
                 setUsername(name)
                 if (name !== username) {
@@ -166,25 +165,6 @@ export default function OnboardingPage() {
                   setSocials([])
                 }
                 setStep(afterProfile)
-              }}
-              onSelect={(name) => {
-                try {
-                  const saved = selectProfile(name)
-                  setError(null)
-                  setUsername(saved.username)
-                  if (saved.username !== username) {
-                    if (!districtFirst) {
-                      setDistrict(saved.district)
-                      setAddressToSave(undefined)
-                    }
-                    setTopics(saved.topics)
-                    setCustomTopics([])
-                    setSocials(saved.socials)
-                  }
-                  setStep(afterProfile)
-                } catch (cause) {
-                  setError(cause instanceof Error ? cause.message : 'The profile could not be opened.')
-                }
               }}
             />
           ) : null}
