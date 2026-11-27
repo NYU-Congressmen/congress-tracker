@@ -405,12 +405,12 @@
 }
 
 .composition-legend__item--d .composition-legend__icon {
-  --party-color: var(--d);
+  --party-color: var(--d-seat, var(--d));
   --party-edge: var(--d-edge);
 }
 
 .composition-legend__item--r .composition-legend__icon {
-  --party-color: var(--r);
+  --party-color: var(--r-seat, var(--r));
   --party-edge: var(--r-edge);
   transform: scaleX(-1);
 }
