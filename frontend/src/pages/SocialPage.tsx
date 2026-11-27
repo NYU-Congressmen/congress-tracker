@@ -266,9 +266,9 @@ function SocialContent({ linkedBill }: { linkedBill: string | null }) {
         {!profile ? (
           <div className="social__prompt panel">
             <div>
-              <h2>Browser profile</h2>
+              <h2>Pull profile</h2>
               <p className="muted">
-                Save your discussion drafts with a profile in this browser.
+                Set up a profile to keep your social handles and stances with your phone-verified account.
               </p>
             </div>
             <Link to="/onboarding" className="btn btn--primary">

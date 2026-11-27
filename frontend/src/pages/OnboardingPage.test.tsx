@@ -5,7 +5,6 @@ import { afterEach, describe, expect, test, vi } from 'vitest'
 import OnboardingPage from './OnboardingPage'
 import { SessionContext } from '../auth/SessionContext'
 import { ProfileProvider } from '../profile/ProfileContext'
-import { createProfile, leaveProfile } from '../profile/store'
 import { mockAccountProfile, mockApi } from '../test/fetchMock'
 
 const ISSUES = [
@@ -38,6 +37,15 @@ afterEach(() => {
   vi.unstubAllGlobals()
   localStorage.clear()
 })
+
+// Write browser profiles the way earlier builds stored them, with one of them in use.
+function storeLegacy(profiles: Record<string, unknown>[], active: string) {
+  const stamp = '2026-11-01T00:00:00Z'
+  localStorage.setItem('pull:accounts', JSON.stringify(Object.fromEntries(profiles.map((profile) => [profile.username, {
+    district: null, topics: [], socials: [], created_at: stamp, updated_at: stamp, ...profile,
+  }]))))
+  localStorage.setItem('pull:session', active)
+}
 
 describe('OnboardingPage', () => {
   test('saves an address match and continues with the account district', async () => {
@@ -237,23 +245,16 @@ describe('OnboardingPage', () => {
     expect(screen.getByText('Wyoming (At large)')).toBeTruthy()
   })
 
-  test('opens an existing local profile without credentials', async () => {
-    createProfile('civics-maya', { district: { state: 'CA', district: 12, method: 'number' }, topics: [1], socials: [] })
-    leaveProfile()
-    mockApi([{ match: '/api/issues', body: ISSUES }])
+  test('starts a new profile without offering browser profiles left by an earlier visitor', () => {
+    storeLegacy([{ username: 'civics-maya', district: { state: 'CA', district: 12, method: 'number' }, topics: [1] }], 'civics-maya')
     renderOnboarding()
 
-    fireEvent.change(screen.getByLabelText('Saved profile'), { target: { value: 'civics-maya' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Open profile' }))
-    expect(screen.getByText('California · District 12')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Continue to topics' }))
-    expect((await screen.findByRole('button', { name: 'Health care' })).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.queryByLabelText('Saved profile')).toBeNull()
+    expect((screen.getByLabelText('Profile name') as HTMLInputElement).value).toBe('')
+    expect(screen.queryByText('California · District 12')).toBeNull()
   })
 
-  test('suggests an editable name when a browser profile name is taken', () => {
-    createProfile('civics-maya', { district: null, topics: [], socials: [] })
-    createProfile('civics-maya-2', { district: null, topics: [], socials: [] })
-    leaveProfile()
+  test('checks the profile name before continuing', () => {
     renderOnboarding()
 
     const field = screen.getByLabelText('Profile name')
@@ -261,11 +262,6 @@ describe('OnboardingPage', () => {
     fireEvent.change(field, { target: { value: 'civics maya' } })
     fireEvent.click(next)
     expect(screen.getByRole('alert').textContent).toMatch(/letters, numbers, dots, dashes and underscores/)
-    fireEvent.change(field, { target: { value: 'Civics-Maya' } })
-    fireEvent.click(next)
-    expect(screen.getByRole('alert').textContent).toMatch(/already used/)
-    fireEvent.click(screen.getByRole('button', { name: 'Use Civics-Maya-3' }))
-    expect((field as HTMLInputElement).value).toBe('Civics-Maya-3')
     fireEvent.change(field, { target: { value: 'Maya-Civics' } })
     fireEvent.click(next)
     expect(screen.getByLabelText('Street address')).toBeTruthy()
