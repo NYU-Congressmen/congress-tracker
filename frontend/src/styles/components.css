@@ -417,6 +417,13 @@ button.link-more:disabled {
   padding: 0 12px;
 }
 
+/* iOS Safari zooms into a focused field set below 16px and keeps that zoom after navigation */
+@media (pointer: coarse) {
+  .field__control {
+    font-size: 16px;
+  }
+}
+
 .field__control::placeholder {
   color: var(--ink-3);
 }
