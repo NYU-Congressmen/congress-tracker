@@ -1730,3 +1730,46 @@ button.chip {
   display: flex;
   gap: 8px;
 }
+
+/* One weekly Constituent Signal draft per office */
+.signal-offices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.signal-office {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--note-bg);
+}
+
+.signal-office__name {
+  font-weight: 800;
+}
+
+.signal-office__counts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 8px 0 0;
+}
+
+.signal-office__counts dt {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.signal-office__counts dd {
+  margin: 2px 0 0;
+  font-size: 20px;
+  font-weight: 800;
+}

@@ -75,6 +75,10 @@ function renderBill(user: User | null = null, routes: ApiRoute[] = []) {
       cosponsors: [{ ...COSPONSOR, name: 'Schumer, Chuck [D-NY]', withdrawn_date: null }],
     } },
     { match: '/api/bills/119/hr/7/house-votes', body: [] },
+    { match: '/api/bills/119/hr/7/signal', body: {
+      window_start: '2026-11-20T18:00:00Z', window_end: '2026-11-27T18:00:00Z', includes_sample: false,
+      your_review: 'none', offices: [],
+    } },
     { match: '/api/bills/119/hr/7/responses', body: {
       label: 'Verified Pull users who responded', total: 0, counts: { support: 0, oppose: 0, unsure: 0 },
     } },
