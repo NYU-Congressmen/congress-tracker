@@ -1,7 +1,8 @@
 import type { User } from '@firebase/auth'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, expect, test, vi } from 'vitest'
+import type { SignalPage } from '../../api/signal'
 import { SessionContext } from '../../auth/SessionContext'
 import { CallLog } from './CallLog'
 
@@ -85,4 +86,43 @@ test('logs the phone link, retries the same entry and adds a note later', async 
   fireEvent.click(screen.getByRole('button', { name: 'Delete call' }))
   expect(await screen.findByText('No calls logged for this bill.')).toBeTruthy()
   expect(screen.queryByText('Asked about the bill.')).toBeNull()
+})
+
+test('shows each office\'s Constituent Signal and withholds a small count', async () => {
+  const signal: SignalPage = {
+    window_start: '2026-11-20T18:00:00Z', window_end: '2026-11-27T18:00:00Z', includes_sample: true,
+    min_counted: 5, your_review: 'included',
+    offices: [
+      { bioguide_id: 'R000001', name: 'District office', party: 'D', chamber: 'House', state: 'NY', district: 12,
+        support: 13, oppose: 8, unsure: 1, calls: 2, withheld: false },
+      { bioguide_id: 'S000001', name: 'State office', party: 'D', chamber: 'Senate', state: 'NY', district: null,
+        support: null, oppose: null, unsure: null, calls: null, withheld: true },
+    ],
+  }
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+    if (url.includes('/members')) {
+      return Response.json({
+        data: [
+          { bioguide_id: 'R000001', name: 'District office', state: 'NY', chamber: 'House', district: 12, office_phone: '(202) 555-0101' },
+          { bioguide_id: 'S000001', name: 'State office', state: 'NY', chamber: 'Senate', district: null, office_phone: '(202) 555-0103' },
+        ],
+      })
+    }
+    return Response.json([])
+  }))
+  const user = { uid: 'fixture', getIdToken: vi.fn().mockResolvedValue('test-token') } as unknown as User
+  render(
+    <MemoryRouter>
+      <SessionContext.Provider value={{ user, loading: false, error: null, retry: () => {} }}>
+        <CallLog congress={119} type="hr" number={7} signal={signal} />
+      </SessionContext.Provider>
+    </MemoryRouter>,
+  )
+
+  const house = (await screen.findByRole('link', { name: 'Call District office' })).closest('li')!
+  expect(await within(house).findByText('13')).toBeTruthy()
+  expect(within(house).getByRole('link', { name: 'Public record' }).getAttribute('href')).toBe('/members/R000001#signal')
+  const senate = screen.getByRole('link', { name: 'Call State office' }).closest('li')!
+  expect(within(senate).getByText('Fewer than 5 constituents counted this week')).toBeTruthy()
+  expect(screen.getByText('Sample data')).toBeTruthy()
 })

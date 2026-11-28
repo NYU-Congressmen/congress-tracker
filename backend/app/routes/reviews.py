@@ -6,7 +6,16 @@ from psycopg import Connection
 from app.ai.moderation import moderate_review
 from app.auth import current_uid, optional_uid
 from app.db import connect, fetch_all, fetch_one
-from app.models import BillType, ReportIn, Review, ReviewIn, ReviewPage, ReviewVisibility, Stance
+from app.models import (
+    BillType,
+    ReportIn,
+    Review,
+    ReviewIn,
+    ReviewPage,
+    ReviewSharingChoice,
+    ReviewVisibility,
+    Stance,
+)
 from app.sample_data import EXCLUDE_SAMPLE_REVIEWS_SQL, sees_sample_data
 from app.sync.bills import make_bill_id
 
@@ -120,6 +129,28 @@ def get_review(congress: int, bill_type: BillType, number: int, uid: Uid) -> dic
     return row
 
 
+@router.patch("/bills/{congress}/{bill_type}/{number}/review/sharing", response_model=Review)
+def set_sharing_choice(
+    congress: int, bill_type: BillType, number: int, choice: ReviewSharingChoice, uid: Uid
+) -> dict[str, Any]:
+    """Update one sharing choice in the signed-in author's review and return the saved review."""
+    # The field name comes from the model's two permitted column names.
+    field = choice.field
+    row = fetch_one(
+        f"""
+        UPDATE reviews
+        SET {field} = %(value)s,
+            updated_at = CASE WHEN {field} IS DISTINCT FROM %(value)s THEN now() ELSE updated_at END
+        WHERE uid = %(uid)s AND bill_id = %(bill_id)s
+        RETURNING {REVIEW_COLUMNS}
+        """,
+        {"value": choice.value, "uid": uid, "bill_id": make_bill_id(congress, bill_type, number)},
+    )
+    if row is None:
+        raise HTTPException(404, "You have not reviewed this bill")
+    return row
+
+
 @router.put("/bills/{congress}/{bill_type}/{number}/review/visibility", response_model=Review)
 def set_visibility(
     congress: int, bill_type: BillType, number: int, visibility: ReviewVisibility, uid: Uid
@@ -153,25 +184,40 @@ def list_shared_reviews(
     number: int,
     page: Annotated[int, Query(ge=1)] = 1,
     limit: Annotated[int, Query(ge=1, le=50)] = 20,
+    state: Annotated[str | None, Query(pattern="^[A-Za-z]{2}$")] = None,
+    district: Annotated[int | None, Query(ge=0)] = None,
     viewer: Annotated[str | None, Depends(optional_uid)] = None,
 ) -> dict[str, Any]:
     """Return the reviews of a bill that their authors shared, most recently edited first.
 
     Each one carries the state and district its author saved, which is what makes it a verified
-    neighbor's view. Names and phone numbers never leave the database.
+    neighbor's view, and the optional filters match the stance counts. Names and phone numbers
+    never leave the database, and `mine` marks the viewer's own review so the page offers Hide
+    instead of Report. A signed-in viewer who hid their review gets it back in `mine_hidden`,
+    outside the count, so the page can show it to them alone and offer to share it again.
     """
     bill_id = make_bill_id(congress, bill_type, number)
     if fetch_one("SELECT 1 FROM bills WHERE bill_id = %s", (bill_id,)) is None:
         raise HTTPException(404, "Bill not found")
-    where = f"r.bill_id = %(bill_id)s AND {SHARED_REVIEW_SQL}"
+    area = ""
+    params: dict[str, Any] = {"bill_id": bill_id, "viewer": viewer}
+    if state is not None:
+        area += " AND u.state = %(state)s"
+        params["state"] = state.upper()
+    if district is not None:
+        area += " AND u.district = %(district)s"
+        params["district"] = district
+    where = f"r.bill_id = %(bill_id)s AND {SHARED_REVIEW_SQL}{area}"
     if not sees_sample_data(viewer):
         where += f" AND {EXCLUDE_SAMPLE_REVIEWS_SQL}"
-    params = {"bill_id": bill_id}
-    total = fetch_one(f"SELECT count(*) AS n FROM reviews r WHERE {where}", params)["n"]
+    total = fetch_one(
+        f"SELECT count(*) AS n FROM reviews r JOIN users u ON u.uid = r.uid WHERE {where}", params
+    )["n"]
     reviews = fetch_all(
         f"""
         SELECT r.review_id, r.bill_id, r.stance, r.story, r.action_taken, u.state, u.district,
-               r.created_at, r.updated_at,
+               r.created_at, r.updated_at, r.uid = %(viewer)s IS TRUE AS mine,
+               u.is_sample,
                ARRAY(SELECT DISTINCT p.platform FROM post_cards p
                      WHERE p.review_id = r.review_id AND NOT p.hidden_on_pull
                      ORDER BY p.platform) AS posted_to
@@ -182,7 +228,25 @@ def list_shared_reviews(
         """,
         {**params, "limit": limit, "offset": (page - 1) * limit},
     )
-    return {"total": total, "page": page, "limit": limit, "data": reviews}
+    mine_hidden = None
+    if viewer is not None:
+        mine_hidden = fetch_one(
+            f"""
+            SELECT r.review_id, r.bill_id, r.stance, r.story, r.action_taken, u.state, u.district,
+                   r.created_at, r.updated_at, true AS mine, u.is_sample
+            FROM reviews r JOIN users u ON u.uid = r.uid
+            WHERE r.bill_id = %(bill_id)s AND r.uid = %(viewer)s AND r.share_publicly
+              AND r.hidden_at IS NOT NULL AND r.moderation_status = 'cleared'{area}
+            """,
+            params,
+        )
+    return {
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "data": reviews,
+        "mine_hidden": mine_hidden,
+    }
 
 
 @router.post("/reviews/{review_id}/reports", status_code=204)

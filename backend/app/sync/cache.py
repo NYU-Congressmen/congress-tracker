@@ -7,6 +7,7 @@ from app.sync.client import CongressClient
 from app.sync.members import SAVE_MEMBER_SQL, clean_member_detail
 from app.sync.status import NEVER_DOWNGRADE_SQL, summarize_actions
 from app.sync.texts import SAVE_VERSION_SQL, clean_version
+from app.tracking import notify_tracked_updates
 
 # Sponsorship has no update date to compare against, so it is refreshed on a schedule
 SPONSORED_MAX_AGE = timedelta(days=1)
@@ -114,9 +115,11 @@ def record_not_found(bill_id: str) -> None:
 def refresh_bill(client: CongressClient, congress: int, bill_type: str, number: int) -> str:
     """Fetch a bill's detail and actions from Congress.gov, cache them and return its bill_id."""
     path = f"/bill/{congress}/{bill_type}/{number}"
-    detail = client.get(path)["bill"]
-    actions = list(client.paginate(f"{path}/actions", "actions"))
-    versions = client.get(f"{path}/text").get("textVersions", [])
+    detail_response, actions, text_response = client.get_parallel(
+        (path, None), (f"{path}/actions", "actions"), (f"{path}/text", None)
+    )
+    detail = detail_response["bill"]
+    versions = text_response.get("textVersions", [])
 
     row = clean_bill(detail)
     row["policy_area"] = (detail.get("policyArea") or {}).get("name")
@@ -155,6 +158,7 @@ def refresh_bill(client: CongressClient, congress: int, bill_type: str, number: 
         conn.cursor().executemany(
             SAVE_VERSION_SQL, [clean_version(row["bill_id"], v) for v in versions]
         )
+        notify_tracked_updates(conn, row["bill_id"])
     return row["bill_id"]
 
 

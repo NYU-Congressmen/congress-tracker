@@ -8,11 +8,13 @@ interface BillListItemProps {
   bill: BillSummary
   // Hide the latest-action line on pages where the row is the whole context.
   showLatestAction?: boolean
+  // Flag a tracked bill whose latest action the reader has not opened yet.
+  isNew?: boolean
 }
 
 // One bill in a list. The bill number leads, the way reporters cite bills,
 // with the stage strip and label under it and the title and latest action beside.
-export function BillListItem({ bill, showLatestAction = true }: BillListItemProps) {
+export function BillListItem({ bill, showLatestAction = true, isNew = false }: BillListItemProps) {
   const to = `/bills/${bill.congress}/${bill.type}/${bill.number}`
   return (
     <li className="bill-list__item">
@@ -22,7 +24,10 @@ export function BillListItem({ bill, showLatestAction = true }: BillListItemProp
           <StageStrip status={bill.status} />
           <StatusBadge status={bill.status} />
         </span>
-        <span className="entry__title">{bill.title}</span>
+        <span className="entry__title">
+          {isNew ? <span className="entry__new">New update</span> : null}
+          {bill.title}
+        </span>
         {showLatestAction && bill.latest_action_text ? (
           <span className="entry__action">
             {bill.latest_action_date ? (

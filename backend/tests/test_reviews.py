@@ -79,6 +79,23 @@ def test_quick_stance_keeps_review_text_visibility_and_consent(signed_in):
     assert signed_in.get(URL).json() == body
 
 
+def test_sharing_choice_keeps_the_latest_review_and_other_choice(signed_in):
+    signed_in.put(URL, json={"stance": "support", "story": "Old story", "share_publicly": True})
+    latest = signed_in.put(URL, json={"stance": "oppose", "story": "New story"}).json()
+    choice = {"field": "consent_to_share", "value": True}
+    response = signed_in.patch(f"{URL}/sharing", json=choice)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["consent_to_share"] is True
+    assert body["stance"] == latest["stance"] and body["story"] == latest["story"]
+    assert body["share_publicly"] is False
+    assert body["moderation_status"] == latest["moderation_status"]
+    assert signed_in.patch(f"{URL}/sharing", json=choice).json() == body
+    assert signed_in.patch(f"{URL}/sharing", json=choice | {"field": "stance"}).status_code == 422
+    app.dependency_overrides[current_uid] = lambda: "someone-else"
+    assert signed_in.patch(f"{URL}/sharing", json=choice).status_code == 404
+
+
 def test_quick_stance_creates_a_review_with_default_sharing(signed_in):
     response = signed_in.put(f"{URL}/stance", json={"stance": "unsure"})
     assert response.status_code == 200

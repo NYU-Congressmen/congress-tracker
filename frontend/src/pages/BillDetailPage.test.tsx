@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { User } from '@firebase/auth'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, test, vi } from 'vitest'
@@ -75,6 +75,10 @@ function renderBill(user: User | null = null, routes: ApiRoute[] = []) {
       cosponsors: [{ ...COSPONSOR, name: 'Schumer, Chuck [D-NY]', withdrawn_date: null }],
     } },
     { match: '/api/bills/119/hr/7/house-votes', body: [] },
+    { match: '/api/bills/119/hr/7/signal', body: {
+      window_start: '2026-11-20T18:00:00Z', window_end: '2026-11-27T18:00:00Z', includes_sample: false,
+      your_review: 'none', offices: [],
+    } },
     { match: '/api/bills/119/hr/7/responses', body: {
       label: 'Verified Pull users who responded', total: 0, counts: { support: 0, oppose: 0, unsure: 0 },
     } },
@@ -128,6 +132,41 @@ describe('BillDetailPage', () => {
     expect(calls).toHaveBeenCalledWith('/api/bills/119/hr/7/review/stance', expect.objectContaining({
       method: 'PUT', body: JSON.stringify({ stance: 'oppose' }),
     }))
+  })
+
+  test('hides an author\'s shared review and keeps one shared reviews panel', async () => {
+    const author = { uid: 'author', getIdToken: vi.fn().mockResolvedValue('test-token') } as unknown as User
+    const review = {
+      bill_id: BILL.bill_id, stance: 'support', story: 'My shared story', consent_to_share: true,
+      share_publicly: true, moderation_status: 'cleared', hidden: false, updated_at: '2026-11-25T12:00:00Z',
+    }
+    const shared = {
+      review_id: 5, bill_id: BILL.bill_id, stance: 'support', story: 'My shared story', action_taken: null,
+      state: 'NY', district: 13, created_at: review.updated_at, updated_at: review.updated_at,
+      posted_to: [], mine: true, is_sample: false,
+    }
+    let hidden = false
+    renderBill(author, [
+      { match: '/api/bills/119/hr/7/reviews', respond: () => hidden
+        ? { total: 0, page: 1, limit: 10, data: [], mine_hidden: shared }
+        : { total: 1, page: 1, limit: 10, data: [shared], mine_hidden: null } },
+      { match: '/api/bills/119/hr/7/review/visibility', respond: (init) => {
+        hidden = JSON.parse(String(init?.body)).hidden
+        return { ...review, hidden }
+      } },
+      { match: '/api/bills/119/hr/7/review', respond: () => ({ ...review, hidden }) },
+    ])
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Hide from shared reviews' }))
+    expect(await screen.findByRole('button', { name: 'Show it again' })).toBeTruthy()
+    expect(await screen.findByText('Only you can see this')).toBeTruthy()
+    expect(screen.getAllByRole('heading', { name: 'Shared reviews' })).toHaveLength(1)
+
+    // The shared list offers the same way back as the stance panel
+    fireEvent.click(screen.getByRole('button', { name: 'Show in shared reviews' }))
+    expect(await screen.findByText('Your review')).toBeTruthy()
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Show it again' })).toBeNull())
+    expect(screen.getAllByRole('heading', { name: 'Shared reviews' })).toHaveLength(1)
   })
 
   test('shows a saved call and its private note on the signed-in bill page', async () => {

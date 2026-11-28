@@ -28,10 +28,10 @@ export default function SignInPage() {
             <div className="onboard-form">
               <p role="status">You’re signed in.</p>
               <Link
-                to={returnToProfile ? '/profile' : '/social'}
+                to={returnToProfile ? '/profile' : '/'}
                 className="btn btn--primary"
               >
-                {returnToProfile ? 'Edit profile' : 'Go to discussions'}
+                {returnToProfile ? 'Edit profile' : 'Go to my dashboard'}
               </Link>
             </div>
           ) : <PhoneAuthForm />}

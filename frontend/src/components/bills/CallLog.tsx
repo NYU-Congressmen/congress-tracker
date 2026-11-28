@@ -6,6 +6,7 @@ import type { BillType } from '../../api/bills'
 import { deleteCall, listCalls, saveCall, updateCallNote, type CallEntry } from '../../api/calls'
 import { ApiError } from '../../api/client'
 import { listMembers } from '../../api/members'
+import type { SignalPage } from '../../api/signal'
 import { useSession } from '../../auth/SessionContext'
 import { getAccountToken } from '../../auth/accountToken'
 import { useApi } from '../../hooks/useApi'
@@ -14,11 +15,14 @@ import { formatDateTime } from '../../lib/format'
 import { useProfile } from '../../profile/ProfileContext'
 import { ErrorState } from '../ui/ErrorState'
 import { LoadingState } from '../ui/LoadingState'
+import { SignalTally } from './SignalTally'
 
 interface CallLogProps {
   congress: number
   type: BillType
   number: number
+  signal?: SignalPage
+  onCallsChanged?: () => void
 }
 
 export function CallLog(props: CallLogProps) {
@@ -33,7 +37,7 @@ export function CallLog(props: CallLogProps) {
   )
 }
 
-function AccountCalls({ user, congress, type, number }: CallLogProps & { user: User }) {
+function AccountCalls({ user, congress, type, number, signal, onCallsChanged }: CallLogProps & { user: User }) {
   const { profile, loading: profileLoading } = useProfile()
   const district = profile?.district
   const state = district?.state ?? ''
@@ -46,6 +50,7 @@ function AccountCalls({ user, congress, type, number }: CallLogProps & { user: U
     async () => listCalls(congress, type, number, await getAccountToken(user)),
     [user, congress, type, number],
   )
+  const tallies = new Map((signal?.offices ?? []).map((office) => [office.bioguide_id, office]))
 
   const directory = (members.data?.data ?? []).filter((member) => member.state === state)
   const home = district ? representativesForDistrict(directory, state, district.district) : null
@@ -65,6 +70,7 @@ function AccountCalls({ user, congress, type, number }: CallLogProps & { user: U
       await saveCall(congress, type, number, key, officeId, await getAccountToken(user))
       pending.current.delete(officeId)
       calls.refetch()
+      onCallsChanged?.()
     } catch (error) {
       setCallError({
         officeId,
@@ -84,6 +90,7 @@ function AccountCalls({ user, congress, type, number }: CallLogProps & { user: U
   async function removeCall(actionId: number) {
     await deleteCall(congress, type, number, actionId, await getAccountToken(user))
     calls.refetch()
+    onCallsChanged?.()
   }
 
   return (
@@ -96,10 +103,15 @@ function AccountCalls({ user, congress, type, number }: CallLogProps & { user: U
         <ErrorState title="Offices could not be loaded" message={members.error.message} onRetry={members.refetch} />
       ) : offices.length ? (
         <>
-          <p className="muted">Opening a phone number saves an entry in your private call log.</p>
+          <p className="muted">
+            Opening a phone number saves an entry in your private call log. Each office also gets a weekly Constituent
+            Signal counting the constituents who included their review in the brief, shown here for the past seven days.
+            {signal?.includes_sample ? <span className="bill-stances__sample">Sample data</span> : null}
+          </p>
           <ul className="call-log__offices" aria-label="Your congressional offices">
             {offices.map((member) => {
               const phone = member.office_phone?.replace(/[^\d+]/g, '')
+              const tally = tallies.get(member.bioguide_id)
               return (
                 <li key={member.bioguide_id}>
                   <span>{member.name}</span>
@@ -109,6 +121,13 @@ function AccountCalls({ user, congress, type, number }: CallLogProps & { user: U
                       {member.office_phone}
                     </a>
                   ) : <Link to={`/members/${member.bioguide_id}`}>Office details</Link>}
+                  {signal && tally ? (
+                    <span className="call-log__signal">
+                      <span className="call-log__signal-label">Constituent Signal</span>{' '}
+                      <SignalTally counts={tally} minimum={signal.min_counted} />{' '}
+                      <Link to={`/members/${member.bioguide_id}#signal`} className="link-more">Public record</Link>
+                    </span>
+                  ) : null}
                 </li>
               )
             })}

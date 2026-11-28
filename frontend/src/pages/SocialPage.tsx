@@ -266,9 +266,9 @@ function SocialContent({ linkedBill }: { linkedBill: string | null }) {
         {!profile ? (
           <div className="social__prompt panel">
             <div>
-              <h2>Browser profile</h2>
+              <h2>Pull profile</h2>
               <p className="muted">
-                Save your discussion drafts with a profile in this browser.
+                Set up a profile to keep your social handles and stances with your phone-verified account.
               </p>
             </div>
             <Link to="/onboarding" className="btn btn--primary">
@@ -443,7 +443,7 @@ function SocialContent({ linkedBill }: { linkedBill: string | null }) {
                   disabled={reviewBlocked}
                   onChange={(event) => setConsentToShare(event.target.checked)}
                 />
-                <span>Include this review in the Constituent Signal brief for my representative’s office.</span>
+                <span>Include this review in the Constituent Signal brief for my representatives’ offices. Pull also shows each office’s totals publicly on its member page once at least 5 constituents are counted, without names.</span>
               </label>
             ) : null}
 

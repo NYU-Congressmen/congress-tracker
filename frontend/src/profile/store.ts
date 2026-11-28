@@ -1,11 +1,11 @@
-// Store local profiles and the active profile selection in this browser.
+// Read browser profiles saved by earlier builds, which seed an empty account at sign-in.
 
 import type { Profile, SocialProfile, DistrictSelection } from './types'
 
 const ACCOUNTS_KEY = 'pull:accounts'
 const SESSION_KEY = 'pull:session'
 
-// What the onboarding flow hands over; the store supplies the timestamps.
+// Describe the profile fields an account save accepts.
 export interface NewProfile {
   firebase_uid?: string
   district: DistrictSelection | null
@@ -42,18 +42,6 @@ function writeAccounts(accounts: Record<string, Profile>): void {
   localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts))
 }
 
-export function listUsernames(): string[] {
-  return Object.keys(readAccounts()).sort()
-}
-
-// List legacy profiles and profiles owned by the signed-in account.
-export function listSelectableUsernames(uid?: string): string[] {
-  return Object.values(readAccounts())
-    .filter((profile) => !profile.firebase_uid || profile.firebase_uid === uid)
-    .map((profile) => profile.username)
-    .sort()
-}
-
 // Validate a profile name during onboarding and again when saving it.
 export function usernameError(username: string): string | null {
   const name = username.trim()
@@ -63,48 +51,6 @@ export function usernameError(username: string): string | null {
     return 'Usernames can use letters, numbers, dots, dashes and underscores.'
   }
   return null
-}
-
-export function isUsernameTaken(username: string): boolean {
-  const name = username.trim().toLowerCase()
-  return Object.keys(readAccounts()).some((existing) => existing.toLowerCase() === name)
-}
-
-export function createProfile(username: string, base: NewProfile): Profile {
-  const name = username.trim()
-  const problem = usernameError(username)
-  if (problem) throw new ProfileError(problem)
-  if (isUsernameTaken(name)) {
-    throw new ProfileError('That name is already used by a profile on this device.')
-  }
-  const accounts = readAccounts()
-  const now = new Date().toISOString()
-  const account: Profile = {
-    username: name,
-    firebase_uid: base.firebase_uid,
-    district: base.district,
-    topics: base.topics,
-    socials: base.socials,
-    created_at: now,
-    updated_at: now,
-  }
-  writeAccounts({ ...accounts, [name]: account })
-  localStorage.setItem(SESSION_KEY, name)
-  return account
-}
-
-export function selectProfile(username: string, uid?: string): Profile {
-  const accounts = readAccounts()
-  const match = Object.keys(accounts).find((name) => name.toLowerCase() === username.trim().toLowerCase())
-  if (!match || (accounts[match].firebase_uid && accounts[match].firebase_uid !== uid)) {
-    throw new ProfileError('That profile could not be found for this account.')
-  }
-  localStorage.setItem(SESSION_KEY, match)
-  return accounts[match]
-}
-
-export function leaveProfile(): void {
-  localStorage.removeItem(SESSION_KEY)
 }
 
 // Return the active local profile or null.
@@ -147,7 +93,7 @@ export function importablePreferences(profile: Profile): ProfileChanges {
   const district = profile.district
   if (district && /^[A-Z]{2}$/.test(district.state)
     && (district.district === null || (Number.isInteger(district.district) && district.district >= 1 && district.district <= 99))
-    && ['address', 'map', 'number'].includes(district.method)) {
+    && ['address', 'map', 'number', 'search'].includes(district.method)) {
     preferences.district = { state: district.state, district: district.district, method: district.method }
   }
 
@@ -172,52 +118,6 @@ export function forgetAccountProfiles(uid: string, imported?: Profile | null): v
   if (Object.keys(kept).length !== Object.keys(accounts).length) writeAccounts(kept)
   const active = localStorage.getItem(SESSION_KEY)
   if (active && !Object.hasOwn(kept, active)) localStorage.removeItem(SESSION_KEY)
-}
-
-// Activate a restored profile if browser storage still links it to the signed-in account.
-export function activateRestoredProfile(username: string, uid: string): void {
-  if (localStorage.getItem(SESSION_KEY) === username) return
-  const accounts = readAccounts()
-  if (Object.hasOwn(accounts, username) && accounts[username].firebase_uid === uid) {
-    localStorage.setItem(SESSION_KEY, username)
-  }
-}
-
-// Save changes to the active local profile and return it.
-export function updateProfile(patch: ProfileChanges, expectedName?: string): Profile {
-  const name = localStorage.getItem(SESSION_KEY)
-  const accounts = readAccounts()
-  const account = name && Object.hasOwn(accounts, name) ? accounts[name] : undefined
-  if (!account || (expectedName !== undefined && name !== expectedName)) {
-    throw new ProfileError('Select a profile before editing it.')
-  }
-  const username = patch.username?.trim() ?? account.username
-  if (username !== account.username) {
-    const problem = usernameError(username)
-    if (problem) throw new ProfileError(problem)
-    if (Object.keys(accounts).some((key) => key !== name && key.toLowerCase() === username.toLowerCase())) {
-      throw new ProfileError('That name is already used by a profile on this device.')
-    }
-  }
-  const next: Profile = {
-    ...account,
-    username,
-    firebase_uid: account.firebase_uid ?? patch.firebase_uid,
-    district: patch.district !== undefined ? patch.district : account.district,
-    topics: patch.topics !== undefined ? patch.topics : account.topics ?? [],
-    socials: patch.socials !== undefined ? patch.socials : account.socials,
-    updated_at: new Date().toISOString(),
-  }
-  delete accounts[account.username]
-  const renamed = username !== account.username
-  if (renamed) localStorage.setItem(SESSION_KEY, username)
-  try {
-    writeAccounts({ ...accounts, [username]: next })
-  } catch (cause) {
-    if (renamed) localStorage.setItem(SESSION_KEY, account.username)
-    throw cause
-  }
-  return toProfile(next)
 }
 
 function toProfile(account: Profile): Profile {

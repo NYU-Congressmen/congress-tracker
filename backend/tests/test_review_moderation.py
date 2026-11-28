@@ -67,6 +67,29 @@ def test_shared_list_shows_only_shared_reviews_with_their_district(client):
     assert "uid" not in review and "phone" not in review
 
 
+def test_shared_list_marks_the_viewers_own_review_and_filters_by_district(client):
+    sql("INSERT INTO users (uid, phone, state, district) VALUES ('ca', '+15550000099', 'CA', 34)")
+    sql(
+        "INSERT INTO reviews (uid, bill_id, stance, story, share_publicly) "
+        "VALUES ('ca', '119-hr-1', 'support', 'Rent is too high.', true)"
+    )
+    sql("UPDATE reviews SET moderation_status = 'cleared' WHERE uid = 'ca'")
+
+    visitor = client.get(SHARED).json()
+    assert visitor["total"] == 2
+    assert [review["mine"] for review in visitor["data"]] == [False, False]
+    assert {review["is_sample"] for review in visitor["data"]} == {False}
+
+    sign_in("author")
+    mine = {review["story"]: review["mine"] for review in client.get(SHARED).json()["data"]}
+    assert mine == {"My clinic closed.": True, "Rent is too high.": False}
+
+    district = client.get(f"{SHARED}?state=ny&district=12").json()
+    assert district["total"] == 1
+    assert district["data"][0]["story"] == "My clinic closed."
+    assert client.get(f"{SHARED}?state=CA").json()["total"] == 1
+
+
 def test_consent_to_the_office_brief_never_lists_a_review(client):
     # Agreeing to the Constituent Signal brief is not agreeing to be listed publicly
     sign_in("private")
@@ -96,11 +119,21 @@ def test_author_hides_and_shows_their_review(client, monkeypatch):
     assert client.get(SHARED).json()["total"] == 0
     assert client.get("/api/bills/119/hr/1/responses").json()["counts"]["oppose"] == 0
 
+    # Only the author gets the hidden review back, outside the count and the page
+    own = client.get(SHARED).json()["mine_hidden"]
+    assert (own["story"], own["mine"]) == ("My clinic closed.", True)
+    assert client.get(f"{SHARED}?state=CA").json()["mine_hidden"] is None
+    sign_in("r1")
+    assert client.get(SHARED).json()["mine_hidden"] is None
+    sign_in("author")
+
     # Editing keeps it hidden until the author shows it again
     client.put(REVIEW, json={"stance": "oppose", "story": "Edited.", "share_publicly": True})
     assert client.get(REVIEW).json()["hidden"] is True
     assert client.put(f"{REVIEW}/visibility", json={"hidden": False}).json()["hidden"] is False
-    assert client.get(SHARED).json()["data"][0]["story"] == "Edited."
+    shown = client.get(SHARED).json()
+    assert shown["data"][0]["story"] == "Edited."
+    assert shown["mine_hidden"] is None
 
 
 def test_hiding_needs_a_review_and_sign_in(client):
