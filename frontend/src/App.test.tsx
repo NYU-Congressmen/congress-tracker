@@ -45,7 +45,7 @@ test('renders the dashboard with the live bills and members', async () => {
   expect(screen.getAllByRole('link', { name: 'Members' })).toHaveLength(2)
 
   // Hero
-  expect(await screen.findByRole('heading', { name: 'Congress in progress' })).toBeTruthy()
+  expect(await screen.findByRole('heading', { name: 'Your representatives work for you' })).toBeTruthy()
   expect(screen.getByText('stand out').tagName).toBe('MARK')
 
   // Latest updates from the API, each with its number and stage
@@ -58,7 +58,7 @@ test('renders the dashboard with the live bills and members', async () => {
   expect(await screen.findByRole('img', { name: /^House seating, 1 current member, Democrats 1/ })).toBeTruthy()
 
   // Without a profile, the home page invites the reader to set one up
-  expect(screen.getByRole('heading', { name: 'Your district in Congress' })).toBeTruthy()
+  expect(screen.getByRole('heading', { name: 'Find your representatives' })).toBeTruthy()
 })
 
 test('shows a helpful offline state when the API is down', async () => {

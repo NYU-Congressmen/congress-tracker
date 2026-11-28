@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import type { BillSummary } from '../../api/bills'
 import { billNumber, formatDate } from '../../lib/format'
@@ -10,11 +11,13 @@ interface BillListItemProps {
   showLatestAction?: boolean
   // Flag a tracked bill whose latest action the reader has not opened yet.
   isNew?: boolean
+  // An extra line under the latest action, such as the reader's own stance and calls
+  note?: ReactNode
 }
 
 // One bill in a list. The bill number leads, the way reporters cite bills,
 // with the stage strip and label under it and the title and latest action beside.
-export function BillListItem({ bill, showLatestAction = true, isNew = false }: BillListItemProps) {
+export function BillListItem({ bill, showLatestAction = true, isNew = false, note }: BillListItemProps) {
   const to = `/bills/${bill.congress}/${bill.type}/${bill.number}`
   return (
     <li className="bill-list__item">
@@ -36,6 +39,7 @@ export function BillListItem({ bill, showLatestAction = true, isNew = false }: B
             {bill.latest_action_text}
           </span>
         ) : null}
+        {note ? <span className="entry__note">{note}</span> : null}
       </Link>
     </li>
   )
