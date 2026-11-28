@@ -117,17 +117,34 @@
   transform: rotate(-90deg);
 }
 
+/* The open menu grows out of the account button: the button becomes a tab in the menu's
+   color, the menu meets it with no gap, and the tab covers the shared border */
+.site-profile[open] > .site-user {
+  position: relative;
+  z-index: 3;
+  border-color: var(--line);
+  border-bottom-color: var(--card);
+  border-radius: 20px 20px 0 0;
+  background: var(--card);
+}
+
 .site-profile__panel {
   position: absolute;
-  inset-block-start: calc(100% + 8px);
+  z-index: 2;
+  inset-block-start: calc(100% - 1px);
   inset-inline-end: 0;
   display: grid;
-  min-width: 10rem;
+  min-width: 100%;
   padding: 4px;
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: 16px 0 16px 16px;
   background: var(--card);
   box-shadow: var(--shadow);
+}
+
+/* On a narrow screen the menu slides past the tab, so its top-right corner rounds again */
+.site-profile__panel--shifted {
+  border-top-right-radius: 16px;
 }
 
 /* Recent bill updates at the top of the account menu */

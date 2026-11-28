@@ -92,6 +92,17 @@ function ProfileMenu() {
   const summary = useRef<HTMLElement>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(false)
+  // How far the menu slides right to stay on a narrow screen, past the button's right edge
+  const [shift, setShift] = useState(0)
+  const panel = useRef<HTMLDivElement>(null)
+
+  function placePanel() {
+    const button = summary.current?.getBoundingClientRect()
+    const width = panel.current?.offsetWidth ?? 0
+    if (!button || !disclosure.current?.open) return
+    const margin = 12
+    setShift(Math.max(0, Math.min(margin + width - button.right, window.innerWidth - margin - button.right)))
+  }
 
   useEffect(() => {
     function dismiss(event: PointerEvent) {
@@ -121,7 +132,7 @@ function ProfileMenu() {
   }
 
   return (
-    <details className="site-profile" ref={disclosure} onKeyDown={(event) => {
+    <details className="site-profile" ref={disclosure} onToggle={placePanel} onKeyDown={(event) => {
       if (event.key === 'Escape' && event.currentTarget.open) {
         event.currentTarget.open = false
         summary.current?.focus()
@@ -141,7 +152,8 @@ function ProfileMenu() {
         </span>
         <ChevronRightIcon size={14} className="site-profile__arrow" />
       </summary>
-      <div className="site-profile__panel">
+      <div className={`site-profile__panel${shift ? ' site-profile__panel--shifted' : ''}`} ref={panel}
+        style={shift ? { insetInlineEnd: -shift } : undefined}>
         <section className="site-updates" aria-labelledby="site-updates-title">
           <div className="site-updates__head">
             <h2 id="site-updates-title">Bill updates</h2>
