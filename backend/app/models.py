@@ -578,3 +578,87 @@ class MemberSignal(BaseModel):
     bills: list[SignalBill]
     # Bills with too few counted constituents to show their counts
     withheld_bills: int
+
+
+class VoteComparison(BaseModel):
+    """Describe a House member's final vote on a bill beside the reader's stance."""
+
+    bill_id: str
+    congress: int
+    type: BillType
+    number: int
+    title: str
+    stance: Stance
+    question: str | None
+    vote_date: datetime | None
+    roll_number: int
+    # Exactly as recorded, or null when the member has no recorded position
+    position: str | None
+    # Null when the member did not vote Yea, Aye, Nay or No
+    agrees: bool | None
+
+
+class VotingRecord(BaseModel):
+    """Summarize how a House member voted on bills where the reader took a side."""
+
+    compared: int
+    agreed: int
+    missed: int
+    votes: list[VoteComparison]
+
+
+class Representative(BaseModel):
+    """Describe one of the reader's offices and its record toward the reader."""
+
+    bioguide_id: str
+    name: str
+    party: str | None
+    chamber: str | None
+    state: str | None
+    district: int | None
+    image_url: str | None
+    office_phone: str | None
+    website_url: str | None
+    # Bills over the public minimum in the past week's Constituent Signal, and their constituents
+    signal_bills: int
+    signal_constituents: int
+    your_calls: int
+    # Null for senators, whose roll calls Pull does not sync
+    voting_record: VotingRecord | None
+
+
+class Ask(BillSummary):
+    """Describe a bill the reader took a stance on or tracks."""
+
+    stance: Stance | None
+    tracking: bool
+    unread: int
+    calls: int
+
+
+class WordCount(BaseModel):
+    """Count how many shared stories use a word."""
+
+    word: str
+    count: int
+
+
+class ReviewHighlightsOut(BaseModel):
+    """Hold the common reasons each stance gives and the themes that recur."""
+
+    support: str
+    oppose: str
+    unsure: str
+    themes: list[str]
+
+
+class ReviewSummary(BaseModel):
+    """Describe what a bill's shared stories say, for readers who will not read them all."""
+
+    story_count: int
+    min_stories: int
+    includes_sample: bool
+    words: list[WordCount]
+    # AI-written, and null until a signed-in reader's request writes them
+    highlights: ReviewHighlightsOut | None
+    highlights_at: datetime | None
