@@ -23,7 +23,8 @@ MIN_COUNTED = 5
 
 # The reader's current House member and senators, in the order the bill page lists them.
 OFFICES_SQL = """
-    SELECT m.bioguide_id, m.name, m.party, m.chamber, m.state, m.district
+    SELECT m.bioguide_id, m.name, m.party, m.chamber, m.state, m.district, m.image_url,
+           m.office_phone, m.website_url
     FROM members m JOIN users u ON m.state = u.state
     WHERE u.uid = %(uid)s AND m.is_current
       AND (m.chamber = 'Senate' OR m.district IS NOT DISTINCT FROM u.district)

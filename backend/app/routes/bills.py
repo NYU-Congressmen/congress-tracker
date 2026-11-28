@@ -94,6 +94,16 @@ def search_bills(
     return {"total": total, "page": page, "limit": limit, "data": bills}
 
 
+@router.get("/bills/stage-counts", response_model=dict[Status, int])
+def stage_counts() -> dict[str, int]:
+    """Return how many bills sit at each stage, with zero for a stage that has none."""
+    counts = {
+        row["status"]: row["n"]
+        for row in fetch_all("SELECT status, count(*) AS n FROM bills GROUP BY status")
+    }
+    return {status: counts.get(status, 0) for status in get_args(Status)}
+
+
 @router.get("/bills/{congress}/{bill_type}/{number}", response_model=BillDetail)
 def get_bill(congress: int, bill_type: BillType, number: int) -> dict[str, Any]:
     """Return one bill with its sponsor and actions, refreshing them when the cache is stale.

@@ -14,6 +14,7 @@ import { BillExplanation } from '../components/bills/BillExplanation'
 import { BillStances } from '../components/bills/BillStances'
 import { CallLog } from '../components/bills/CallLog'
 import { ReviewPanel } from '../components/bills/ReviewPanel'
+import { ReviewHighlights } from '../components/bills/ReviewHighlights'
 import { SharedReviews } from '../components/bills/SharedReviews'
 import { TrackButton } from '../components/bills/TrackButton'
 import { MemberAvatar } from '../components/members/MemberAvatar'
@@ -280,6 +281,7 @@ export default function BillDetailPage() {
         <ReviewPanel key={`review-${bill.bill_id}-${reviewRevision}`} congress={bill.congress} type={bill.type} number={bill.number}
           signalStatus={signal?.your_review} onStanceSaved={() => setStanceRevision((value) => value + 1)} />
         <BillStances key={`stances-${bill.bill_id}`} bill={bill} revision={stanceRevision} />
+        <ReviewHighlights key={`highlights-${bill.bill_id}`} bill={bill} revision={stanceRevision} />
         <SharedReviews key={`shared-${bill.bill_id}`} bill={bill} revision={stanceRevision} onVisibilityChange={() => {
           setReviewRevision((value) => value + 1)
           setStanceRevision((value) => value + 1)

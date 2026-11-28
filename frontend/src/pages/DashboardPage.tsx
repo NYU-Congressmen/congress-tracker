@@ -7,7 +7,8 @@ import { PageBand } from '../components/layout/PageBand'
 import { ChamberComposition } from '../components/dashboard/ChamberComposition'
 import { DistrictBills } from '../components/dashboard/DistrictBills'
 import { TopicFeed } from '../components/dashboard/TopicFeed'
-import { TrackedBills } from '../components/dashboard/TrackedBills'
+import { RepresentativeTiles } from '../components/dashboard/RepresentativeTiles'
+import { YourAsks } from '../components/dashboard/YourAsks'
 import { AlertIcon, ChevronRightIcon, SearchIcon } from '../components/icons'
 import { EmptyState } from '../components/ui/EmptyState'
 import { LoadingState } from '../components/ui/LoadingState'
@@ -100,17 +101,99 @@ export default function DashboardPage() {
   const district = profile?.district ?? null
   const topics = profile?.topics ?? []
 
+  const personal = Boolean(user && district)
+
+  const latestFeed = (
+    <section className={personal ? 'card panel--stack' : 'home__feed'} aria-labelledby="updates-title" aria-busy={latestLoading}>
+      <h2 id="updates-title" className={personal ? undefined : 'home__feed-title'}>
+        Latest updates
+      </h2>
+      {latestError ? (
+        <div className="state state--error" role="alert">
+          <span className="state__icon">
+            <AlertIcon />
+          </span>
+          <div className="state__body">
+            <h3>Live data unavailable</h3>
+            <p>Bill updates could not be loaded.</p>
+          </div>
+          <button type="button" className="btn btn--secondary" onClick={refetch}>
+            Try again
+          </button>
+        </div>
+      ) : latestLoading ? (
+        <LoadingState message="Loading the latest bills…" />
+      ) : latest && latest.data.length > 0 ? (
+        <>
+          <ul className="notes">
+            {latest.data.map((bill) => (
+              <UpdateCard key={bill.bill_id} bill={bill} />
+            ))}
+          </ul>
+          <Link to="/bills" className="more home__more">
+            See all bills
+          </Link>
+        </>
+      ) : (
+        <EmptyState title="No bills available" />
+      )}
+    </section>
+  )
+
+  const stages = (
+    <section className="card" aria-labelledby="stages-title">
+      <div className="card__head">
+        <h2 id="stages-title">Stage</h2>
+        <Link to="/bills" className="more">
+          See all bills
+        </Link>
+      </div>
+      {counts ? (
+        <ul className="stages">
+          {STATUS_META.map((meta) => (
+            <li key={meta.value}>
+              <Link to={`/bills?status=${meta.value}`} className="stages__row" title={meta.description}>
+                <span className={`stages__icon note__icon--s${stageNumber(meta.value)}`} aria-hidden="true">
+                  {stageNumber(meta.value)}
+                </span>
+                <span className="stages__label">{meta.label}</span>
+                <span className="stages__count">{counts[meta.value].toLocaleString()}</span>
+                <ChevronRightIcon className="stages__chev" />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <LoadingState message="Tallying bills by stage…" />
+      )}
+    </section>
+  )
+
+  const seats = (
+    <section className="card" aria-labelledby="chambers-title">
+      {chambers ? (
+        <ChamberComposition counts={chambers} />
+      ) : (
+        <>
+          <div className="composition-toolbar"><h2 id="chambers-title">Seats</h2></div>
+          <LoadingState message="Counting current members…" />
+        </>
+      )}
+    </section>
+  )
+
   return (
     <div className="home">
       <PageBand labelledBy="home-title">
-        <div className="home__hero">
+        <div className={`home__hero${personal ? ' home__hero--personal' : ''}`}>
           <div className="home__intro">
             <h1 id="home-title" className="home__title">
-              Congress in progress
+              Your representatives work for you
             </h1>
             <p className="home__lede">
-              {total !== null ? `${total.toLocaleString()} bills` : 'Every bill'} in the {CONGRESS_NUMBER}th Congress,
-              one dot each. The ones that <mark>stand out</mark> became law.
+              {personal
+                ? 'See how they vote on the bills you care about, tell them where you stand and track what happens next.'
+                : <>Find your members of Congress, see how they vote on the bills you care about and tell them where you stand. {total !== null ? `${total.toLocaleString()} bills` : 'Every bill'} in the {CONGRESS_NUMBER}th Congress, one dot each. The ones that <mark>stand out</mark> became law.</>}
             </p>
             <form className="home__search glass" role="search" onSubmit={onSearch}>
               <SearchIcon size={20} />
@@ -128,7 +211,7 @@ export default function DashboardPage() {
                 Search
               </button>
             </form>
-            <ul className="home__topics" aria-label="Suggested topics">
+            {personal ? null : <ul className="home__topics" aria-label="Suggested topics">
               {TOPICS.map((topic) => (
                 <li key={topic.q}>
                   <Link to={`/bills?q=${encodeURIComponent(topic.q)}`} className="chip">
@@ -136,126 +219,61 @@ export default function DashboardPage() {
                   </Link>
                 </li>
               ))}
-            </ul>
+            </ul>}
           </div>
-
-          <section className="home__feed" aria-labelledby="updates-title" aria-busy={latestLoading}>
-            <h2 id="updates-title" className="home__feed-title">
-              Latest updates
-            </h2>
-            {latestError ? (
-              <div className="state state--error" role="alert">
-                <span className="state__icon">
-                  <AlertIcon />
-                </span>
-                <div className="state__body">
-                  <h3>Live data unavailable</h3>
-                  <p>Bill updates could not be loaded.</p>
-                </div>
-                <button type="button" className="btn btn--secondary" onClick={refetch}>
-                  Try again
-                </button>
-              </div>
-            ) : latestLoading ? (
-              <LoadingState message="Loading the latest bills…" />
-            ) : latest && latest.data.length > 0 ? (
-              <>
-                <ul className="notes">
-                  {latest.data.map((bill) => (
-                    <UpdateCard key={bill.bill_id} bill={bill} />
-                  ))}
-                </ul>
-                <Link to="/bills" className="more home__more">
-                  See all bills
-                </Link>
-              </>
-            ) : (
-              <EmptyState
-                title="No bills available"
-              />
-            )}
-          </section>
+          {personal ? null : latestFeed}
         </div>
       </PageBand>
 
-      {latestError ? null : (
-        <div className="container page-body home__body">
-          <div className="home__grid">
-            <section className="card" aria-labelledby="stages-title">
-              <div className="card__head">
-                <h2 id="stages-title">Stage</h2>
-                <Link to="/bills" className="more">
-                  See all bills
-                </Link>
-              </div>
-              {counts ? (
-                <ul className="stages">
-                  {STATUS_META.map((meta) => (
-                    <li key={meta.value}>
-                      <Link to={`/bills?status=${meta.value}`} className="stages__row" title={meta.description}>
-                        <span className={`stages__icon note__icon--s${stageNumber(meta.value)}`} aria-hidden="true">
-                          {stageNumber(meta.value)}
-                        </span>
-                        <span className="stages__label">{meta.label}</span>
-                        <span className="stages__count">{counts[meta.value].toLocaleString()}</span>
-                        <ChevronRightIcon className="stages__chev" />
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <LoadingState message="Tallying bills by stage…" />
-              )}
-            </section>
+      <div className="container page-body home__body">
+        {personal ? <RepresentativeTiles /> : (
+          <section className="card home__setup" aria-labelledby="setup-title">
+            <div>
+              <h2 id="setup-title">Find your representatives</h2>
+              <p>
+                Save your district to see your House member and senators, how they vote on the bills you care about and
+                what your neighbors are telling them.
+              </p>
+            </div>
+            <Link to={user && profile ? '/profile?section=district' : '/onboarding'} className="btn btn--ink">
+              Find your representatives
+            </Link>
+          </section>
+        )}
 
-            <section className="card" aria-labelledby="chambers-title">
-              {chambers ? (
-                <ChamberComposition counts={chambers} />
-              ) : (
-                <>
-                  <div className="composition-toolbar"><h2 id="chambers-title">Seats</h2></div>
-                  <LoadingState message="Counting current members…" />
-                </>
-              )}
-            </section>
-          </div>
+        {user ? (
+          <section className="card panel--stack" id="tracked" aria-label="Your asks">
+            <YourAsks />
+          </section>
+        ) : null}
 
-          {/* The personal panels follow the signed-in person's district and
-              topics; without a profile, one card invites them to set it up. */}
-          {user ? (
-            <section className="card panel--stack" id="tracked" aria-label="Bills you track">
-              <TrackedBills />
-            </section>
-          ) : null}
-          {district ? (
+        {user && !profileLoading ? (
+          <section className="home-section" aria-labelledby="issues-title">
+            <h2 id="issues-title" className="home-section__title">Your issues</h2>
             <div className="home__mine">
-              <section className="card panel--stack" aria-label="Your district">
-                <DistrictBills state={district.state} district={district.district} />
-              </section>
               <section className="card panel--stack" aria-label="Topics you follow">
                 <TopicFeed topicIds={topics} />
               </section>
+              {district ? (
+                <section className="card panel--stack" aria-label="Your district">
+                  <DistrictBills state={district.state} district={district.district} />
+                </section>
+              ) : null}
             </div>
-          ) : (
-            <section className="card home__setup" aria-labelledby="setup-title">
-              <div>
-                <h2 id="setup-title">Your district in Congress</h2>
-                <p>
-                  Start with the bills your representatives have sponsored. Add topics to follow legislation across Congress.
-                </p>
-              </div>
-              <Link to={user && profile ? '/profile?section=district' : '/onboarding'} className="btn btn--ink">
-                {user && profile ? 'Set up my district' : 'Set up my profile'}
-              </Link>
-            </section>
-          )}
-          {user && !district && !profileLoading ? (
-            <section className="card panel--stack" aria-label="Topics you follow">
-              <TopicFeed topicIds={topics} />
-            </section>
-          ) : null}
-        </div>
-      )}
+          </section>
+        ) : null}
+
+        {latestError && !personal ? null : (
+          <section className="home-section" aria-labelledby="glance-title">
+            <h2 id="glance-title" className="home-section__title">Congress at a glance</h2>
+            <div className={personal ? 'home__glance' : 'home__grid'}>
+              {personal ? latestFeed : null}
+              {stages}
+              {seats}
+            </div>
+          </section>
+        )}
+      </div>
     </div>
   )
 }

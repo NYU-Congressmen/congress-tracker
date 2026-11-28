@@ -27,7 +27,11 @@ class FakeModel:
     def __init__(self, parsed=HELLO, error=None, before_return=None):
         self.parsed, self.error, self.before_return = parsed, error, before_return
         self.calls = 0
+        self.closed = 0
         self.chat = SimpleNamespace(completions=SimpleNamespace(parse=self.parse))
+
+    def close(self):
+        self.closed += 1
 
     def parse(self, **request):
         self.calls += 1

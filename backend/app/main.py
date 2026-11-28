@@ -12,7 +12,9 @@ from app.routes import (
     graph,
     health,
     members,
+    representatives,
     responses,
+    review_summary,
     reviews,
     sharing,
     signal,
@@ -29,6 +31,7 @@ app.include_router(members.router, prefix="/api")
 app.include_router(bills.router, prefix="/api")
 app.include_router(explanations.router, prefix="/api")
 app.include_router(feed.router, prefix="/api")
+app.include_router(review_summary.router, prefix="/api")
 app.include_router(reviews.router, prefix="/api")
 app.include_router(account.router, prefix="/api")
 app.include_router(custom_topics.router, prefix="/api")
@@ -39,5 +42,6 @@ app.include_router(sharing.router, prefix="/api")
 app.include_router(calls.router, prefix="/api")
 app.include_router(tracking.router, prefix="/api")
 app.include_router(signal.router, prefix="/api")
+app.include_router(representatives.router, prefix="/api")
 # Share links live at /s/{code}, outside /api, so the address people see stays short
 app.include_router(sharing.pages)

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'vitest'
-import { currentProfile, forgetAccountProfiles, importablePreferences, legacyProfileFor, usernameError } from './store'
+import { forgetAccountProfiles, importablePreferences, legacyProfileFor, usernameError } from './store'
 import type { Profile } from './types'
 
 afterEach(() => {
@@ -27,20 +27,20 @@ describe('profile names', () => {
 
 describe('browser profiles from earlier builds', () => {
   test('preserves older profiles and removes stored credentials', () => {
-    storeLegacy([{ username: 'maya', password: 'legacy-example' } as Partial<Profile>], 'maya')
+    storeLegacy([{ username: 'maya', firebase_uid: 'maya-id', password: 'legacy-example' } as Partial<Profile>], 'maya')
     const accounts = JSON.parse(localStorage.getItem('pull:accounts') ?? '{}')
     delete accounts.maya.topics
     localStorage.setItem('pull:accounts', JSON.stringify(accounts))
-    expect(currentProfile()?.topics).toEqual([])
+    expect(legacyProfileFor('maya-id')?.topics).toEqual([])
     expect(JSON.parse(localStorage.getItem('pull:accounts') ?? '{}').maya).not.toHaveProperty('password')
   })
 
-  test('prefers the profile linked to the account, then the unlinked profile in use', () => {
+  test('imports only the profile already linked to the signing-in account', () => {
+    // An unlinked profile in use could have been left by anyone who used this browser
     storeLegacy([{ username: 'walk-in' }], 'walk-in')
-    expect(legacyProfileFor('maya-id')?.username).toBe('walk-in')
+    expect(legacyProfileFor('maya-id')).toBeNull()
     storeLegacy([{ username: 'walk-in' }, { username: 'maya', firebase_uid: 'maya-id' }], 'walk-in')
     expect(legacyProfileFor('maya-id')?.username).toBe('maya')
-    storeLegacy([{ username: 'maya', firebase_uid: 'maya-id' }], 'maya')
     expect(legacyProfileFor('other-id')).toBeNull()
   })
 
@@ -59,12 +59,15 @@ describe('browser profiles from earlier builds', () => {
     })
   })
 
-  test('forgets linked copies and the imported profile but keeps other browser profiles', () => {
-    storeLegacy([{ username: 'maya', firebase_uid: 'maya-id' }, { username: 'sam' }, { username: 'walk-in' }], 'walk-in')
+  test('forgets the account\'s copies and every unlinked profile but keeps other accounts\' copies', () => {
+    storeLegacy([
+      { username: 'maya', firebase_uid: 'maya-id' }, { username: 'lee', firebase_uid: 'lee-id' },
+      { username: 'sam' }, { username: 'walk-in' },
+    ], 'walk-in')
 
-    forgetAccountProfiles('maya-id', currentProfile())
+    forgetAccountProfiles('maya-id')
 
-    expect(Object.keys(JSON.parse(localStorage.getItem('pull:accounts') ?? '{}'))).toEqual(['sam'])
-    expect(currentProfile()).toBeNull()
+    expect(Object.keys(JSON.parse(localStorage.getItem('pull:accounts') ?? '{}'))).toEqual(['lee'])
+    expect(localStorage.getItem('pull:session')).toBeNull()
   })
 })

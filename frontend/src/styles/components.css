@@ -726,3 +726,17 @@ select.field__control {
   bottom: -3px;
   box-shadow: 0 0 0 2px var(--card);
 }
+
+/* The reader's own relation to a bill in a list, such as their stance and logged calls */
+.entry__note {
+  grid-column: 2;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-2);
+}
+
+@media (max-width: 640px) {
+  .entry__note {
+    grid-column: 1;
+  }
+}

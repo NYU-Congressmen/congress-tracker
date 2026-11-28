@@ -37,7 +37,7 @@ export default function SocialPage() {
 function SocialContent({ linkedBill }: { linkedBill: string | null }) {
   const { profile, updateProfile } = useProfile()
   const { user, loading: sessionLoading } = useSession()
-  const discussionOwner = user ? `firebase:${user.uid}` : profile?.username ?? null
+  const discussionOwner = user ? `firebase:${user.uid}` : null
 
   // Saved social handles
   const [socials, setSocials] = useState<SocialProfile[]>(profile?.socials ?? [])

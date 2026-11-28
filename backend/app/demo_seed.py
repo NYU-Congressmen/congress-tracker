@@ -179,7 +179,13 @@ VIEWER_REVIEWS = [
         True,
     ),
     ("119-hr-9352", "support", None, False, True),
-    ("119-hr-6644", "unsure", None, False, False),
+    # Sides on bills with House roll calls give the viewer's representative a voting record
+    ("119-hr-6644", "support", None, False, False),
+    ("119-hr-1", "oppose", None, False, True),
+    ("119-hr-1770", "support", None, False, False),
+    ("119-hr-5184", "support", None, False, True),
+    ("119-hr-5764", "support", None, False, False),
+    ("119-hr-2616", "oppose", None, False, False),
 ]
 VIEWER_CALLS = [
     ("119-hr-9352", "N000002", "Asked whether the office supports the House version.", 3),

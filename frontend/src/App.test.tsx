@@ -28,6 +28,10 @@ const MEMBER = {
   is_current: true,
 }
 
+const STAGE_COUNTS = {
+  introduced: 0, committee: 1, passed_one_chamber: 0, passed_both_chambers: 0, to_president: 0, became_law: 0,
+}
+
 afterEach(() => {
   vi.unstubAllGlobals()
 })
@@ -35,6 +39,7 @@ afterEach(() => {
 test('renders the dashboard with the live bills and members', async () => {
   mockApi([
     { match: '/api/members', body: { total: 1, data: [MEMBER] } },
+    { match: '/api/bills/stage-counts', body: STAGE_COUNTS },
     { match: '/api/bills', body: { total: 1, page: 1, limit: 8, data: [BILL] } },
   ])
 
@@ -45,7 +50,7 @@ test('renders the dashboard with the live bills and members', async () => {
   expect(screen.getAllByRole('link', { name: 'Members' })).toHaveLength(2)
 
   // Hero
-  expect(await screen.findByRole('heading', { name: 'Congress in progress' })).toBeTruthy()
+  expect(await screen.findByRole('heading', { name: 'Your representatives work for you' })).toBeTruthy()
   expect(screen.getByText('stand out').tagName).toBe('MARK')
 
   // Latest updates from the API, each with its number and stage
@@ -58,12 +63,13 @@ test('renders the dashboard with the live bills and members', async () => {
   expect(await screen.findByRole('img', { name: /^House seating, 1 current member, Democrats 1/ })).toBeTruthy()
 
   // Without a profile, the home page invites the reader to set one up
-  expect(screen.getByRole('heading', { name: 'Your district in Congress' })).toBeTruthy()
+  expect(screen.getByRole('heading', { name: 'Find your representatives' })).toBeTruthy()
 })
 
 test('shows a helpful offline state when the API is down', async () => {
   mockApi([
     { match: '/api/members', body: { detail: 'down' }, status: 500 },
+    { match: '/api/bills/stage-counts', body: { detail: 'down' }, status: 500 },
     { match: '/api/bills', body: { detail: 'down' }, status: 500 },
   ])
 

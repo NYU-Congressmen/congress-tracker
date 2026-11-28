@@ -4,7 +4,6 @@ import type { User } from '@firebase/auth'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { SessionContext } from '../auth/SessionContext'
 import { ProfileProvider } from '../profile/ProfileContext'
-import { currentProfile } from '../profile/store'
 import SocialPage from './SocialPage'
 import { listDiscussions, recordDiscussion } from '../social/drafts'
 import { mockAccountProfile, mockApi } from '../test/fetchMock'
@@ -72,6 +71,7 @@ function renderSocial(
 afterEach(() => {
   vi.unstubAllGlobals()
   localStorage.clear()
+  sessionStorage.clear()
 })
 
 // Write browser profiles the way earlier builds stored them, with one of them in use.
@@ -111,7 +111,8 @@ describe('SocialPage', () => {
     const { rerender } = render(view(null))
     await screen.findByRole('button', { name: 'Change bill' })
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Save my stance' }).disabled).toBe(true)
-    expect(currentProfile()).toBeNull()
+    // A signed-out visit leaves no browser profile behind
+    expect(localStorage.getItem('pull:session')).toBeNull()
 
     rerender(view(user))
     expect(await screen.findByDisplayValue('Saved account review.')).toBeTruthy()
@@ -174,6 +175,20 @@ describe('SocialPage', () => {
 
     expect(listDiscussions('maya')).toHaveLength(1)
     expect(listDiscussions('sam')).toHaveLength(0)
+    expect(listDiscussions(null)).toHaveLength(0)
+  })
+
+  test('keeps a signed-out draft in this tab and clears the old shared list', () => {
+    localStorage.setItem('pull:discussions', JSON.stringify([{ stance: 'oppose' }]))
+    recordDiscussion(null, {
+      bill: { congress: 119, type: 'hr', number: 7, title: BILL.title },
+      stance: 'support', story: null, action_taken: null, consent: false, saved: false, at: '2026-11-28T12:00:00Z',
+    })
+
+    expect(localStorage.getItem('pull:discussions')).toBeNull()
+    expect(listDiscussions(null)).toHaveLength(1)
+    // A new tab, or the next person after this one closes, starts empty
+    sessionStorage.clear()
     expect(listDiscussions(null)).toHaveLength(0)
   })
 
