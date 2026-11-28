@@ -119,9 +119,13 @@ def ask[Result: BaseModel](
 
     call = {"feature": feature, "bill_id": bill_id, "model": model}
     started = monotonic()
+    # A client made here is closed after the call, so its connections do not wait for garbage
+    # collection. A caller that passes one keeps it open for its own later calls.
+    owned = client is None
+    model_client = client or llm_client()
     try:
         options = {"reasoning_effort": REASONING_EFFORT[model]} if model in REASONING_EFFORT else {}
-        completion = (client or llm_client()).chat.completions.parse(
+        completion = model_client.chat.completions.parse(
             model=model, messages=messages, response_format=schema, **options
         )
         value = completion.choices[0].message.parsed
@@ -143,6 +147,9 @@ def ask[Result: BaseModel](
                 reservation_id,
             )
         raise
+    finally:
+        if owned:
+            model_client.close()
 
     usage = completion.usage
     input_tokens = usage.prompt_tokens if usage else 0

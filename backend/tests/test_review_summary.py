@@ -65,7 +65,8 @@ def test_visitors_read_words_but_only_a_signed_in_reader_generates(client):
     app.dependency_overrides[current_uid] = lambda: "real-0"
     written = http.post(URL).json()
     assert written["highlights"]["themes"] == ["rent relief", "housing costs"]
-    assert model.calls == 1
+    # The client made for the call is closed once it returns
+    assert (model.calls, model.closed) == (1, 1)
     # The saved highlights now reach visitors without another model call
     assert http.get(URL).json()["highlights"]["support"] == "Supporters want rent relief."
     assert http.post(URL).json()["highlights"] is not None
