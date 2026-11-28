@@ -44,6 +44,27 @@
   font-weight: 800;
 }
 
+/* Unread bill updates on the account avatar */
+.site-user__avatar {
+  position: relative;
+}
+
+.site-user__badge {
+  position: absolute;
+  top: -5px;
+  right: -6px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--hl);
+  color: var(--hl-ink);
+  box-shadow: 0 0 0 2px var(--card);
+  font-size: 10.5px;
+  line-height: 17px;
+  text-align: center;
+}
+
 .site-user__text {
   display: grid;
   min-width: 0;
@@ -96,17 +117,138 @@
   transform: rotate(-90deg);
 }
 
+/* The open menu grows out of the account button: the button becomes a tab in the menu's
+   color, the menu meets it with no gap, and the tab covers the shared border */
+.site-profile[open] > .site-user {
+  position: relative;
+  z-index: 3;
+  border-color: var(--line);
+  border-bottom-color: var(--card);
+  border-radius: 20px 20px 0 0;
+  background: var(--card);
+}
+
 .site-profile__panel {
   position: absolute;
-  inset-block-start: calc(100% + 8px);
+  z-index: 2;
+  inset-block-start: calc(100% - 1px);
   inset-inline-end: 0;
   display: grid;
-  min-width: 10rem;
+  min-width: 100%;
   padding: 4px;
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: 16px 0 16px 16px;
   background: var(--card);
   box-shadow: var(--shadow);
+}
+
+/* On a narrow screen the menu slides past the tab, so its top-right corner rounds again */
+.site-profile__panel--shifted {
+  border-top-right-radius: 16px;
+}
+
+/* Curve each inside corner where the tab meets the menu. The quarter-circle draws the
+   outline, and its shadow, which paints only outside the curve, fills the corner with the
+   menu's color and covers the straight edges it replaces. */
+.site-profile[open] > .site-user::before,
+.site-profile--shifted[open] > .site-user::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  width: 12px;
+  height: 12px;
+  border: 0 solid var(--line);
+  pointer-events: none;
+}
+
+.site-profile[open] > .site-user::before {
+  left: -13px;
+  border-right-width: 1px;
+  border-bottom-width: 1px;
+  border-bottom-right-radius: 12px;
+  box-shadow: 6px 6px 0 6px var(--card);
+}
+
+.site-profile--shifted[open] > .site-user::after {
+  right: -13px;
+  border-left-width: 1px;
+  border-bottom-width: 1px;
+  border-bottom-left-radius: 12px;
+  box-shadow: -6px 6px 0 6px var(--card);
+}
+
+/* Recent bill updates at the top of the account menu */
+.site-updates {
+  display: grid;
+  gap: 6px;
+  width: min(22rem, calc(100vw - 48px));
+  padding: 10px 10px 12px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 4px;
+}
+
+.site-updates__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.site-updates__head h2 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.site-updates__list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.site-updates__list a {
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+  border-radius: 8px;
+  color: var(--ink-2);
+  text-decoration: none;
+  font-size: 13.5px;
+  line-height: 1.35;
+}
+
+.site-updates__list a:hover {
+  background: var(--note-bg);
+}
+
+.site-updates__list .is-unread a {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.site-updates__list .is-unread .site-updates__bill::after {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: var(--hl);
+  vertical-align: 1px;
+}
+
+.site-updates__bill {
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.site-updates__empty {
+  margin: 0;
+  font-size: 13.5px;
 }
 
 .site-profile__panel > .btn {
@@ -1400,9 +1542,31 @@ button.chip {
   border-top: 1px solid var(--line);
 }
 
-.call-log__offices li > span {
+.call-log__offices li > span:first-child {
   flex: 1 1 12ch;
   font-weight: 600;
+}
+
+/* The office's Constituent Signal sits on its own line under the name and phone number */
+.call-log__signal {
+  flex-basis: 100%;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+
+.call-log__signal-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.signal-tally strong {
+  color: var(--ink);
+}
+
+.signal-tally--withheld {
+  font-style: italic;
 }
 
 .call-log__history {
@@ -1479,10 +1643,6 @@ button.chip {
 
 .call-log__history button.link-more {
   padding: 4px 0;
-  border: 0;
-  background: transparent;
-  font-family: inherit;
-  cursor: pointer;
 }
 
 .call-log__history .call-log__delete {
@@ -1636,4 +1796,212 @@ button.chip {
 .onboard-results__option > span {
   display: grid;
   gap: 2px;
+}
+
+/* stories readers shared about a bill */
+.shared-reviews {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.shared-review {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--note-bg);
+}
+
+.shared-review__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.shared-review__head .review__stance,
+.shared-review__head .bill-stances__sample {
+  margin: 0;
+}
+
+.shared-review__head {
+  width: 100%;
+}
+
+/* Hide, Show and Report sit at the right end of the stance line */
+.shared-review__action {
+  margin-left: auto;
+}
+
+/* On a phone the stance and its action share the top line, and the district and tag go below */
+@media (max-width: 640px) {
+  .shared-review__head {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-areas: "stance action" "meta meta" "tag tag";
+    row-gap: 6px;
+  }
+  .shared-review__head .review__stance { grid-area: stance; }
+  .shared-review__head .review__meta { grid-area: meta; }
+  .shared-review__head .bill-stances__sample { grid-area: tag; justify-self: start; }
+  .shared-review__action { grid-area: action; justify-self: end; text-align: right; }
+}
+
+/* The author's hidden review reads as set apart from what everyone else sees */
+.shared-review--hidden {
+  background: transparent;
+  outline: 1px dashed var(--chip-border);
+  outline-offset: -1px;
+}
+
+.shared-review .review__story,
+.shared-review .review__action {
+  margin: 0;
+}
+
+.shared-review__report {
+  display: grid;
+  gap: 10px;
+  width: min(100%, 30rem);
+}
+
+.shared-review__report-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* One weekly Constituent Signal draft per office */
+.signal-offices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.signal-office {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--note-bg);
+}
+
+.signal-office__name {
+  font-weight: 800;
+}
+
+.signal-office__counts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 8px 0 0;
+}
+
+.signal-office__counts dt {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.signal-office__counts dd {
+  margin: 2px 0 0;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+/* An office's public Constituent Signal, one bill per row */
+.signal-bills {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.signal-bills li {
+  display: grid;
+  gap: 4px;
+  padding: 12px 0;
+}
+
+.signal-bills li + li {
+  border-top: 1px solid var(--line);
+}
+
+.signal-bills__bill {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-weight: 700;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.signal-bills__bill:hover span:last-child {
+  text-decoration: underline;
+}
+
+/* The reader's own contribution, set apart so it reads as private */
+.private-box {
+  background: var(--note-bg);
+  outline: 1px dashed var(--chip-border);
+  outline-offset: -6px;
+}
+
+.private-box__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.private-box__choices {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.private-box__choices legend {
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.private-box__others {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  font-size: 14px;
+}
+
+.private-box__others-title {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.private-box__others ul {
+  margin: 0;
+  padding-left: 18px;
 }

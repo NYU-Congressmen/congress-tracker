@@ -258,6 +258,13 @@ class ReviewIn(BaseModel):
         return value if value and value.strip() else None
 
 
+class ReviewSharingChoice(BaseModel):
+    """Describe a change to one of the author's sharing settings."""
+
+    field: Literal["consent_to_share", "share_publicly"]
+    value: bool
+
+
 class Review(ReviewIn):
     """Describe a saved review of one bill by the signed-in user."""
 
@@ -361,6 +368,8 @@ class PublicReview(BaseModel):
     updated_at: datetime
     # Platforms where a live post carrying one of the review's share links was found
     posted_to: list[str] = Field(default_factory=list)
+    mine: bool = False
+    is_sample: bool = False
 
 
 class ReviewPage(BaseModel):
@@ -370,6 +379,8 @@ class ReviewPage(BaseModel):
     page: int
     limit: int
     data: list[PublicReview]
+    # The viewer's own review when they hid it from everyone else, which only they see
+    mine_hidden: PublicReview | None = None
 
 
 ReportReason = Literal["spam", "harassment", "misinformation", "personal_info", "other"]
@@ -472,3 +483,98 @@ class CallEntry(CallIn):
     action_id: int
     member_name: str
     created_at: datetime
+
+
+class TrackStatus(BaseModel):
+    """Describe whether the signed-in reader tracks a bill."""
+
+    tracking: bool
+
+
+class TrackedBill(BillSummary):
+    """Describe a bill the reader tracks and how many of its updates they have not opened."""
+
+    followed_at: datetime
+    unread: int
+
+
+class Notification(BaseModel):
+    """Describe one update about a tracked bill."""
+
+    notification_id: int
+    bill_id: str
+    congress: int
+    type: BillType
+    number: int
+    title: str
+    message: str
+    is_read: bool
+    created_at: datetime
+
+
+class NotificationPage(BaseModel):
+    """Describe the reader's most recent updates and how many are unread."""
+
+    unread: int
+    data: list[Notification]
+
+
+class NotificationsReadIn(BaseModel):
+    """Choose which updates to mark read, either one bill's or all of them."""
+
+    bill_id: str | None = None
+
+
+class SignalCounts(BaseModel):
+    """Hold one office's counts for a bill, which are null when too few constituents are counted."""
+
+    support: int | None
+    oppose: int | None
+    unsure: int | None
+    calls: int | None
+    withheld: bool
+
+
+class SignalOffice(SignalCounts):
+    """Describe one of the reader's offices and its Constituent Signal counts for a bill."""
+
+    bioguide_id: str
+    name: str
+    party: str | None
+    chamber: str | None
+    state: str | None
+    district: int | None
+
+
+class SignalPage(BaseModel):
+    """Describe the Constituent Signal the reader's offices get for a bill this week."""
+
+    window_start: datetime
+    window_end: datetime
+    includes_sample: bool
+    min_counted: int
+    # Whether the reader's own review counts: none, not_consented, not_included or included
+    your_review: Literal["none", "not_consented", "not_included", "included"]
+    offices: list[SignalOffice]
+
+
+class SignalBill(SignalCounts):
+    """Describe one bill in an office's public Constituent Signal."""
+
+    bill_id: str
+    congress: int
+    type: BillType
+    number: int
+    title: str
+
+
+class MemberSignal(BaseModel):
+    """Describe the Constituent Signal one office received over the past week."""
+
+    window_start: datetime
+    window_end: datetime
+    includes_sample: bool
+    min_counted: int
+    bills: list[SignalBill]
+    # Bills with too few counted constituents to show their counts
+    withheld_bills: int

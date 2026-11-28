@@ -213,3 +213,11 @@ export function ChatIcon({ size = 22, className }: IconProps) {
     </svg>
   )
 }
+
+export function LockIcon({ size = 16, className }: IconProps) {
+  return (
+    <svg viewBox="0 0 20 20" width={size} height={size} className={className} aria-hidden="true" fill="currentColor">
+      <path d="M10 2a4 4 0 0 0-4 4v2H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1h-1V6a4 4 0 0 0-4-4zm-2 6V6a2 2 0 1 1 4 0v2zm2 3a1.5 1.5 0 0 1 .75 2.8V15h-1.5v-1.2A1.5 1.5 0 0 1 10 11z" />
+    </svg>
+  )
+}

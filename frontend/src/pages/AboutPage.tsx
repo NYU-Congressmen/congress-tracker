@@ -108,10 +108,13 @@ export default function AboutPage() {
           <section className="panel panel--stack">
             <h2>Stack</h2>
             <ul className="stack-list">
-              <li>React 19, TypeScript and Vite for this interface</li>
-              <li>FastAPI on Python 3.13 for the API and sync job</li>
-              <li>PostgreSQL with Alembic-managed migrations for stored data</li>
-              <li>Firebase Auth for sign-in, planned for the next milestone</li>
+              <li>React 19, TypeScript and Vite for this interface, served by Firebase Hosting</li>
+              <li>FastAPI on Python 3.13 for the API, running on Google Cloud Run</li>
+              <li>PostgreSQL on Supabase with pgvector, with Alembic-managed migrations</li>
+              <li>Firebase Auth phone sign-in, verified by the API on every account request</li>
+              <li>A daily GitHub Actions job that syncs members, bills and summaries from the Congress.gov API</li>
+              <li>OpenAI models for bill explanations, version summaries, topic matching and review moderation</li>
+              <li>FastMCP tools that let AI assistants look up bills, members and explanations</li>
             </ul>
           </section>
         </div>
@@ -121,13 +124,6 @@ export default function AboutPage() {
           <section className="panel panel--stack" aria-label="Links">
             <h2>Links</h2>
             <ul className="link-list">
-              {import.meta.env.DEV && (
-                <li>
-                  <a href="http://localhost:8000/docs" target="_blank" rel="noreferrer">
-                    Interactive API documentation
-                  </a>
-                </li>
-              )}
               <li>
                 <a href="https://www.congress.gov" target="_blank" rel="noreferrer">
                   congress.gov

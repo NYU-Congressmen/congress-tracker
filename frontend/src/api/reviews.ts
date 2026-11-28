@@ -5,6 +5,7 @@ import type { BillType } from './bills'
 
 export type Stance = 'support' | 'oppose' | 'unsure'
 export type ModerationStatus = 'pending' | 'flagged' | 'held' | 'cleared'
+export type ReviewSharingField = 'consent_to_share' | 'share_publicly'
 
 export const STANCES: readonly Stance[] = ['support', 'oppose', 'unsure']
 
@@ -50,6 +51,8 @@ export interface ReviewIn {
 // Describe a saved review of one bill by the signed-in user.
 export interface Review extends ReviewIn {
   bill_id: string
+  // The author hid it from the shared list and the stance counts.
+  hidden: boolean
   moderation_status: ModerationStatus
   created_at: string
   updated_at: string
@@ -84,5 +87,86 @@ export function saveStance(
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ stance }),
+  })
+}
+
+export function saveReviewSharingChoice(
+  congress: number, type: BillType, number: number, field: ReviewSharingField, value: boolean, token: string,
+): Promise<Review> {
+  return request<Review>(`/api/bills/${congress}/${type}/${number}/review/sharing`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ field, value }),
+  })
+}
+
+// Describe a review its author shared on the bill page, with the district they saved.
+export interface PublicReview {
+  review_id: number
+  bill_id: string
+  stance: Stance
+  story: string | null
+  action_taken: string | null
+  state: string | null
+  district: number | null
+  created_at: string
+  updated_at: string
+  posted_to: string[]
+  mine: boolean
+  is_sample: boolean
+}
+
+export interface ReviewPage {
+  total: number
+  page: number
+  limit: number
+  data: PublicReview[]
+  // The signed-in reader's own review when they hid it, which only they see
+  mine_hidden?: PublicReview | null
+}
+
+// List a bill's shared reviews, optionally from one state or district, newest first.
+export function listSharedReviews(
+  congress: number, type: BillType, number: number,
+  options: { page?: number; state?: string; district?: number | null; token?: string } = {},
+): Promise<ReviewPage> {
+  const query = new URLSearchParams({ page: String(options.page ?? 1), limit: '10' })
+  if (options.state) {
+    query.set('state', options.state)
+    if (options.district != null) query.set('district', String(options.district))
+  }
+  return request<ReviewPage>(`/api/bills/${congress}/${type}/${number}/reviews?${query}`,
+    options.token ? { headers: { Authorization: `Bearer ${options.token}` } } : undefined)
+}
+
+export type ReportReason = 'spam' | 'harassment' | 'misinformation' | 'personal_info' | 'other'
+
+export const REPORT_REASONS: Record<ReportReason, string> = {
+  spam: 'Spam',
+  harassment: 'Harassment',
+  misinformation: 'Misinformation',
+  personal_info: 'Personal information',
+  other: 'Something else',
+}
+
+// Report a shared review, as a signed-in reader when a token is given or as a visitor.
+export async function reportReview(
+  reviewId: number, reason: ReportReason, details: string | null, token?: string,
+): Promise<void> {
+  await request<null>(`/api/reviews/${reviewId}/reports`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify({ reason, details }),
+  })
+}
+
+// Hide the signed-in author's review from the shared list and counts, or show it again.
+export function setReviewHidden(
+  congress: number, type: BillType, number: number, hidden: boolean, token: string,
+): Promise<Review> {
+  return request<Review>(`/api/bills/${congress}/${type}/${number}/review/visibility`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ hidden }),
   })
 }

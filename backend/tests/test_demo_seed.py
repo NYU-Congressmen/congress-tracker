@@ -18,6 +18,11 @@ def test_seed_is_repeatable_and_stays_out_of_public_counts(db):
             "('119-hr-9352', 119, 'hr', 9352, 'AI-Related Job Impacts Clarity Act')"
         )
         conn.execute(
+            "INSERT INTO bills (bill_id, congress, type, number, title, latest_action_date, "
+            "latest_action_text) VALUES ('119-hr-1190', 119, 'hr', 1190, 'Rural Capital Act', "
+            "'2026-10-14', 'Message on Senate action sent to the House.')"
+        )
+        conn.execute(
             "INSERT INTO members (bioguide_id, name, state, chamber, district, is_current) VALUES "
             "('N000002', 'Nadler, Jerrold', 'NY', 'House', 12, true), "
             "('S000148', 'Schumer, Charles E.', 'NY', 'Senate', NULL, true), "
@@ -43,9 +48,18 @@ def test_seed_is_repeatable_and_stays_out_of_public_counts(db):
             calls = conn.execute(
                 "SELECT count(*) FROM actions WHERE uid = %s", (VIEWER_UID,)
             ).fetchone()[0]
+            tracked = conn.execute(
+                "SELECT count(*) FROM tracked_bills WHERE uid = %s", (VIEWER_UID,)
+            ).fetchone()[0]
+            updates = conn.execute(
+                "SELECT bill_id, message FROM notifications WHERE uid = %s", (VIEWER_UID,)
+            ).fetchall()
     assert counted[0] == counted[1]
     assert counted[0][1] == 1
-    assert counts["bills"] == 2 and calls == 3
+    assert counts["bills"] == 3 and calls == 3
+    # The viewer tracks the seeded bills, and only the one with an action since has an update
+    assert tracked == 2
+    assert updates == [("119-hr-1190", "Oct 14, 2026: Message on Senate action sent to the House.")]
     with psycopg.connect(TEST_DATABASE_URL) as conn:
         statuses = conn.execute(
             "SELECT DISTINCT moderation_status FROM reviews WHERE uid <> 'real-reader'"

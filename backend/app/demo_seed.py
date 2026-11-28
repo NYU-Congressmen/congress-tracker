@@ -11,12 +11,14 @@ includes the is_sample filter, or the sample activity appears in public totals.
 import argparse
 import random
 from datetime import UTC, datetime, timedelta
+from itertools import cycle
 from uuid import NAMESPACE_URL, uuid5
 
 from psycopg.types.json import Jsonb
 
 from app.config import settings
 from app.db import connect
+from app.tracking import notify_tracked_updates
 
 # The Firebase project's fictional test number signs in as this account.
 VIEWER_UID = "9bVp6U75ItXOcuVGapdsz3hcTX63"
@@ -64,6 +66,11 @@ BILLS = {
 }
 AI_BILLS = {"119-s-3108", "119-hr-9352"}
 
+# Bills the viewer tracks, with how many days before each bill's latest official action they
+# started. A bill tracked after its latest action has no update yet, and the others get one
+# notification each from the same step the daily sync runs.
+VIEWER_TRACKED = {"119-s-3108": None, "119-hr-1190": 14, "119-hr-10159": 14}
+
 STORIES = {
     ("ai", "support"): [
         (
@@ -78,6 +85,15 @@ STORIES = {
             "I teach community college students who ask me which careers will still exist. They "
             "deserve real numbers."
         ),
+        "My paralegal program changed half its courses this year, and nobody can say why.",
+        "I was laid off from a call center after it moved to an AI system. Track this.",
+        (
+            "My younger brother is choosing a major now. Better data on which jobs are shrinking "
+            "would help him."
+        ),
+        "Companies already measure what AI saves them. Workers deserve the same numbers.",
+        "I manage a small design team, and I want facts before we restructure anything.",
+        "Our union keeps asking for this information. A federal report would settle it.",
     ],
     ("ai", "oppose"): [
         (
@@ -85,12 +101,18 @@ STORIES = {
             "like mine."
         ),
         "I would rather Congress fund retraining directly than start with another study.",
+        "A report every year will be out of date before anyone reads it.",
+        "I worry the survey questions will make every tool look like a job cut.",
+        "The Labor Department already has job data. Fund that instead of a new report.",
     ],
     ("ai", "unsure"): [
         (
             "I support transparency, but I want to know who collects the data and how it stays "
             "private."
         ),
+        "I like the idea, but I want to see whether small employers have to file anything.",
+        "Measuring job changes makes sense. I am less sure what Congress will do with it.",
+        "I would support this if the data were broken down by region and age.",
     ],
     ("jobs", "support"): [
         (
@@ -98,9 +120,11 @@ STORIES = {
             "on my own."
         ),
         "My family's business could hire two more people with better access to capital.",
+        "I started a cleaning business last year, and a small loan would let me hire.",
     ],
     ("jobs", "oppose"): [
         "I worry the costs fall on small employers who are already stretched.",
+        "Programs like this tend to help the businesses that already have accountants.",
     ],
     ("jobs", "unsure"): [
         "I like the goal, and I want to see how it works for part-time and gig workers.",
@@ -117,9 +141,11 @@ STORIES = {
     ],
     ("housing", "oppose"): [
         "I want more housing too, but I am not convinced this approach reaches renters quickly.",
+        "New buildings near me have all been luxury units. I doubt this changes that.",
     ],
     ("housing", "unsure"): [
         "I need to understand how this changes local zoning decisions before I decide.",
+        "My landlord says this would raise rents during construction. I want to check that.",
     ],
     ("education", "support"): [
         "As a parent, I want more say in what happens at my kids' school.",
@@ -175,9 +201,12 @@ def sample_accounts(rng: random.Random) -> list[tuple[str, str, str, int]]:
 
 
 def sample_reviews(rng: random.Random, accounts, bills: list[str]) -> list[tuple]:
-    """Return sample stances, with some stories shared publicly or with the brief."""
+    """Return sample stances, some with stories shared publicly and some included in the brief."""
     now = datetime.now(UTC)
     reviews = []
+    # Each theme and stance deals its stories in a shuffled rotation, so neighboring reviews
+    # rarely repeat one.
+    decks = {key: cycle(rng.sample(stories, len(stories))) for key, stories in STORIES.items()}
     for uid, _, state, district in accounts:
         for bill_id in bills:
             # The viewer's district follows the AI jobs bills closely, which fills its view.
@@ -189,7 +218,7 @@ def sample_reviews(rng: random.Random, accounts, bills: list[str]) -> list[tuple
             stance = (
                 "support" if roll < support else "oppose" if roll < support + oppose else "unsure"
             )
-            story = rng.choice(STORIES[(theme, stance)]) if rng.random() < 0.16 else None
+            story = next(decks[(theme, stance)]) if rng.random() < 0.16 else None
             written = now - timedelta(days=rng.uniform(0.2, 21))
             reviews.append(
                 (
@@ -198,7 +227,8 @@ def sample_reviews(rng: random.Random, accounts, bills: list[str]) -> list[tuple
                     stance,
                     story,
                     story is not None and rng.random() < 0.7,
-                    story is not None and rng.random() < 0.55,
+                    # Any stance can go into the brief, and people who wrote a story opt in more
+                    rng.random() < (0.55 if story is not None else 0.3),
                     written,
                 )
             )
@@ -230,6 +260,8 @@ def seed(conn, rng_seed: int = 119) -> dict[str, int]:
     )
     conn.execute("DELETE FROM reviews WHERE uid = %s", (VIEWER_UID,))
     conn.execute("DELETE FROM actions WHERE uid = %s AND action_type = 'call'", (VIEWER_UID,))
+    conn.execute("DELETE FROM notifications WHERE uid = %s", (VIEWER_UID,))
+    conn.execute("DELETE FROM tracked_bills WHERE uid = %s", (VIEWER_UID,))
 
     accounts = sample_accounts(rng)
     with conn.cursor() as cursor:
@@ -276,6 +308,21 @@ def seed(conn, rng_seed: int = 119) -> dict[str, int]:
                 if bill_id in bills
             ],
         )
+    for bill_id, days_before in VIEWER_TRACKED.items():
+        if bill_id not in bills:
+            continue
+        conn.execute(
+            """
+            INSERT INTO tracked_bills (uid, bill_id, followed_at)
+            SELECT %(uid)s, bill_id,
+                   CASE WHEN %(days)s::int IS NULL OR latest_action_date IS NULL
+                        THEN now() - interval '3 days'
+                        ELSE latest_action_date - %(days)s::int END
+            FROM bills WHERE bill_id = %(bill_id)s
+            """,
+            {"uid": VIEWER_UID, "bill_id": bill_id, "days": days_before},
+        )
+        notify_tracked_updates(conn, bill_id)
     # The seeded stories are written for the demo, so they skip the moderation queue.
     conn.execute(
         "UPDATE reviews r SET moderation_status = 'cleared' FROM users u "

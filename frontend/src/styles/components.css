@@ -148,6 +148,21 @@ a.chip:hover {
   text-decoration: underline;
 }
 
+/* The same link look on buttons that act in place */
+button.link-more {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+button.link-more:disabled {
+  cursor: default;
+  opacity: 0.6;
+  text-decoration: none;
+}
+
 .ext-link {
   display: inline-flex;
   align-items: center;
@@ -350,6 +365,19 @@ a.chip:hover {
   line-height: 1.3;
 }
 
+/* Marks a tracked bill whose latest action the reader has not opened */
+.entry__new {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--hl);
+  color: var(--hl-ink);
+  font-size: 12px;
+  font-weight: 800;
+  vertical-align: 2px;
+}
+
 .entry:hover .entry__title {
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -400,6 +428,13 @@ a.chip:hover {
   color: var(--ink);
   font: 600 15px var(--font);
   padding: 0 12px;
+}
+
+/* iOS Safari zooms into a focused field set below 16px and keeps that zoom after navigation */
+@media (pointer: coarse) {
+  .field__control {
+    font-size: 16px;
+  }
 }
 
 .field__control::placeholder {

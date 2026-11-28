@@ -7,6 +7,7 @@ import { PageBand } from '../components/layout/PageBand'
 import { ChamberComposition } from '../components/dashboard/ChamberComposition'
 import { DistrictBills } from '../components/dashboard/DistrictBills'
 import { TopicFeed } from '../components/dashboard/TopicFeed'
+import { TrackedBills } from '../components/dashboard/TrackedBills'
 import { AlertIcon, ChevronRightIcon, SearchIcon } from '../components/icons'
 import { EmptyState } from '../components/ui/EmptyState'
 import { LoadingState } from '../components/ui/LoadingState'
@@ -24,15 +25,6 @@ const TOPICS: { label: string; q: string }[] = [
   { label: 'Student loans', q: 'student loan' },
   { label: 'Elections', q: 'election' },
   { label: 'Health care', q: 'health' },
-]
-
-// The dot colors, in stage order, for the key under the header.
-const DOT_KEY: { label: string; token: string }[] = [
-  { label: 'Introduced or in committee', token: '--d2' },
-  { label: 'Passed the House or Senate', token: '--d3' },
-  { label: 'Passed both', token: '--d4' },
-  { label: 'With the President', token: '--d5' },
-  { label: 'Law', token: '--d6' },
 ]
 
 // What happened to a bill most recently, in a few words.
@@ -184,15 +176,6 @@ export default function DashboardPage() {
             )}
           </section>
         </div>
-
-        <ul className="home__key" aria-label="Bill stages by dot color">
-          {DOT_KEY.map((item) => (
-            <li key={item.token}>
-              <i style={{ background: `var(${item.token})` }} aria-hidden="true" />
-              {item.label}
-            </li>
-          ))}
-        </ul>
       </PageBand>
 
       {latestError ? null : (
@@ -239,6 +222,11 @@ export default function DashboardPage() {
 
           {/* The personal panels follow the signed-in person's district and
               topics; without a profile, one card invites them to set it up. */}
+          {user ? (
+            <section className="card panel--stack" id="tracked" aria-label="Bills you track">
+              <TrackedBills />
+            </section>
+          ) : null}
           {district ? (
             <div className="home__mine">
               <section className="card panel--stack" aria-label="Your district">

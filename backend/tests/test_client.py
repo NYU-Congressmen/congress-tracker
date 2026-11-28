@@ -1,4 +1,4 @@
-import time
+import asyncio
 
 import httpx
 import pytest
@@ -78,15 +78,65 @@ def test_batch_sync_retries_the_same_page_after_a_read_timeout(failures):
 def test_refresh_budget_is_shared_across_pages():
     calls = []
 
-    def slow_page(request):
+    async def slow_page(request):
         calls.append(request.url.params["offset"])
-        time.sleep(0.12)
+        await asyncio.sleep(0.12)
         return httpx.Response(200, json={"bills": [1], "pagination": {"next": "next"}})
 
     with CongressClient("test", transport=httpx.MockTransport(slow_page), budget=0.2) as client:
         with pytest.raises(httpx.TimeoutException):
             list(client.paginate("/bill", "bills"))
     assert calls == ["0", "1"]
+
+
+def test_refresh_deadline_interrupts_a_response_that_keeps_sending_bytes():
+    received = []
+    closed = []
+
+    class SlowBody(httpx.AsyncByteStream):
+        async def __aiter__(self):
+            while True:
+                received.append(True)
+                yield b" "
+                await asyncio.sleep(0.005)
+
+        async def aclose(self):
+            closed.append(True)
+
+    async def response(request):
+        return httpx.Response(200, stream=SlowBody())
+
+    with CongressClient("test", transport=httpx.MockTransport(response), budget=0.1) as client:
+        with pytest.raises(httpx.TimeoutException, match="refresh deadline expired"):
+            client.get("/bill")
+    assert len(received) > 1
+    assert closed == [True]
+
+
+def test_parallel_refresh_starts_independent_requests_and_collects_action_pages():
+    paths = set()
+    started = asyncio.Event()
+
+    async def response(request):
+        path = request.url.path
+        paths.add(path)
+        if len(paths) == 3:
+            started.set()
+        await started.wait()
+        if path.endswith("/actions"):
+            offset = int(request.url.params["offset"])
+            pagination = {"next": "next"} if offset == 0 else {}
+            return httpx.Response(200, json={"actions": [offset], "pagination": pagination})
+        return httpx.Response(200, json={"path": path})
+
+    path = "/bill/119/hr/1"
+    with CongressClient("test", transport=httpx.MockTransport(response), budget=1) as client:
+        detail, actions, versions = client.get_parallel(
+            (path, None), (f"{path}/actions", "actions"), (f"{path}/text", None)
+        )
+    assert detail == {"path": f"/v3{path}"}
+    assert actions == [0, 1]
+    assert versions == {"path": f"/v3{path}/text"}
 
 
 def test_collect_reads_again_until_nothing_is_missing():

@@ -1,4 +1,6 @@
+import asyncio
 from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from time import monotonic
 from typing import Any
 
@@ -20,19 +22,19 @@ class CongressClient:
     def __init__(
         self,
         api_key: str,
-        transport: httpx.BaseTransport | None = None,
+        transport: httpx.BaseTransport | httpx.AsyncBaseTransport | None = None,
         budget: float | None = None,
         *,
         retry_read_timeouts: bool = False,
     ):
         # The key goes in a header so it never appears in URLs, logs or error messages
-        self._http = httpx.Client(
-            base_url=BASE_URL,
-            headers={"X-Api-Key": api_key},
-            params={"format": "json"},
-            timeout=TIMEOUT,
-            transport=transport,
-        )
+        self._http_options = {
+            "base_url": BASE_URL,
+            "headers": {"X-Api-Key": api_key},
+            "params": {"format": "json"},
+            "transport": transport,
+        }
+        self._http = httpx.Client(**self._http_options) if budget is None else None
         # Every request in one refresh shares a single deadline
         self._deadline = None if budget is None else monotonic() + budget
         self._read_attempts = 3 if retry_read_timeouts else 1
@@ -41,38 +43,93 @@ class CongressClient:
         return self
 
     def __exit__(self, *exc: object) -> None:
-        self._http.close()
+        if self._http is not None:
+            self._http.close()
+
+    @contextmanager
+    def _retry_read(self, path: str, attempt: int) -> Iterator[None]:
+        try:
+            yield
+        except httpx.ReadTimeout:
+            if attempt == self._read_attempts:
+                raise
+            print(
+                f"Congress.gov read timed out on {path} (attempt {attempt}). Retrying.",
+                flush=True,
+            )
 
     def get(self, path: str, **params: Any) -> dict[str, Any]:
-        """Fetch one response from the API and return its decoded JSON body.
+        """Return the decoded JSON response for one API request."""
+        if self._http is not None:
+            for attempt in range(1, self._read_attempts + 1):
+                with self._retry_read(path, attempt):
+                    response = self._http.get(path, params=params, timeout=TIMEOUT)
+                    response.raise_for_status()
+                    return response.json()
+        return asyncio.run(self._get_parallel(((path, None, params),)))[0]
 
-        With a budget, each request may wait only for the time the refresh has left, so a
-        stalled connection ends at the deadline, although a server that keeps trickling
-        bytes can still run past it.
-        """
-        for attempt in range(1, self._read_attempts + 1):
-            timeout = TIMEOUT
-            if self._deadline is not None:
-                remaining = self._deadline - monotonic()
-                if remaining <= 0:
-                    raise httpx.TimeoutException("Congress.gov refresh deadline expired")
-                timeout = min(TIMEOUT, remaining)
-            try:
-                response = self._http.get(path, params=params, timeout=timeout)
-            except httpx.ReadTimeout:
-                if attempt == self._read_attempts:
-                    raise
-                print(
-                    f"Congress.gov read timed out on {path} (attempt {attempt}). Retrying.",
-                    flush=True,
-                )
-            else:
-                break
-        response.raise_for_status()
-        return response.json()
+    def get_parallel(self, *requests: tuple[str, str | None]) -> list[Any]:
+        """Return responses in request order, collecting all pages when a list key is given."""
+        if self._deadline is None:
+            return [
+                self.get(path) if key is None else list(self.paginate(path, key))
+                for path, key in requests
+            ]
+        return asyncio.run(self._get_parallel(tuple((path, key, {}) for path, key in requests)))
+
+    async def _get_parallel(
+        self, requests: tuple[tuple[str, str | None, dict[str, Any]], ...]
+    ) -> list[Any]:
+        assert self._deadline is not None
+        remaining = self._deadline - monotonic()
+        if remaining <= 0:
+            raise httpx.TimeoutException("Congress.gov refresh deadline expired")
+        try:
+            async with asyncio.timeout(remaining):
+                async with httpx.AsyncClient(
+                    **self._http_options, timeout=min(TIMEOUT, remaining)
+                ) as client:
+                    tasks = [
+                        asyncio.create_task(self._read_async(client, path, key, params))
+                        for path, key, params in requests
+                    ]
+                    try:
+                        # A missing bill takes precedence over errors in its dependent endpoints.
+                        return [await task for task in tasks]
+                    finally:
+                        for task in tasks:
+                            if not task.done():
+                                task.cancel()
+                        await asyncio.gather(*tasks, return_exceptions=True)
+        except TimeoutError as error:
+            raise httpx.TimeoutException("Congress.gov refresh deadline expired") from error
+
+    async def _read_async(
+        self, client: httpx.AsyncClient, path: str, key: str | None, params: dict[str, Any]
+    ) -> Any:
+        offset = 0
+        items = []
+        while True:
+            query = params if key is None else {**params, "limit": PAGE_SIZE, "offset": offset}
+            for attempt in range(1, self._read_attempts + 1):
+                with self._retry_read(path, attempt):
+                    response = await client.get(path, params=query)
+                    response.raise_for_status()
+                    page = response.json()
+                    break
+            if key is None:
+                return page
+            batch = page.get(key, [])
+            items.extend(batch)
+            if not batch or not page.get("pagination", {}).get("next"):
+                return items
+            offset += len(batch)
 
     def paginate(self, path: str, key: str, **params: Any) -> Iterator[dict[str, Any]]:
         """Yield every item stored under key across all pages of a list endpoint."""
+        if self._deadline is not None:
+            yield from asyncio.run(self._get_parallel(((path, key, params),)))[0]
+            return
         offset = 0
         while True:
             page = self.get(path, limit=PAGE_SIZE, offset=offset, **params)
