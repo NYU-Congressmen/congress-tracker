@@ -22,8 +22,15 @@ export function loadFirebaseAuth(): Promise<Auth> {
     if (!options?.apiKey || !options.authDomain || !options.projectId) {
       throw new Error('Phone sign-in is unavailable.')
     }
-    const { getAuth } = await import('@firebase/auth')
-    const auth = getAuth(initializeApp(options))
+    const {
+      browserLocalPersistence, browserSessionPersistence, indexedDBLocalPersistence, initializeAuth,
+    } = await import('@firebase/auth')
+    // The same persistence getAuth uses in a browser, without its popup and redirect support.
+    // Pull signs in only by phone, and that support loads a Google script on phones that the
+    // site's content security policy blocks.
+    const auth = initializeAuth(initializeApp(options), {
+      persistence: [indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence],
+    })
     // Firebase accepts only configured fictional numbers in this preview mode.
     if (import.meta.env.DEV && window.location.hostname === 'localhost'
       && import.meta.env.VITE_FIREBASE_PHONE_TEST_MODE === 'true') {
