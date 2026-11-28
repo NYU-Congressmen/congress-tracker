@@ -1,28 +1,18 @@
 import { useEffect, useState } from 'react'
-import { BILL_STATUSES, searchBills, type BillStatus } from '../api/bills'
+import { BILL_STATUSES, type BillStatus } from '../api/bills'
+import { request } from '../api/client'
 
 export type StageCounts = Record<BillStatus, number>
 
 let pending: Promise<StageCounts> | null = null
 
-// How many bills sit at each stage. Each request asks for a single row, so only
-// the totals come back. The result is shared by every page in the visit; a failed
-// load is forgotten so the next caller tries again.
+// How many bills sit at each stage, from one grouped count on the server. The result is shared by
+// every page in the visit, and a failed load is forgotten so the next caller tries again.
 export function loadStageCounts(): Promise<StageCounts> {
-  if (!pending) {
-    pending = Promise.all(BILL_STATUSES.map((status) => searchBills({ status, limit: 1 })))
-      .then((pages) => {
-        const counts = {} as StageCounts
-        BILL_STATUSES.forEach((status, index) => {
-          counts[status] = pages[index].total
-        })
-        return counts
-      })
-      .catch((error: unknown) => {
-        pending = null
-        throw error
-      })
-  }
+  pending ??= request<StageCounts>('/api/bills/stage-counts').catch((error: unknown) => {
+    pending = null
+    throw error
+  })
   return pending
 }
 

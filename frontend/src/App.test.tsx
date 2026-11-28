@@ -28,6 +28,10 @@ const MEMBER = {
   is_current: true,
 }
 
+const STAGE_COUNTS = {
+  introduced: 0, committee: 1, passed_one_chamber: 0, passed_both_chambers: 0, to_president: 0, became_law: 0,
+}
+
 afterEach(() => {
   vi.unstubAllGlobals()
 })
@@ -35,6 +39,7 @@ afterEach(() => {
 test('renders the dashboard with the live bills and members', async () => {
   mockApi([
     { match: '/api/members', body: { total: 1, data: [MEMBER] } },
+    { match: '/api/bills/stage-counts', body: STAGE_COUNTS },
     { match: '/api/bills', body: { total: 1, page: 1, limit: 8, data: [BILL] } },
   ])
 
@@ -64,6 +69,7 @@ test('renders the dashboard with the live bills and members', async () => {
 test('shows a helpful offline state when the API is down', async () => {
   mockApi([
     { match: '/api/members', body: { detail: 'down' }, status: 500 },
+    { match: '/api/bills/stage-counts', body: { detail: 'down' }, status: 500 },
     { match: '/api/bills', body: { detail: 'down' }, status: 500 },
   ])
 
