@@ -1,4 +1,5 @@
-// Keep a local discussion history for each profile in the browser.
+// Keep a local discussion history for each account in the browser. A signed-out visitor's drafts
+// stay in this tab only, so the next person on a shared browser never sees them.
 
 import type { BillType } from '../api/bills'
 import type { Stance } from '../api/reviews'
@@ -21,9 +22,22 @@ function storageKey(username: string | null): string {
   return username === null ? KEY : `${KEY}:${username}`
 }
 
+function storageFor(username: string | null): Storage {
+  if (username === null) {
+    // Earlier builds kept signed-out drafts in one browser-wide list, which no one should inherit.
+    try {
+      localStorage.removeItem(KEY)
+    } catch {
+      // Storage can be unavailable in private modes, and there is then nothing to clear
+    }
+    return sessionStorage
+  }
+  return localStorage
+}
+
 export function listDiscussions(username: string | null): DiscussionRecord[] {
   try {
-    const raw = localStorage.getItem(storageKey(username))
+    const raw = storageFor(username).getItem(storageKey(username))
     if (!raw) return []
     const parsed = JSON.parse(raw)
     return Array.isArray(parsed) ? (parsed as DiscussionRecord[]) : []
@@ -41,5 +55,5 @@ export function recordDiscussion(username: string | null, record: DiscussionReco
       existing.bill.type !== record.bill.type ||
       existing.bill.number !== record.bill.number,
   )
-  localStorage.setItem(storageKey(username), JSON.stringify([record, ...rest].slice(0, MAX_RECORDS)))
+  storageFor(username).setItem(storageKey(username), JSON.stringify([record, ...rest].slice(0, MAX_RECORDS)))
 }

@@ -1,4 +1,5 @@
-// Read browser profiles saved by earlier builds, which seed an empty account at sign-in.
+// Read browser profiles saved by earlier builds, which seed an empty account at sign-in when they
+// were already linked to it.
 
 import type { Profile, SocialProfile, DistrictSelection } from './types'
 
@@ -53,13 +54,6 @@ export function usernameError(username: string): string | null {
   return null
 }
 
-// Return the active local profile or null.
-export function currentProfile(): Profile | null {
-  const accounts = readAccounts()
-  const name = localStorage.getItem(SESSION_KEY)
-  return name && Object.hasOwn(accounts, name) ? accounts[name] : null
-}
-
 // Find the active or most recently updated local profile for the signed-in account.
 export function profileForUser(uid: string): Profile | null {
   const accounts = readAccounts()
@@ -72,12 +66,10 @@ export function profileForUser(uid: string): Profile | null {
     .sort((left, right) => (right.updated_at ?? '').localeCompare(left.updated_at ?? ''))[0] ?? null
 }
 
-// Return the browser profile to copy into a new account, preferring the one linked to it over the unlinked one in use.
+// Return the browser profile to copy into a new account, which is only ever one an earlier build
+// linked to this same account. An unlinked profile could belong to anyone who used the browser.
 export function legacyProfileFor(uid: string): Profile | null {
-  const linked = profileForUser(uid)
-  if (linked) return linked
-  const active = currentProfile()
-  return active && !active.firebase_uid ? active : null
+  return profileForUser(uid)
 }
 
 const NAME_PATTERN = /^[a-zA-Z0-9_.-]{3,80}$/
@@ -110,14 +102,24 @@ export function importablePreferences(profile: Profile): ProfileChanges {
   return preferences
 }
 
-// Delete browser copies that the account now holds, so the two cannot drift apart.
-export function forgetAccountProfiles(uid: string, imported?: Profile | null): void {
+// Keep only the browser profiles that pass the test, and drop the profile in use if it went.
+function keepProfiles(keep: (profile: Profile) => boolean): void {
   const accounts = readAccounts()
-  const kept = Object.fromEntries(Object.entries(accounts).filter(([name, profile]) =>
-    profile.firebase_uid !== uid && name !== imported?.username))
+  const kept = Object.fromEntries(Object.entries(accounts).filter(([, profile]) => keep(profile)))
   if (Object.keys(kept).length !== Object.keys(accounts).length) writeAccounts(kept)
   const active = localStorage.getItem(SESSION_KEY)
   if (active && !Object.hasOwn(kept, active)) localStorage.removeItem(SESSION_KEY)
+}
+
+// Delete every unlinked profile, which no screen shows and no account can import, so nothing a
+// signed-out visitor left behind lingers after the next sign-in.
+export function forgetUnlinkedProfiles(): void {
+  keepProfiles((profile) => Boolean(profile.firebase_uid))
+}
+
+// Delete the browser copies an account now holds, along with every unlinked profile.
+export function forgetAccountProfiles(uid: string): void {
+  keepProfiles((profile) => Boolean(profile.firebase_uid) && profile.firebase_uid !== uid)
 }
 
 function toProfile(account: Profile): Profile {

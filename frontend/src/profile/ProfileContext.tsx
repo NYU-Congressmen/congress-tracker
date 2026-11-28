@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import type { User } from '@firebase/auth'
 import { getAccountProfile, saveAccountProfile } from '../api/account'
 import { useSession } from '../auth/SessionContext'
-import { ProfileError, forgetAccountProfiles, importablePreferences, legacyProfileFor } from './store'
+import { ProfileError, forgetAccountProfiles, forgetUnlinkedProfiles, importablePreferences, legacyProfileFor } from './store'
 import type { ProfileChanges } from './store'
 import type { Profile } from './types'
 
@@ -56,15 +56,14 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
 
     async function restore(owner: NonNullable<typeof user>) {
       try {
+        forgetUnlinkedProfiles()
         let saved = await getAccountProfile(owner)
         const legacy = legacyProfileFor(owner.uid)
-        let imported: Profile | null = null
-        // Copy a browser profile from earlier builds once, into an account that has none.
+        // Copy this account's own browser profile from earlier builds once, into an account that has none.
         if (!saved.saved && legacy && active) {
           saved = await saveAccountProfile(owner, importablePreferences(legacy), true)
-          imported = legacy
         }
-        if (saved.saved) forgetAccountProfiles(owner.uid, imported)
+        if (saved.saved) forgetAccountProfiles(owner.uid)
         if (active && savedBeforeLoad === saves.current) {
           setAccount({ uid: owner.uid, profile: { ...saved, firebase_uid: owner.uid }, error: null })
         }
