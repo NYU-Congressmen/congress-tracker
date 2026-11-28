@@ -2005,3 +2005,63 @@ button.chip {
   margin: 0;
   padding-left: 18px;
 }
+
+/* AI highlights of a bill's shared stories and the words they use most */
+.highlights {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--note-bg);
+}
+
+.highlights__groups {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.highlights__groups dt {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.highlights__groups dd {
+  margin: 2px 0 0;
+}
+
+.highlights__themes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.word-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px 14px;
+  margin: 0;
+  padding: 8px 0;
+  list-style: none;
+  line-height: 1.2;
+}
+
+.word-cloud__word {
+  color: var(--ink-2);
+  font-weight: 700;
+}
+
+.word-cloud__word--1 { font-size: 13px; color: var(--ink-3); }
+.word-cloud__word--2 { font-size: 16px; }
+.word-cloud__word--3 { font-size: 20px; color: var(--ink); }
+.word-cloud__word--4 { font-size: 25px; color: var(--ink); font-weight: 800; }
+.word-cloud__word--5 { font-size: 31px; color: var(--link); font-weight: 800; }

@@ -66,6 +66,9 @@ function renderBill(user: User | null = null, routes: ApiRoute[] = []) {
   // More specific routes first: the mock matches by URL substring, so the
   // bare bill route would swallow the explanation, text and review calls.
   const fetchMock = mockApi([
+    { match: '/api/bills/119/hr/7/reviews/summary', body: {
+      story_count: 0, min_stories: 5, includes_sample: false, words: [], highlights: null, highlights_at: null,
+    } },
     ...routes,
     { match: '/api/bills/119/hr/7/explanation', body: EXPLANATION },
     { match: '/api/bills/119/hr/7/texts', body: [] },
