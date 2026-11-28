@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import type { User } from '@firebase/auth'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, expect, test, vi } from 'vitest'
@@ -39,4 +39,33 @@ test('shows no notice for a cleared review', async () => {
   renderPanel('cleared')
   expect(await screen.findByText('My clinic closed.')).toBeTruthy()
   expect(screen.queryByText(/Moderation pending|Held for review|Hidden after review/)).toBeNull()
+})
+
+test('keeps the contribution box private and saves a brief choice with the rest of the review', async () => {
+  const fetchMock = mockApi([{
+    match: '/api/bills/119/hr/1/review',
+    respond: (init) => init?.method === 'PUT'
+      ? { ...REVIEW, ...JSON.parse(String(init.body)), moderation_status: 'cleared' }
+      : { ...REVIEW, moderation_status: 'cleared' },
+  }])
+  const user = { uid: 'author', getIdToken: vi.fn().mockResolvedValue('verified-token') } as unknown as User
+  render(
+    <SessionContext.Provider value={{ user, loading: false, error: null, retry: () => {} }}>
+      <MemoryRouter><ReviewPanel congress={119} type="hr" number={1} /></MemoryRouter>
+    </SessionContext.Provider>,
+  )
+
+  expect(await screen.findByText('Only you can see this box')).toBeTruthy()
+  expect(screen.getByText('Your story appears in Shared reviews without your name, labeled with your district.')).toBeTruthy()
+  expect(screen.getByText(/do not count you in their Constituent Signal/)).toBeTruthy()
+  fireEvent.click(screen.getByRole('checkbox', { name: /Count me in my representatives/ }))
+
+  expect(await screen.findByText('Your choice is saved.')).toBeTruthy()
+  expect(screen.getByText(/see you only as part of a count/)).toBeTruthy()
+  expect(fetchMock).toHaveBeenCalledWith('/api/bills/119/hr/1/review', expect.objectContaining({
+    method: 'PUT',
+    body: JSON.stringify({
+      stance: 'oppose', story: 'My clinic closed.', action_taken: null, consent_to_share: true, share_publicly: true,
+    }),
+  }))
 })

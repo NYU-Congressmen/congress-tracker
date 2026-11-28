@@ -6,6 +6,7 @@ import type { BillType } from '../../api/bills'
 import { deleteCall, listCalls, saveCall, updateCallNote, type CallEntry } from '../../api/calls'
 import { ApiError } from '../../api/client'
 import { listMembers } from '../../api/members'
+import { getSignal } from '../../api/signal'
 import { useSession } from '../../auth/SessionContext'
 import { getAccountToken } from '../../auth/accountToken'
 import { useApi } from '../../hooks/useApi'
@@ -14,11 +15,14 @@ import { formatDateTime } from '../../lib/format'
 import { useProfile } from '../../profile/ProfileContext'
 import { ErrorState } from '../ui/ErrorState'
 import { LoadingState } from '../ui/LoadingState'
+import { SignalTally } from './SignalTally'
 
 interface CallLogProps {
   congress: number
   type: BillType
   number: number
+  // Changes when the reader's stance or brief choice changes, so the office counts reload
+  revision?: number
 }
 
 export function CallLog(props: CallLogProps) {
@@ -33,7 +37,7 @@ export function CallLog(props: CallLogProps) {
   )
 }
 
-function AccountCalls({ user, congress, type, number }: CallLogProps & { user: User }) {
+function AccountCalls({ user, congress, type, number, revision = 0 }: CallLogProps & { user: User }) {
   const { profile, loading: profileLoading } = useProfile()
   const district = profile?.district
   const state = district?.state ?? ''
@@ -46,6 +50,11 @@ function AccountCalls({ user, congress, type, number }: CallLogProps & { user: U
     async () => listCalls(congress, type, number, await getAccountToken(user)),
     [user, congress, type, number],
   )
+  const signal = useApi(
+    async () => getSignal(congress, type, number, await getAccountToken(user)),
+    [user, congress, type, number, revision],
+  )
+  const tallies = new Map((signal.data?.offices ?? []).map((office) => [office.bioguide_id, office]))
 
   const directory = (members.data?.data ?? []).filter((member) => member.state === state)
   const home = district ? representativesForDistrict(directory, state, district.district) : null
@@ -96,7 +105,11 @@ function AccountCalls({ user, congress, type, number }: CallLogProps & { user: U
         <ErrorState title="Offices could not be loaded" message={members.error.message} onRetry={members.refetch} />
       ) : offices.length ? (
         <>
-          <p className="muted">Opening a phone number saves an entry in your private call log.</p>
+          <p className="muted">
+            Opening a phone number saves an entry in your private call log. Each office also gets a weekly Constituent
+            Signal counting the constituents who included their review in the brief, shown here for the past seven days.
+            {signal.data?.includes_sample ? <span className="bill-stances__sample">Sample data</span> : null}
+          </p>
           <ul className="call-log__offices" aria-label="Your congressional offices">
             {offices.map((member) => {
               const phone = member.office_phone?.replace(/[^\d+]/g, '')
@@ -109,6 +122,13 @@ function AccountCalls({ user, congress, type, number }: CallLogProps & { user: U
                       {member.office_phone}
                     </a>
                   ) : <Link to={`/members/${member.bioguide_id}`}>Office details</Link>}
+                  {tallies.has(member.bioguide_id) ? (
+                    <span className="call-log__signal">
+                      <span className="call-log__signal-label">Constituent Signal</span>{' '}
+                      <SignalTally counts={tallies.get(member.bioguide_id)!} minimum={signal.data!.min_counted} />{' '}
+                      <Link to={`/members/${member.bioguide_id}#signal`} className="link-more">Public record</Link>
+                    </span>
+                  ) : null}
                 </li>
               )
             })}

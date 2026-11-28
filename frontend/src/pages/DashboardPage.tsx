@@ -223,7 +223,7 @@ export default function DashboardPage() {
           {/* The personal panels follow the signed-in person's district and
               topics; without a profile, one card invites them to set it up. */}
           {user ? (
-            <section className="card panel--stack" aria-label="Bills you track">
+            <section className="card panel--stack" id="tracked" aria-label="Bills you track">
               <TrackedBills />
             </section>
           ) : null}

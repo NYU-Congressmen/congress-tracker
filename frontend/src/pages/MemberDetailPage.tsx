@@ -3,6 +3,7 @@ import { getMember } from '../api/members'
 import { PageBand } from '../components/layout/PageBand'
 import { BillListItem } from '../components/bills/BillListItem'
 import { MemberAvatar } from '../components/members/MemberAvatar'
+import { MemberSignal } from '../components/members/MemberSignal'
 import { ChevronLeftIcon, ExternalLinkIcon } from '../components/icons'
 import { CacheNotice } from '../components/ui/CacheNotice'
 import { EmptyState } from '../components/ui/EmptyState'
@@ -115,6 +116,7 @@ export default function MemberDetailPage() {
 
       <div className="container page-body member-grid-page">
         <div className="member-grid-page__main">
+          <MemberSignal bioguideId={member.bioguide_id} />
           <section className="card panel--stack" aria-labelledby="sponsored-title">
             <div className="card__head">
               <h2 id="sponsored-title">Sponsored bills</h2>

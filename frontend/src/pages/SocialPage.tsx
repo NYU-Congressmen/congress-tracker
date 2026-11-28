@@ -443,7 +443,7 @@ function SocialContent({ linkedBill }: { linkedBill: string | null }) {
                   disabled={reviewBlocked}
                   onChange={(event) => setConsentToShare(event.target.checked)}
                 />
-                <span>Include this review in the Constituent Signal brief for my representative’s office.</span>
+                <span>Include this review in the Constituent Signal brief for my representatives’ offices. Pull also shows each office’s totals publicly on its member page once at least 5 constituents are counted, without names.</span>
               </label>
             ) : null}
 

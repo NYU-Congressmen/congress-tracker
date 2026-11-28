@@ -10,7 +10,6 @@ import { BillCosponsors } from '../components/bills/BillCosponsors'
 import { BillExplanation } from '../components/bills/BillExplanation'
 import { BillStances } from '../components/bills/BillStances'
 import { CallLog } from '../components/bills/CallLog'
-import { ConstituentSignal } from '../components/bills/ConstituentSignal'
 import { ReviewPanel } from '../components/bills/ReviewPanel'
 import { SharedReviews } from '../components/bills/SharedReviews'
 import { TrackButton } from '../components/bills/TrackButton'
@@ -269,8 +268,8 @@ export default function BillDetailPage() {
           setReviewRevision((value) => value + 1)
           setStanceRevision((value) => value + 1)
         }} />
-        <ConstituentSignal key={`signal-${bill.bill_id}`} bill={bill} revision={stanceRevision} />
-        <CallLog key={`calls-${bill.bill_id}`} congress={bill.congress} type={bill.type} number={bill.number} />
+        <CallLog key={`calls-${bill.bill_id}`} congress={bill.congress} type={bill.type} number={bill.number}
+          revision={stanceRevision} />
       </div>
     </div>
   )

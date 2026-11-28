@@ -130,6 +130,80 @@
   box-shadow: var(--shadow);
 }
 
+/* Recent bill updates at the top of the account menu */
+.site-updates {
+  display: grid;
+  gap: 6px;
+  width: min(22rem, calc(100vw - 48px));
+  padding: 10px 10px 12px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 4px;
+}
+
+.site-updates__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.site-updates__head h2 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.site-updates__list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.site-updates__list a {
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+  border-radius: 8px;
+  color: var(--ink-2);
+  text-decoration: none;
+  font-size: 13.5px;
+  line-height: 1.35;
+}
+
+.site-updates__list a:hover {
+  background: var(--note-bg);
+}
+
+.site-updates__list .is-unread a {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.site-updates__list .is-unread .site-updates__bill::after {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: var(--hl);
+  vertical-align: 1px;
+}
+
+.site-updates__bill {
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.site-updates__empty {
+  margin: 0;
+  font-size: 13.5px;
+}
+
 .site-profile__panel > .btn {
   justify-content: flex-start;
   border-color: transparent;
@@ -1421,9 +1495,31 @@ button.chip {
   border-top: 1px solid var(--line);
 }
 
-.call-log__offices li > span {
+.call-log__offices li > span:first-child {
   flex: 1 1 12ch;
   font-weight: 600;
+}
+
+/* The office's Constituent Signal sits on its own line under the name and phone number */
+.call-log__signal {
+  flex-basis: 100%;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+
+.call-log__signal-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.signal-tally strong {
+  color: var(--ink);
+}
+
+.signal-tally--withheld {
+  font-style: italic;
 }
 
 .call-log__history {
@@ -1772,4 +1868,93 @@ button.chip {
   margin: 2px 0 0;
   font-size: 20px;
   font-weight: 800;
+}
+
+/* An office's public Constituent Signal, one bill per row */
+.signal-bills {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.signal-bills li {
+  display: grid;
+  gap: 4px;
+  padding: 12px 0;
+}
+
+.signal-bills li + li {
+  border-top: 1px solid var(--line);
+}
+
+.signal-bills__bill {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-weight: 700;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.signal-bills__bill:hover span:last-child {
+  text-decoration: underline;
+}
+
+/* The reader's own contribution, set apart so it reads as private */
+.private-box {
+  background: var(--note-bg);
+  outline: 1px dashed var(--chip-border);
+  outline-offset: -6px;
+}
+
+.private-box__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.private-box__choices {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.private-box__choices legend {
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.private-box__others {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  font-size: 14px;
+}
+
+.private-box__others-title {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.private-box__others ul {
+  margin: 0;
+  padding-left: 18px;
 }

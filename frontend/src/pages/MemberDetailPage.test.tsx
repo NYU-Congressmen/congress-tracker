@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import MemberDetailPage from './MemberDetailPage'
@@ -22,8 +22,20 @@ const MEMBER = {
   cache: CACHE,
 }
 
+const SIGNAL = {
+  window_start: '2026-11-20T18:00:00Z', window_end: '2026-11-27T18:00:00Z', includes_sample: false, min_counted: 5,
+  bills: [{
+    bill_id: '119-s-3108', congress: 119, type: 's', number: 3108, title: 'AI-Related Job Impacts Clarity Act',
+    support: 13, oppose: 8, unsure: 1, calls: 2, withheld: false,
+  }],
+  withheld_bills: 2,
+}
+
 function renderPage(body: object) {
-  mockApi([{ match: '/api/members/H001072', body }])
+  mockApi([
+    { match: '/api/members/H001072/signal', body: SIGNAL },
+    { match: '/api/members/H001072', body },
+  ])
   return render(
     <MemoryRouter initialEntries={['/members/H001072']}>
       <Routes>
@@ -101,5 +113,13 @@ describe('MemberDetailPage', () => {
 
     expect(await screen.findByText('No office contact is on file for this member yet.')).toBeTruthy()
     expect(screen.queryByRole('link', { name: 'Official website' })).toBeNull()
+  })
+
+  test('shows the office\'s public Constituent Signal and how many bills fell below the minimum', async () => {
+    renderPage(MEMBER)
+    const section = await screen.findByRole('region', { name: 'Constituent Signal' })
+    expect(await within(section).findByText('AI-Related Job Impacts Clarity Act')).toBeTruthy()
+    expect(within(section).getByText('13')).toBeTruthy()
+    expect(within(section).getByText('2 more bills have fewer than 5 counted constituents.')).toBeTruthy()
   })
 })

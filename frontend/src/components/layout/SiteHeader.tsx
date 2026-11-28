@@ -4,12 +4,13 @@ import { NAV_ITEMS } from '../../lib/constants'
 import { CapitolIcon, ChevronRightIcon, PeopleIcon } from '../icons'
 import { ThemeToggle } from '../ui/ThemeToggle'
 import { useProfile } from '../../profile/ProfileContext'
-import { initialsOf } from '../../lib/format'
+import { billNumber, initialsOf } from '../../lib/format'
 import { districtHeading } from '../../lib/districts'
 import { useSession } from '../../auth/SessionContext'
 import { loadFirebaseAuth } from '../../auth/firebase'
 import { getAccountToken } from '../../auth/accountToken'
-import { listUpdates, UPDATES_CHANGED } from '../../api/tracking'
+import { listUpdates, markUpdatesRead, UPDATES_CHANGED } from '../../api/tracking'
+import type { UpdatePage } from '../../api/tracking'
 
 // Render the wordmark, primary links, account controls and theme switch.
 export function SiteHeader() {
@@ -55,20 +56,19 @@ export function SiteHeader() {
   )
 }
 
-// Open the signed-in profile and handle sign-out from the header.
-// Count the signed-in reader's unread bill updates and follow changes made on other screens.
-function useUnreadUpdates(): number {
+// Load the signed-in reader's recent bill updates and follow changes made on other screens.
+function useUpdates(): UpdatePage | null {
   const { user } = useSession()
-  const [unread, setUnread] = useState(0)
+  const [page, setPage] = useState<UpdatePage | null>(null)
   useEffect(() => {
     if (!user) return
     let active = true
     async function load() {
       try {
-        const page = await listUpdates(await getAccountToken(user!))
-        if (active) setUnread(page.unread)
+        const next = await listUpdates(await getAccountToken(user!))
+        if (active) setPage(next)
       } catch {
-        // The badge is a convenience, so a failed count leaves it hidden
+        // The updates are a convenience, so a failed load leaves the menu without them
       }
     }
     void load()
@@ -78,12 +78,15 @@ function useUnreadUpdates(): number {
       window.removeEventListener(UPDATES_CHANGED, load)
     }
   }, [user])
-  return user ? unread : 0
+  return user ? page : null
 }
 
+// Open the signed-in profile, recent bill updates and sign-out from the header.
 function ProfileMenu() {
   const { profile } = useProfile()
-  const unread = useUnreadUpdates()
+  const { user } = useSession()
+  const updates = useUpdates()
+  const unread = updates?.unread ?? 0
   const navigate = useNavigate()
   const disclosure = useRef<HTMLDetailsElement>(null)
   const summary = useRef<HTMLElement>(null)
@@ -98,6 +101,10 @@ function ProfileMenu() {
     document.addEventListener('pointerdown', dismiss)
     return () => document.removeEventListener('pointerdown', dismiss)
   }, [])
+
+  function close() {
+    if (disclosure.current) disclosure.current.open = false
+  }
 
   async function leave() {
     setBusy(true)
@@ -135,11 +142,32 @@ function ProfileMenu() {
         <ChevronRightIcon size={14} className="site-profile__arrow" />
       </summary>
       <div className="site-profile__panel">
-        <Link
-          to="/profile"
-          className="btn btn--ghost"
-          onClick={() => { if (disclosure.current) disclosure.current.open = false }}
-        >
+        <section className="site-updates" aria-labelledby="site-updates-title">
+          <div className="site-updates__head">
+            <h2 id="site-updates-title">Bill updates</h2>
+            {unread && user ? (
+              <button type="button" className="link-more" onClick={() => void (async () => {
+                await markUpdatesRead(await getAccountToken(user))
+              })()}>Mark all read</button>
+            ) : null}
+          </div>
+          {updates?.data.length ? (
+            <ul className="site-updates__list">
+              {updates.data.slice(0, 5).map((update) => (
+                <li key={update.notification_id} className={update.is_read ? undefined : 'is-unread'}>
+                  <Link to={`/bills/${update.congress}/${update.type}/${update.number}`} onClick={close}>
+                    <span className="site-updates__bill">{billNumber(update.type, update.number)}</span>
+                    <span className="site-updates__message">{update.message}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="muted site-updates__empty">Track a bill to get its new official actions here.</p>
+          )}
+          <Link to="/#tracked" className="link-more" onClick={close}>All bills you track</Link>
+        </section>
+        <Link to="/profile" className="btn btn--ghost" onClick={close}>
           Edit profile
         </Link>
         <button type="button" className="btn btn--ghost" disabled={busy} onClick={() => void leave()}>Sign out</button>
