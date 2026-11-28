@@ -115,9 +115,11 @@ def record_not_found(bill_id: str) -> None:
 def refresh_bill(client: CongressClient, congress: int, bill_type: str, number: int) -> str:
     """Fetch a bill's detail and actions from Congress.gov, cache them and return its bill_id."""
     path = f"/bill/{congress}/{bill_type}/{number}"
-    detail = client.get(path)["bill"]
-    actions = list(client.paginate(f"{path}/actions", "actions"))
-    versions = client.get(f"{path}/text").get("textVersions", [])
+    detail_response, actions, text_response = client.get_parallel(
+        (path, None), (f"{path}/actions", "actions"), (f"{path}/text", None)
+    )
+    detail = detail_response["bill"]
+    versions = text_response.get("textVersions", [])
 
     row = clean_bill(detail)
     row["policy_area"] = (detail.get("policyArea") or {}).get("name")

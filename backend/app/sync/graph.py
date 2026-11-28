@@ -132,9 +132,11 @@ def refresh_graph(client: CongressClient, congress: int, bill_type: str, number:
     """Fetch a bill's cosponsors, committees and related bills and replace the stored edges."""
     path = f"/bill/{congress}/{bill_type}/{number}"
     bill_id = make_bill_id(congress, bill_type, number)
-    cosponsors = list(client.paginate(f"{path}/cosponsors", "cosponsors"))
-    committees = list(client.paginate(f"{path}/committees", "committees"))
-    related = list(client.paginate(f"{path}/relatedbills", "relatedBills"))
+    cosponsors, committees, related = client.get_parallel(
+        (f"{path}/cosponsors", "cosponsors"),
+        (f"{path}/committees", "committees"),
+        (f"{path}/relatedbills", "relatedBills"),
+    )
 
     # Every upstream call finishes before the transaction, so a failure keeps the old edges
     cosponsor_rows = {c["bioguideId"]: clean_cosponsor(bill_id, c) for c in cosponsors}
