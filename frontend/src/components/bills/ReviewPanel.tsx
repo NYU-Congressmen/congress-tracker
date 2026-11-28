@@ -2,8 +2,9 @@ import type { User } from '@firebase/auth'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { BillType } from '../../api/bills'
-import { getReview, saveReview, saveStance, setReviewHidden, STANCE_LABELS, STANCES } from '../../api/reviews'
-import type { ModerationStatus, Review, Stance } from '../../api/reviews'
+import { getReview, saveReviewSharingChoice, saveStance, setReviewHidden, STANCE_LABELS, STANCES } from '../../api/reviews'
+import type { ModerationStatus, Review, ReviewSharingField, Stance } from '../../api/reviews'
+import type { OwnReviewInSignal } from '../../api/signal'
 import { useSession } from '../../auth/SessionContext'
 import { getAccountToken } from '../../auth/accountToken'
 import { useApi } from '../../hooks/useApi'
@@ -22,11 +23,9 @@ interface ReviewPanelProps {
   congress: number
   type: BillType
   number: number
+  signalStatus?: OwnReviewInSignal
   onStanceSaved?: () => void
 }
-
-// A review counts in the brief for seven days after it is saved, as the office pages show.
-const SIGNAL_WINDOW_MS = 7 * 24 * 60 * 60 * 1000
 
 // Say in plain terms what other readers and offices can see of this review.
 function whatOthersSee(review: Review): string[] {
@@ -41,7 +40,7 @@ function whatOthersSee(review: Review): string[] {
         : 'No one else sees your story.'
       : 'You have not written a story.',
     review.consent_to_share
-      ? 'Your representatives\' offices see you only as part of a count, and their public pages show the totals.'
+      ? 'You opted in to the Constituent Signal. Public member pages show aggregate totals.'
       : 'Your representatives\' offices do not count you in their Constituent Signal.',
   ]
 }
@@ -61,7 +60,7 @@ export function ReviewPanel(props: ReviewPanelProps) {
   )
 }
 
-function AccountReview({ congress, type, number, user, onStanceSaved }: ReviewPanelProps & { user: User }) {
+function AccountReview({ congress, type, number, signalStatus, user, onStanceSaved }: ReviewPanelProps & { user: User }) {
   const { data, loading, error } = useApi(
     async () => getReview(congress, type, number, await getAccountToken(user)),
     [congress, type, number, user],
@@ -70,8 +69,6 @@ function AccountReview({ congress, type, number, user, onStanceSaved }: ReviewPa
   const [saving, setSaving] = useState(false)
   const [status, setStatus] = useState('')
   const [saveError, setSaveError] = useState('')
-  // The time the box opened, which is close enough for a seven-day window
-  const [openedAt] = useState(() => Date.now())
   const review = saved ?? data
   const discussionPath = `/social?bill=${congress}-${type}-${number}#bill-review`
 
@@ -98,15 +95,10 @@ function AccountReview({ congress, type, number, user, onStanceSaved }: ReviewPa
     )
   }
 
-  // Saving replaces the whole review, so every other field goes back as it was loaded.
-  async function setChoice(field: 'share_publicly' | 'consent_to_share', value: boolean) {
+  async function setChoice(field: ReviewSharingField, value: boolean) {
     if (!review || saving) return
-    const next = {
-      stance: review.stance, story: review.story ?? null, action_taken: review.action_taken ?? null,
-      consent_to_share: review.consent_to_share, share_publicly: review.share_publicly ?? false, [field]: value,
-    }
     await run(
-      async () => saveReview(congress, type, number, next, await getAccountToken(user)),
+      async () => saveReviewSharingChoice(congress, type, number, field, value, await getAccountToken(user)),
       'Your choice is saved.', 'Your choice could not be saved.',
     )
   }
@@ -117,9 +109,6 @@ function AccountReview({ congress, type, number, user, onStanceSaved }: ReviewPa
       'Your review is back in Shared reviews and the stance totals.', 'Your review could not be shown again.',
     )
   }
-
-  const counted = review && review.consent_to_share && !review.hidden && review.moderation_status === 'cleared'
-    && openedAt - new Date(review.updated_at).getTime() < SIGNAL_WINDOW_MS
 
   return (
     <section className="panel panel--stack private-box" aria-labelledby="your-contribution">
@@ -179,9 +168,11 @@ function AccountReview({ congress, type, number, user, onStanceSaved }: ReviewPa
                   <span>Count me in my representatives' Constituent Signal</span>
                 </label>
               </fieldset>
-              <p className="muted review__meta">
-                {counted ? 'You are counted in this week\'s Constituent Signal.' : 'You are not counted in this week\'s Constituent Signal.'}
-              </p>
+              {signalStatus ? (
+                <p className="muted review__meta">
+                  {signalStatus === 'included' ? 'You are counted in this week\'s Constituent Signal.' : 'You are not counted in this week\'s Constituent Signal.'}
+                </p>
+              ) : null}
               <div className="private-box__others">
                 <span className="private-box__others-title">What others see</span>
                 <ul>{whatOthersSee(review).map((line) => <li key={line}>{line}</li>)}</ul>

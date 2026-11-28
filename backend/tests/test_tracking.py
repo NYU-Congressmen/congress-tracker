@@ -98,3 +98,17 @@ def test_notifications_need_sign_in(db):
     plain = TestClient(app)
     assert plain.get("/api/account/notifications").status_code == 401
     assert plain.put(TRACK).status_code == 401
+
+
+def test_a_second_writer_waits_for_the_first_notification(client):
+    client.put(TRACK)
+    sql("UPDATE tracked_bills SET followed_at = '2026-01-04 15:00+00'")
+    with psycopg.connect(TEST_DATABASE_URL) as first:
+        assert notify_tracked_updates(first) == 1
+        with pytest.raises(psycopg.errors.LockNotAvailable):
+            with psycopg.connect(TEST_DATABASE_URL) as second:
+                second.execute("SET LOCAL lock_timeout = '250ms'")
+                notify_tracked_updates(second)
+
+    assert notify() == 0
+    assert sql("SELECT count(*) FROM notifications") == [(1,)]

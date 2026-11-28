@@ -258,6 +258,13 @@ class ReviewIn(BaseModel):
         return value if value and value.strip() else None
 
 
+class ReviewSharingChoice(BaseModel):
+    """Describe a change to one of the author's sharing settings."""
+
+    field: Literal["consent_to_share", "share_publicly"]
+    value: bool
+
+
 class Review(ReviewIn):
     """Describe a saved review of one bill by the signed-in user."""
 

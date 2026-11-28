@@ -6,7 +6,16 @@ from psycopg import Connection
 from app.ai.moderation import moderate_review
 from app.auth import current_uid, optional_uid
 from app.db import connect, fetch_all, fetch_one
-from app.models import BillType, ReportIn, Review, ReviewIn, ReviewPage, ReviewVisibility, Stance
+from app.models import (
+    BillType,
+    ReportIn,
+    Review,
+    ReviewIn,
+    ReviewPage,
+    ReviewSharingChoice,
+    ReviewVisibility,
+    Stance,
+)
 from app.sample_data import EXCLUDE_SAMPLE_REVIEWS_SQL, sees_sample_data
 from app.sync.bills import make_bill_id
 
@@ -114,6 +123,28 @@ def get_review(congress: int, bill_type: BillType, number: int, uid: Uid) -> dic
     row = fetch_one(
         f"SELECT {REVIEW_COLUMNS} FROM reviews WHERE uid = %s AND bill_id = %s",
         (uid, make_bill_id(congress, bill_type, number)),
+    )
+    if row is None:
+        raise HTTPException(404, "You have not reviewed this bill")
+    return row
+
+
+@router.patch("/bills/{congress}/{bill_type}/{number}/review/sharing", response_model=Review)
+def set_sharing_choice(
+    congress: int, bill_type: BillType, number: int, choice: ReviewSharingChoice, uid: Uid
+) -> dict[str, Any]:
+    """Update one sharing choice in the signed-in author's review and return the saved review."""
+    # The field name comes from the model's two permitted column names.
+    field = choice.field
+    row = fetch_one(
+        f"""
+        UPDATE reviews
+        SET {field} = %(value)s,
+            updated_at = CASE WHEN {field} IS DISTINCT FROM %(value)s THEN now() ELSE updated_at END
+        WHERE uid = %(uid)s AND bill_id = %(bill_id)s
+        RETURNING {REVIEW_COLUMNS}
+        """,
+        {"value": choice.value, "uid": uid, "bill_id": make_bill_id(congress, bill_type, number)},
     )
     if row is None:
         raise HTTPException(404, "You have not reviewed this bill")

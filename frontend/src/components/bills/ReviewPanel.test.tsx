@@ -14,13 +14,16 @@ const REVIEW = {
   created_at: '2026-11-20T12:00:00Z', updated_at: '2026-11-20T12:00:00Z',
 }
 
-function renderPanel(moderationStatus: string) {
-  mockApi([{ match: '/api/bills/119/hr/1/review', body: { ...REVIEW, moderation_status: moderationStatus } }])
+function renderPanel(moderationStatus: string, signalStatus?: 'included' | 'not_included') {
+  mockApi([{ match: '/api/bills/119/hr/1/review', body: {
+    ...REVIEW, moderation_status: moderationStatus, consent_to_share: signalStatus !== undefined,
+    updated_at: new Date().toISOString(),
+  } }])
   const user = { uid: 'author', getIdToken: vi.fn().mockResolvedValue('verified-token') } as unknown as User
   render(
     <SessionContext.Provider value={{ user, loading: false, error: null, retry: () => {} }}>
       <MemoryRouter>
-        <ReviewPanel congress={119} type="hr" number={1} />
+        <ReviewPanel congress={119} type="hr" number={1} signalStatus={signalStatus} />
       </MemoryRouter>
     </SessionContext.Provider>,
   )
@@ -41,11 +44,11 @@ test('shows no notice for a cleared review', async () => {
   expect(screen.queryByText(/Moderation pending|Held for review|Hidden after review/)).toBeNull()
 })
 
-test('keeps the contribution box private and saves a brief choice with the rest of the review', async () => {
+test('saves just the selected sharing choice and displays the latest review', async () => {
   const fetchMock = mockApi([{
     match: '/api/bills/119/hr/1/review',
-    respond: (init) => init?.method === 'PUT'
-      ? { ...REVIEW, ...JSON.parse(String(init.body)), moderation_status: 'cleared' }
+    respond: (init) => init?.method === 'PATCH'
+      ? { ...REVIEW, story: 'An edit from another tab.', consent_to_share: true, moderation_status: 'cleared' }
       : { ...REVIEW, moderation_status: 'cleared' },
   }])
   const user = { uid: 'author', getIdToken: vi.fn().mockResolvedValue('verified-token') } as unknown as User
@@ -61,11 +64,15 @@ test('keeps the contribution box private and saves a brief choice with the rest 
   fireEvent.click(screen.getByRole('checkbox', { name: /Count me in my representatives/ }))
 
   expect(await screen.findByText('Your choice is saved.')).toBeTruthy()
-  expect(screen.getByText(/see you only as part of a count/)).toBeTruthy()
-  expect(fetchMock).toHaveBeenCalledWith('/api/bills/119/hr/1/review', expect.objectContaining({
-    method: 'PUT',
-    body: JSON.stringify({
-      stance: 'oppose', story: 'My clinic closed.', action_taken: null, consent_to_share: true, share_publicly: true,
-    }),
+  expect(screen.getByText('An edit from another tab.')).toBeTruthy()
+  expect(fetchMock).toHaveBeenCalledWith('/api/bills/119/hr/1/review/sharing', expect.objectContaining({
+    method: 'PATCH',
+    body: JSON.stringify({ field: 'consent_to_share', value: true }),
   }))
+})
+
+test('uses the server status when an opted-in review is ineligible', async () => {
+  renderPanel('cleared', 'not_included')
+  expect(await screen.findByText(/You are not counted in this week/)).toBeTruthy()
+  expect(screen.queryByText(/You are counted in this week/)).toBeNull()
 })

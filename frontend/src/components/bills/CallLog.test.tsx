@@ -2,6 +2,7 @@ import type { User } from '@firebase/auth'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, expect, test, vi } from 'vitest'
+import type { SignalPage } from '../../api/signal'
 import { SessionContext } from '../../auth/SessionContext'
 import { CallLog } from './CallLog'
 
@@ -88,19 +89,17 @@ test('logs the phone link, retries the same entry and adds a note later', async 
 })
 
 test('shows each office\'s Constituent Signal and withholds a small count', async () => {
+  const signal: SignalPage = {
+    window_start: '2026-11-20T18:00:00Z', window_end: '2026-11-27T18:00:00Z', includes_sample: true,
+    min_counted: 5, your_review: 'included',
+    offices: [
+      { bioguide_id: 'R000001', name: 'District office', party: 'D', chamber: 'House', state: 'NY', district: 12,
+        support: 13, oppose: 8, unsure: 1, calls: 2, withheld: false },
+      { bioguide_id: 'S000001', name: 'State office', party: 'D', chamber: 'Senate', state: 'NY', district: null,
+        support: null, oppose: null, unsure: null, calls: null, withheld: true },
+    ],
+  }
   vi.stubGlobal('fetch', vi.fn(async (url: string) => {
-    if (url.includes('/signal')) {
-      return Response.json({
-        window_start: '2026-11-20T18:00:00Z', window_end: '2026-11-27T18:00:00Z', includes_sample: true,
-        min_counted: 5, your_review: 'included',
-        offices: [
-          { bioguide_id: 'R000001', name: 'District office', party: 'D', chamber: 'House', state: 'NY', district: 12,
-            support: 13, oppose: 8, unsure: 1, calls: 2, withheld: false },
-          { bioguide_id: 'S000001', name: 'State office', party: 'D', chamber: 'Senate', state: 'NY', district: null,
-            support: null, oppose: null, unsure: null, calls: null, withheld: true },
-        ],
-      })
-    }
     if (url.includes('/members')) {
       return Response.json({
         data: [
@@ -115,7 +114,7 @@ test('shows each office\'s Constituent Signal and withholds a small count', asyn
   render(
     <MemoryRouter>
       <SessionContext.Provider value={{ user, loading: false, error: null, retry: () => {} }}>
-        <CallLog congress={119} type="hr" number={7} />
+        <CallLog congress={119} type="hr" number={7} signal={signal} />
       </SessionContext.Provider>
     </MemoryRouter>,
   )

@@ -5,8 +5,8 @@ from typing import Any
 import psycopg
 
 # One notification per tracker for each latest action recorded after they started tracking.
-# The message carries the action's date and text, so a rerun or a second refresh of the same
-# action finds the existing row and adds nothing.
+# The message identifies the action by date and text. The unique index handles overlapping
+# writes, and the existing-row check avoids reserving new IDs on routine sync runs.
 NOTIFY_SQL = """
     INSERT INTO notifications (uid, bill_id, type, message)
     SELECT t.uid, b.bill_id, 'latest_action', m.message
@@ -24,6 +24,8 @@ NOTIFY_SQL = """
           WHERE n.uid = t.uid AND n.bill_id = b.bill_id
             AND n.type = 'latest_action' AND n.message = m.message
       )
+    ON CONFLICT (uid, bill_id, md5(message)) WHERE type = 'latest_action' AND bill_id IS NOT NULL
+    DO NOTHING
 """
 
 

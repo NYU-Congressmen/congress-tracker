@@ -5,6 +5,7 @@ import type { BillType } from './bills'
 
 export type Stance = 'support' | 'oppose' | 'unsure'
 export type ModerationStatus = 'pending' | 'flagged' | 'held' | 'cleared'
+export type ReviewSharingField = 'consent_to_share' | 'share_publicly'
 
 export const STANCES: readonly Stance[] = ['support', 'oppose', 'unsure']
 
@@ -86,6 +87,16 @@ export function saveStance(
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ stance }),
+  })
+}
+
+export function saveReviewSharingChoice(
+  congress: number, type: BillType, number: number, field: ReviewSharingField, value: boolean, token: string,
+): Promise<Review> {
+  return request<Review>(`/api/bills/${congress}/${type}/${number}/review/sharing`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ field, value }),
   })
 }
 

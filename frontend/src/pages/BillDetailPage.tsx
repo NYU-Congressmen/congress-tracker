@@ -3,6 +3,9 @@ import { Link, useParams } from 'react-router-dom'
 import { ApiError } from '../api/client'
 import { BILL_STATUSES, BILL_TYPES, getBill } from '../api/bills'
 import type { BillDetail, BillType } from '../api/bills'
+import { getSignal } from '../api/signal'
+import { getAccountToken } from '../auth/accountToken'
+import { useSession } from '../auth/SessionContext'
 import { PageBand } from '../components/layout/PageBand'
 import { ActionTimeline } from '../components/bills/ActionTimeline'
 import { BillDiff } from '../components/bills/BillDiff'
@@ -72,6 +75,7 @@ function CopyLinkButton() {
 }
 
 export default function BillDetailPage() {
+  const { user } = useSession()
   const [stanceRevision, setStanceRevision] = useState(0)
   // Hiding a review from the shared list reloads the author's own panel.
   const [reviewRevision, setReviewRevision] = useState(0)
@@ -91,6 +95,18 @@ export default function BillDetailPage() {
         : Promise.reject(new ApiError('This bill does not exist in the tracker.', 404)),
     [congressParam, typeParam, numberParam],
   )
+  const billId = bill?.bill_id
+  const { data: signalResult, error: signalError, refetch: refreshSignal } = useApi(
+    async () => user && bill
+      ? {
+        user, billId, stanceRevision,
+        signal: await getSignal(bill.congress, bill.type, bill.number, await getAccountToken(user)),
+      }
+      : null,
+    [user, billId, stanceRevision],
+  )
+  const signal = !signalError && signalResult?.user === user && signalResult?.billId === billId
+    && signalResult?.stanceRevision === stanceRevision ? signalResult.signal : undefined
 
   if (error) {
     const notFound = error.status === 404
@@ -262,14 +278,14 @@ export default function BillDetailPage() {
         <BillDiff key={`diff-${bill.bill_id}`} congress={bill.congress} type={bill.type} number={bill.number} />
 
         <ReviewPanel key={`review-${bill.bill_id}-${reviewRevision}`} congress={bill.congress} type={bill.type} number={bill.number}
-          onStanceSaved={() => setStanceRevision((value) => value + 1)} />
+          signalStatus={signal?.your_review} onStanceSaved={() => setStanceRevision((value) => value + 1)} />
         <BillStances key={`stances-${bill.bill_id}`} bill={bill} revision={stanceRevision} />
         <SharedReviews key={`shared-${bill.bill_id}`} bill={bill} revision={stanceRevision} onVisibilityChange={() => {
           setReviewRevision((value) => value + 1)
           setStanceRevision((value) => value + 1)
         }} />
         <CallLog key={`calls-${bill.bill_id}`} congress={bill.congress} type={bill.type} number={bill.number}
-          revision={stanceRevision} />
+          signal={signal} onCallsChanged={refreshSignal} />
       </div>
     </div>
   )
