@@ -132,7 +132,8 @@ function ProfileMenu() {
   }
 
   return (
-    <details className="site-profile" ref={disclosure} onToggle={placePanel} onKeyDown={(event) => {
+    <details className={`site-profile${shift ? ' site-profile--shifted' : ''}`} ref={disclosure} onToggle={placePanel}
+      onKeyDown={(event) => {
       if (event.key === 'Escape' && event.currentTarget.open) {
         event.currentTarget.open = false
         summary.current?.focus()
