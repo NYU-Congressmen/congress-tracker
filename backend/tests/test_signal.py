@@ -57,6 +57,25 @@ def client(db):
             ('maya', '119-hr-1', 'support', false, now() - interval '1 day')
         """
     )
+    # Four more district supporters lift the House office past the minimum for public counts
+    for index in range(4):
+        sql(
+            "INSERT INTO users (uid, phone, state, district) VALUES (%s, %s, 'NY', 12)",
+            (f"extra-{index}", f"+1555000040{index}"),
+        )
+        sql(
+            "INSERT INTO reviews (uid, bill_id, stance, consent_to_share, updated_at) "
+            "VALUES (%s, '119-hr-1', 'support', true, now() - interval '1 day')",
+            (f"extra-{index}",),
+        )
+    sql(
+        "INSERT INTO bills (bill_id, congress, type, number, title) "
+        "VALUES ('119-hr-2', 119, 'hr', 2, 'Quiet Act')"
+    )
+    sql(
+        "INSERT INTO reviews (uid, bill_id, stance, consent_to_share, updated_at) "
+        "VALUES ('reader', '119-hr-2', 'oppose', true, now() - interval '1 day')"
+    )
     sql("UPDATE reviews SET moderation_status = 'cleared'")
     sql(
         "INSERT INTO actions (uid, bill_id, bioguide_id, action_type, created_at) "
@@ -67,7 +86,7 @@ def client(db):
     app.dependency_overrides.clear()
 
 
-def counts(page: dict) -> dict[str, tuple[int, int, int, int]]:
+def counts(offices: list[dict]) -> dict[str, tuple]:
     return {
         office["bioguide_id"]: (
             office["support"],
@@ -75,7 +94,7 @@ def counts(page: dict) -> dict[str, tuple[int, int, int, int]]:
             office["unsure"],
             office["calls"],
         )
-        for office in page["offices"]
+        for office in offices
     }
 
 
@@ -88,12 +107,22 @@ def test_each_office_gets_its_constituents_from_the_past_week(client):
         "S000002",
     ]
     # The House office counts its district, and the senators count the whole state
-    assert counts(page) == {
-        "H000012": (1, 1, 0, 1),
-        "S000001": (2, 1, 0, 0),
-        "S000002": (2, 1, 0, 0),
+    assert counts(page["offices"]) == {
+        "H000012": (5, 1, 0, 1),
+        "S000001": (6, 1, 0, 0),
+        "S000002": (6, 1, 0, 0),
     }
-    assert (page["your_review"], page["includes_sample"]) == ("included", False)
+    assert (page["your_review"], page["includes_sample"], page["min_counted"]) == (
+        "included",
+        False,
+        5,
+    )
+
+
+def test_small_counts_are_withheld(client):
+    page = client.get("/api/bills/119/hr/2/signal").json()
+    assert {office["withheld"] for office in page["offices"]} == {True}
+    assert counts(page["offices"])["H000012"] == (None, None, None, None)
 
 
 def test_sample_activity_counts_only_for_a_sample_account(client):
@@ -101,7 +130,7 @@ def test_sample_activity_counts_only_for_a_sample_account(client):
     page = client.get(URL).json()
 
     assert page["includes_sample"] is True
-    assert counts(page)["H000012"] == (1, 1, 1, 1)
+    assert counts(page["offices"])["H000012"] == (5, 1, 1, 1)
     assert page["your_review"] == "not_consented"
 
 
@@ -116,3 +145,13 @@ def test_readers_without_a_review_or_district(client):
 
 def test_signal_needs_sign_in(db):
     assert TestClient(app).get(URL).status_code == 401
+
+
+def test_a_members_public_signal_lists_bills_past_the_minimum(client):
+    app.dependency_overrides.clear()
+    visitor = TestClient(app).get("/api/members/H000012/signal").json()
+    assert [(bill["bill_id"], bill["support"], bill["oppose"]) for bill in visitor["bills"]] == [
+        ("119-hr-1", 5, 1)
+    ]
+    assert (visitor["withheld_bills"], visitor["includes_sample"]) == (1, False)
+    assert TestClient(app).get("/api/members/X000000/signal").status_code == 404

@@ -28,9 +28,10 @@ SYSTEM_PROMPT = (
 COUNTS = "support_count", "oppose_count", "unsure_count", "action_count"
 
 # A null district is an at-large seat only when the account also has a state. The window is
-# a half-open range of timestamps, so the weekly command and the bill page's rolling seven days
-# share the query. Sample accounts count only when the caller asks for them, so a draft meant
-# for a real office never includes demo data.
+# a half-open range of timestamps, so the weekly command and the pages' rolling seven days
+# share the query, and a null bill_id covers every bill for the member pages. Sample accounts
+# count only when the caller asks for them, so a draft meant for a real office never includes
+# demo data.
 BRIEF_INPUTS = """
     WITH eligible AS (
         SELECT r.uid, r.bill_id, r.stance, m.bioguide_id
@@ -38,7 +39,7 @@ BRIEF_INPUTS = """
         JOIN members m ON m.state = u.state AND m.is_current
           AND (m.chamber = 'Senate' OR
                (m.chamber = 'House' AND m.district IS NOT DISTINCT FROM u.district))
-        WHERE r.bill_id = %(bill_id)s AND r.consent_to_share
+        WHERE (%(bill_id)s::text IS NULL OR r.bill_id = %(bill_id)s) AND r.consent_to_share
           AND r.updated_at >= %(starts)s AND r.updated_at < %(ends)s
           AND (%(include_sample)s OR NOT u.is_sample)
           AND (%(offices)s::text[] IS NULL OR m.bioguide_id = ANY(%(offices)s))
@@ -48,20 +49,21 @@ BRIEF_INPUTS = """
                 AND sent.week_start = %(week_start)s AND sent.sent_at IS NOT NULL
           )
     ), calls AS (
-        SELECT e.bioguide_id, count(*) AS total
+        SELECT e.bioguide_id, e.bill_id, count(*) AS total
         FROM eligible e JOIN actions a USING (uid, bill_id, bioguide_id)
         WHERE a.action_type = 'call' AND a.created_at >= %(starts)s AND a.created_at < %(ends)s
-        GROUP BY e.bioguide_id
+        GROUP BY e.bioguide_id, e.bill_id
     )
-    SELECT e.bioguide_id, b.title, m.name AS member_name,
+    SELECT e.bioguide_id, e.bill_id, b.congress, b.type, b.number, b.title,
+           m.name AS member_name,
            count(*) FILTER (WHERE e.stance = 'support') AS support_count,
            count(*) FILTER (WHERE e.stance = 'oppose') AS oppose_count,
            count(*) FILTER (WHERE e.stance = 'unsure') AS unsure_count,
            coalesce(c.total, 0) AS action_count
     FROM eligible e JOIN bills b USING (bill_id) JOIN members m USING (bioguide_id)
-    LEFT JOIN calls c USING (bioguide_id)
-    GROUP BY e.bioguide_id, b.title, m.name, c.total
-    ORDER BY e.bioguide_id
+    LEFT JOIN calls c USING (bioguide_id, bill_id)
+    GROUP BY e.bioguide_id, e.bill_id, b.congress, b.type, b.number, b.title, m.name, c.total
+    ORDER BY e.bioguide_id, e.bill_id
 """
 
 EASTERN = ZoneInfo("America/New_York")

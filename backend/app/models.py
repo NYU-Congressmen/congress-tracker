@@ -518,8 +518,18 @@ class NotificationsReadIn(BaseModel):
     bill_id: str | None = None
 
 
-class SignalOffice(BaseModel):
-    """Describe one office's Constituent Signal counts for a bill."""
+class SignalCounts(BaseModel):
+    """Hold one office's counts for a bill, which are null when too few constituents are counted."""
+
+    support: int | None
+    oppose: int | None
+    unsure: int | None
+    calls: int | None
+    withheld: bool
+
+
+class SignalOffice(SignalCounts):
+    """Describe one of the reader's offices and its Constituent Signal counts for a bill."""
 
     bioguide_id: str
     name: str
@@ -527,18 +537,37 @@ class SignalOffice(BaseModel):
     chamber: str | None
     state: str | None
     district: int | None
-    support: int
-    oppose: int
-    unsure: int
-    calls: int
 
 
 class SignalPage(BaseModel):
-    """Describe the Constituent Signal the reader's offices would get for a bill this week."""
+    """Describe the Constituent Signal the reader's offices get for a bill this week."""
 
     window_start: datetime
     window_end: datetime
     includes_sample: bool
+    min_counted: int
     # Whether the reader's own review counts: none, not_consented, not_included or included
     your_review: Literal["none", "not_consented", "not_included", "included"]
     offices: list[SignalOffice]
+
+
+class SignalBill(SignalCounts):
+    """Describe one bill in an office's public Constituent Signal."""
+
+    bill_id: str
+    congress: int
+    type: BillType
+    number: int
+    title: str
+
+
+class MemberSignal(BaseModel):
+    """Describe the Constituent Signal one office received over the past week."""
+
+    window_start: datetime
+    window_end: datetime
+    includes_sample: bool
+    min_counted: int
+    bills: list[SignalBill]
+    # Bills with too few counted constituents to show their counts
+    withheld_bills: int
